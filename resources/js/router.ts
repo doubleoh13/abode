@@ -5,6 +5,7 @@ import AppShell from './layouts/AppShell.vue';
 import CommoditiesPage from './pages/CommoditiesPage.vue';
 import FinancesPage from './pages/FinancesPage.vue';
 import HomePage from './pages/HomePage.vue';
+import InstitutionsPage from './pages/InstitutionsPage.vue';
 import LoginPage from './pages/LoginPage.vue';
 import NotFoundPage from './pages/NotFoundPage.vue';
 
@@ -30,6 +31,11 @@ export const router = createRouter({
                             path: 'commodities',
                             name: 'finances.commodities',
                             component: CommoditiesPage,
+                        },
+                        {
+                            path: 'institutions',
+                            name: 'finances.institutions',
+                            component: InstitutionsPage,
                         },
                     ],
                 },

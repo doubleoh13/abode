@@ -84,6 +84,7 @@ async function endSession(): Promise<void> {
                             v-for="subItem in [
                                 { name: 'finances.accounts', label: 'Accounts' },
                                 { name: 'finances.commodities', label: 'Commodities' },
+                                { name: 'finances.institutions', label: 'Institutions' },
                             ]"
                             :key="subItem.name"
                             :to="{ name: subItem.name }"
