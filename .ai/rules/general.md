@@ -5,12 +5,9 @@ paths:
 
 # General
 
-## Project ground rules: narrow scope, no filler, personal-only
-This is a personal side project for Jake — never SaaS, never multi-user. Config belongs in code; no administrative UI, ever.
-Implement exactly the requested scope; do not anticipate related features.
-No filler text anywhere (UI included): no placeholder data, developer assurances, or reminders in finished work — placeholder data only when explicitly requested for visual review.
-Comments only for what code cannot express; no restating the code or narrating decisions. Names must be full and intent-revealing, never abbreviated.
+## Ground rules live in .ai/guidelines/abode.md
+The project ground rules (narrow scope, no filler, comments, naming, personal-only, conventions-first, dependency policy) are maintained in .ai/guidelines/abode.md, which Boost compiles into CLAUDE.md so they load in every session. Edit them there, not here.
 
-## Laravel conventions first; dependencies must earn their weight
-Stay true to Laravel conventions unless a deviation genuinely makes things better.
-Composer/npm packages are welcome suggestions but must earn their weight: adopt a package only if it serves how this project already wants to operate — never bend the project's approach to fit a package.
+## Development environment: everything flows from migrate:fresh
+migrate:fresh is the dev reset button: the DatabaseRefreshed listener (local-only) recreates the dev user (email in config/development.php, password from DEVELOPMENT_USER_PASSWORD), grants all permissions, recreates the deterministic API token (DEVELOPMENT_API_TOKEN, pipe-less so Sanctum resolves it by hash — survives every fresh), and runs DevelopmentFinancialSeeder (idempotent, local-only).
+POST /dev/login is a local-only login bypass; the button renders only when the Blade shell flags local. config/development.php is the home for dev-only config — new dev knobs go there, not scattered env checks.
