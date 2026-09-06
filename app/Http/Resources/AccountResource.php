@@ -1,0 +1,32 @@
+<?php
+
+namespace App\Http\Resources;
+
+use App\Models\Account;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+/**
+ * @mixin Account
+ */
+class AccountResource extends JsonResource
+{
+    /**
+     * Transform the resource into an array.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'account_type' => $this->account_type,
+            'name' => $this->name,
+            'path' => $this->path,
+            'parent_id' => $this->parent_id,
+            'institution' => new InstitutionResource($this->whenLoaded('institution')),
+            'opened_at' => $this->opened_at?->toDateString(),
+            'closed_at' => $this->closed_at?->toDateString(),
+        ];
+    }
+}

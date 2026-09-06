@@ -1,6 +1,10 @@
 <?php
 
+use App\Enums\Permission;
+use App\Models\User;
+use App\Models\UserPermission;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /*
@@ -44,7 +48,15 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+function actingWithPermissions(Permission ...$permissions): User
 {
-    // ..
+    $user = User::factory()->create();
+
+    foreach ($permissions as $permission) {
+        UserPermission::factory()->for($user)->create(['permission' => $permission]);
+    }
+
+    Sanctum::actingAs($user);
+
+    return $user;
 }
