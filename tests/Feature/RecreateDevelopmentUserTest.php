@@ -2,11 +2,13 @@
 
 use App\Models\User;
 use Illuminate\Database\Events\DatabaseRefreshed;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\PersonalAccessToken;
 
 test('a database refresh recreates the development user and token in the local environment', function () {
     $this->app['env'] = 'local';
     config()->set('development.api_token', 'plain-text-token');
+    config()->set('development.user_password', 'development-password');
 
     event(new DatabaseRefreshed);
 
@@ -15,7 +17,8 @@ test('a database refresh recreates the development user and token in the local e
 
     expect($token)->not->toBeNull()
         ->and($token->tokenable->is($user))->toBeTrue()
-        ->and($token->abilities)->toBe(['*']);
+        ->and($token->abilities)->toBe(['*'])
+        ->and(Hash::check('development-password', $user->password))->toBeTrue();
 });
 
 test('the development user is recreated without a token when none is configured', function () {

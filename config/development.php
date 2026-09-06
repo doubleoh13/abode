@@ -15,4 +15,16 @@ return [
 
     'api_token' => env('DEVELOPMENT_API_TOKEN'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Development User Password
+    |--------------------------------------------------------------------------
+    |
+    | The password assigned to the development user after every database
+    | refresh so the UI login keeps working across migrate:fresh runs.
+    |
+    */
+
+    'user_password' => env('DEVELOPMENT_USER_PASSWORD'),
+
 ];

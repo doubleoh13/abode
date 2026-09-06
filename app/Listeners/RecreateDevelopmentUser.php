@@ -17,7 +17,7 @@ class RecreateDevelopmentUser
         $user = User::query()->create([
             'name' => 'Jake Richhart',
             'email' => 'jake@jakerichhart.com',
-            'password' => Str::password(),
+            'password' => config('development.user_password') ?? Str::password(),
         ]);
 
         $plainTextToken = config('development.api_token');
