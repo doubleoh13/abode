@@ -1,3 +1,9 @@
+declare global {
+    interface Window {
+        developmentLoginEnabled?: boolean;
+    }
+}
+
 export type AccountType = 'asset' | 'liability' | 'income' | 'expense' | 'equity';
 
 export type CommodityKind = 'currency' | 'traded' | 'custom';

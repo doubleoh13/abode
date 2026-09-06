@@ -17,7 +17,7 @@ class RecreateDevelopmentUser
 
         $user = User::query()->create([
             'name' => 'Jake Richhart',
-            'email' => 'jake@jakerichhart.com',
+            'email' => config('development.user_email'),
             'password' => config('development.user_password') ?? Str::password(),
         ]);
 

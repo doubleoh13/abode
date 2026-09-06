@@ -2,9 +2,16 @@
 import { isAxiosError } from 'axios';
 import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { login, type LoginCredentials } from '../auth';
+import { login, loginAsDevelopmentUser, type LoginCredentials } from '../auth';
 
 const router = useRouter();
+
+const developmentLoginEnabled = window.developmentLoginEnabled === true;
+
+async function developmentLogin(): Promise<void> {
+    await loginAsDevelopmentUser();
+    router.push({ name: 'home' });
+}
 
 const form = reactive<LoginCredentials>({
     email: '',
@@ -90,6 +97,15 @@ async function attemptLogin(): Promise<void> {
                     class="rounded-sm bg-accent px-4 py-2 text-sm font-semibold text-background transition-colors hover:bg-accent/85 disabled:opacity-50"
                 >
                     Log in
+                </button>
+
+                <button
+                    v-if="developmentLoginEnabled"
+                    type="button"
+                    class="button-subtle font-mono text-xs tracking-wider uppercase"
+                    @click="developmentLogin"
+                >
+                    Dev login
                 </button>
             </div>
         </form>

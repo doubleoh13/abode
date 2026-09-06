@@ -17,6 +17,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Development User Email
+    |--------------------------------------------------------------------------
+    |
+    | Identifies the user recreated after database refreshes and logged in
+    | by the local-only login bypass.
+    |
+    */
+
+    'user_email' => 'jake@jakerichhart.com',
+
+    /*
+    |--------------------------------------------------------------------------
     | Development User Password
     |--------------------------------------------------------------------------
     |

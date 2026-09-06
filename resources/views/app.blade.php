@@ -6,6 +6,12 @@
 
         <title>{{ config('app.name') }}</title>
 
+        @if (app()->environment('local'))
+            <script>
+                window.developmentLoginEnabled = true;
+            </script>
+        @endif
+
         @fonts
         @vite(['resources/css/app.css', 'resources/js/app.ts'])
     </head>

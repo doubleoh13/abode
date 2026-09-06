@@ -44,6 +44,12 @@ export async function login(credentials: LoginCredentials): Promise<void> {
     await resolveAuthenticatedUser();
 }
 
+export async function loginAsDevelopmentUser(): Promise<void> {
+    await axios.get('/sanctum/csrf-cookie');
+    await axios.post('/dev/login');
+    await resolveAuthenticatedUser();
+}
+
 export async function logout(): Promise<void> {
     await axios.post('/logout');
     auth.user = null;
