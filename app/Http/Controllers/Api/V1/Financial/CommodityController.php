@@ -38,17 +38,20 @@ class CommodityController extends Controller
     {
         DB::transaction(function () use ($request, $commodity): void {
             $previousPrecision = $commodity->precision;
+            $isBaseCurrency = $commodity->id === Commodity::baseCurrency()->id;
 
             $commodity->update($request->validated());
 
-            $scale = 10 ** ($commodity->precision - $previousPrecision);
+            $additionalDigits = $commodity->precision - $previousPrecision;
 
-            if ($scale > 1) {
+            if ($additionalDigits > 0) {
+                $scale = '1'.str_repeat('0', $additionalDigits);
+
                 Posting::query()
                     ->where('financial_commodity_id', $commodity->id)
                     ->update(['amount' => DB::raw("amount * {$scale}")]);
 
-                if ($commodity->code === Commodity::BASE_CURRENCY_CODE) {
+                if ($isBaseCurrency) {
                     Lot::query()->update(['cost' => DB::raw("cost * {$scale}")]);
                 }
             }

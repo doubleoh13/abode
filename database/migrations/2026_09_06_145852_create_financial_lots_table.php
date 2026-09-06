@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('financial_commodity_id')->constrained('financial_commodities');
             $table->date('acquired_at');
-            $table->bigInteger('cost');
+            $table->decimal('cost', 78, 0);
             $table->jsonb('metadata')->default('{}');
             $table->timestampsTz();
         });

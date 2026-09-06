@@ -10,6 +10,7 @@ const institutions = ref<Institution[]>([]);
 const loaded = ref(false);
 const formOpen = ref(false);
 const editingAccount = ref<Account | null>(null);
+const showClosedAccounts = ref(false);
 
 async function loadAccounts(): Promise<void> {
     const [accountsResponse, institutionsResponse] = await Promise.all([
@@ -59,8 +60,13 @@ const rowsByType = computed<Map<AccountType, AccountRow[]>>(() => {
 
         const walk = (nodes: Account[], depth: number): void => {
             for (const account of nodes) {
-                sectionRows.push({ account, depth });
-                walk(childrenByParent.get(account.id) ?? [], depth + 1);
+                const visible = showClosedAccounts.value || account.closed_at === null;
+
+                if (visible) {
+                    sectionRows.push({ account, depth });
+                }
+
+                walk(childrenByParent.get(account.id) ?? [], visible ? depth + 1 : depth);
             }
         };
 
@@ -76,6 +82,10 @@ const rowsByType = computed<Map<AccountType, AccountRow[]>>(() => {
 });
 
 const hasAccounts = computed(() => accounts.value.length > 0);
+const hasClosedAccounts = computed(() => accounts.value.some((account) => account.closed_at !== null));
+const hasVisibleAccounts = computed(() =>
+    sections.some((section) => (rowsByType.value.get(section.type)?.length ?? 0) > 0),
+);
 
 function openCreateForm(): void {
     editingAccount.value = null;
@@ -121,9 +131,21 @@ async function deleteAccount(account: Account): Promise<void> {
         <div class="flex items-center justify-between">
             <h1 class="text-xl font-semibold">Accounts</h1>
 
-            <button type="button" class="button-primary" @click="openCreateForm">
-                New account
-            </button>
+            <div class="flex items-center gap-3">
+                <button
+                    v-if="loaded && hasClosedAccounts"
+                    type="button"
+                    class="button-subtle"
+                    :aria-pressed="showClosedAccounts"
+                    @click="showClosedAccounts = !showClosedAccounts"
+                >
+                    {{ showClosedAccounts ? 'Hide closed' : 'Show closed' }}
+                </button>
+
+                <button type="button" class="button-primary" @click="openCreateForm">
+                    New account
+                </button>
+            </div>
         </div>
 
         <template v-if="loaded">
@@ -140,7 +162,11 @@ async function deleteAccount(account: Account): Promise<void> {
 
             <p v-if="!hasAccounts" class="mt-6 text-sm text-muted">No accounts yet.</p>
 
-            <div v-if="hasAccounts" class="mt-6 flex flex-col gap-8">
+            <p v-else-if="!hasVisibleAccounts" class="mt-6 text-sm text-muted">
+                No open accounts.
+            </p>
+
+            <div v-if="hasVisibleAccounts" class="mt-6 flex flex-col gap-8">
                 <section
                     v-for="section in sections.filter((candidate) => rowsByType.get(candidate.type)?.length)"
                     :key="section.type"

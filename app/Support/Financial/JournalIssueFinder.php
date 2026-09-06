@@ -6,6 +6,7 @@ use App\Models\Financial\Commodity;
 use App\Models\Financial\Lot;
 use App\Models\Financial\Posting;
 use App\Models\Financial\Transaction;
+use Brick\Math\BigInteger;
 
 /**
  * Derives the journal's soft integrity issues on the fly: nothing here is
@@ -41,12 +42,12 @@ class JournalIssueFinder
                 fn (Posting $a, Posting $b): int => $a->position <=> $b->position,
             ]);
 
-            $runningQuantity = 0;
+            $runningQuantity = BigInteger::zero();
 
             foreach ($orderedPostings as $posting) {
-                $runningQuantity += $posting->amount;
+                $runningQuantity = $runningQuantity->plus($posting->amount);
 
-                if ($runningQuantity < 0) {
+                if ($runningQuantity->isNegative()) {
                     $issues[] = [
                         'type' => 'negative_lot',
                         'financial_lot_id' => $lot->id,
@@ -80,7 +81,7 @@ class JournalIssueFinder
             ->groupBy('financial_lot_id')
             ->selectRaw('financial_lot_id, sum(amount) as acquired_quantity')
             ->pluck('acquired_quantity', 'financial_lot_id')
-            ->map(fn (string|int $quantity): int => (int) $quantity);
+            ->map(fn (string|int $quantity): BigInteger => BigInteger::of($quantity));
 
         foreach (Transaction::query()->with('postings.lot')->get() as $transaction) {
             $legs = $transaction->postings->map(fn (Posting $posting): array => [
@@ -95,12 +96,12 @@ class JournalIssueFinder
 
             $residual = $this->costBasisBalancer->residual($legs);
 
-            if ($residual !== 0) {
+            if (! $residual->isZero()) {
                 $issues[] = [
                     'type' => 'unbalanced_transaction',
                     'financial_transaction_id' => $transaction->id,
-                    'residual' => $residual,
-                    'message' => "Postings no longer balance at cost (off by {$residual} USD minor units).",
+                    'residual' => (string) $residual,
+                    'message' => 'Postings no longer balance at cost.',
                 ];
             }
         }

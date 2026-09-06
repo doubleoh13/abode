@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('financial_commodity_prices', function (Blueprint $table) {
             $table->id();
             $table->foreignId('financial_commodity_id')->constrained('financial_commodities')->cascadeOnDelete();
-            $table->decimal('price', 24, 12);
+            $table->decimal('price', 78, 36);
             $table->timestampTz('priced_at');
             $table->timestampTz('created_at')->nullable();
 

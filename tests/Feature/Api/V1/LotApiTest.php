@@ -47,12 +47,12 @@ describe('with finance permissions', function () {
         $this->getJson("/api/v1/financial/lots?financial_account_id={$this->brokerage->id}&financial_commodity_id={$this->fbtc->id}")
             ->assertOk()
             ->assertJsonPath('data.0.id', $lot->id)
-            ->assertJsonPath('data.0.open_quantity', 70)
-            ->assertJsonPath('data.0.acquired_quantity', 130);
+            ->assertJsonPath('data.0.open_quantity', '70')
+            ->assertJsonPath('data.0.acquired_quantity', '130');
 
         $this->getJson("/api/v1/financial/lots?financial_account_id={$otherAccount->id}&financial_commodity_id={$this->fbtc->id}")
             ->assertOk()
-            ->assertJsonPath('data.0.open_quantity', 30);
+            ->assertJsonPath('data.0.open_quantity', '30');
     });
 
     test('as_of excludes postings dated after it', function () {
@@ -62,11 +62,11 @@ describe('with finance permissions', function () {
 
         $this->getJson("/api/v1/financial/lots?financial_account_id={$this->brokerage->id}&financial_commodity_id={$this->fbtc->id}&as_of=2026-03-01")
             ->assertOk()
-            ->assertJsonPath('data.0.open_quantity', 100);
+            ->assertJsonPath('data.0.open_quantity', '100');
 
         $this->getJson("/api/v1/financial/lots?financial_account_id={$this->brokerage->id}&financial_commodity_id={$this->fbtc->id}")
             ->assertOk()
-            ->assertJsonPath('data.0.open_quantity', 60);
+            ->assertJsonPath('data.0.open_quantity', '60');
     });
 
     test('fully consumed lots are excluded', function () {

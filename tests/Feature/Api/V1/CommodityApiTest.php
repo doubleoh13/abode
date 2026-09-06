@@ -55,14 +55,24 @@ describe('with finance permissions', function () {
             ->assertJsonPath('data.symbol_placement', 'prefix');
     });
 
-    test('precision above the storage cap is rejected', function () {
+    test('precision above the commodity scale cap is rejected', function () {
         $this->postJson('/api/v1/financial/commodities', [
             'code' => 'ETH',
             'name' => 'Ether',
             'kind' => 'traded',
-            'precision' => 18,
+            'precision' => 256,
         ])->assertUnprocessable()
-            ->assertJsonPath('errors.precision.0', 'Precision cannot exceed 8 decimal places.');
+            ->assertJsonPath('errors.precision.0', 'Precision cannot exceed 255 decimal places.');
+    });
+
+    test('precision supports the full unsigned tiny integer range', function () {
+        $this->postJson('/api/v1/financial/commodities', [
+            'code' => 'ATOM',
+            'name' => 'Atomic Unit',
+            'kind' => 'traded',
+            'precision' => 255,
+        ])->assertCreated()
+            ->assertJsonPath('data.precision', 255);
     });
 
     test('a symbol requires a placement and vice versa', function (array $payload, string $errorField) {
@@ -142,7 +152,20 @@ describe('with finance permissions', function () {
             'precision' => 6,
         ])->assertOk();
 
-        expect($posting->refresh()->amount)->toBe(1_234_500);
+        expect((string) $posting->refresh()->amount)->toBe('1234500');
+    });
+
+    test('precision cannot increase when rescaling would exceed atomic storage', function () {
+        $commodity = Commodity::factory()->create(['code' => 'MAX', 'precision' => 0]);
+        Posting::factory()->ofCommodity($commodity)->create(['amount' => str_repeat('9', 78)]);
+
+        $this->putJson("/api/v1/financial/commodities/{$commodity->id}", [
+            'code' => 'MAX',
+            'name' => $commodity->name,
+            'kind' => 'traded',
+            'precision' => 1,
+        ])->assertUnprocessable()
+            ->assertJsonPath('errors.precision.0', 'Precision cannot increase because a stored value would exceed 78 digits.');
     });
 
     test('increasing the base currency precision also rescales lot costs', function () {
@@ -159,7 +182,7 @@ describe('with finance permissions', function () {
             'symbol_placement' => $usd->symbol_placement?->value,
         ])->assertOk();
 
-        expect($posting->refresh()->amount)->toBe(5_000)
-            ->and($lot->refresh()->cost)->toBe(4_250_000);
+        expect((string) $posting->refresh()->amount)->toBe('5000')
+            ->and((string) $lot->refresh()->cost)->toBe('4250000');
     });
 });

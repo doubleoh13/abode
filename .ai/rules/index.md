@@ -5,10 +5,11 @@ Before planning or editing, find the row whose globs match the file's path and r
 | Applies to | Rule file |
 | --- | --- |
 | app/Enums/** | .ai/rules/enums.md |
-| app/Models/Financial/** | .ai/rules/financial.md |
+| app/Models/Financial/**, app/Models/Financial/CommodityPrice.php | .ai/rules/financial.md |
 | **/* | .ai/rules/general.md |
 | app/Http/** | .ai/rules/http.md |
 | resources/js/** | .ai/rules/js.md |
+| app/Listeners/RecreateDevelopmentUser.php | .ai/rules/listeners.md |
 | database/migrations/** | .ai/rules/migrations.md |
 | app/Models/** | .ai/rules/models.md |
 | resources/** | .ai/rules/resources.md |

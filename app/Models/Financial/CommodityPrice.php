@@ -2,6 +2,7 @@
 
 namespace App\Models\Financial;
 
+use App\Casts\BigDecimalCast;
 use Database\Factories\Financial\CommodityPriceFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -34,7 +35,7 @@ class CommodityPrice extends Model
     protected function casts(): array
     {
         return [
-            'price' => 'decimal:12',
+            'price' => BigDecimalCast::class,
             'priced_at' => 'immutable_datetime',
         ];
     }

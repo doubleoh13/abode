@@ -39,3 +39,6 @@ Use Rule::unique(Model::class)/Rule::exists(Model::class) in validation, never s
 The morph map is ENFORCED (AppServiceProvider): every morphable model needs an alias ('user', 'financial.account', ...) — FQCNs never hit the database (namespace moves proved why). Adding a morphable model without registering it throws, including Sanctum's tokenable.
 Notes and Attachments are global cross-domain polymorphics (App\Models, unprefixed tables): nullable user_id author, soft deletes (timestampsTz + softDeletesTz). Models opt in via App\Models\Concerns\HasNotes / HasAttachments.
 Attachments store disk/path/name/mime_type/size plus sha256 hash (indexed, for dedup); files stay on disk through soft delete — removal belongs with a future force-delete. Generic APIs at /api/v1/notes and /api/v1/attachments address parents by (morph alias, id); index endpoints require the filter pair.
+
+## Exact numeric values supersede bigint amounts
+Financial posting amounts and lot costs are atomic integers stored as NUMERIC(78,0), cast to Brick Math BigInteger in PHP, and serialized as canonical integer strings. Commodity precision is the storage/display scale and may be 0–255; each atomic value remains limited to 78 digits. Never coerce exact financial values to PHP int or float.

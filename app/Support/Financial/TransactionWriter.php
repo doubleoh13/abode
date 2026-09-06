@@ -149,7 +149,7 @@ class TransactionWriter
             'cost' => $payload['lot']['cost'],
         ];
 
-        if ($previousLotId !== null && $persisted->amount > 0) {
+        if ($previousLotId !== null && $persisted->amount->isPositive()) {
             $persisted->lot->update($lotAttributes);
 
             return $previousLotId;

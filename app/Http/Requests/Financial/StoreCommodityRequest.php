@@ -23,7 +23,7 @@ class StoreCommodityRequest extends FormRequest
             'code' => ['required', 'string', 'max:16', $this->uniqueCodeRule()],
             'name' => ['required', 'string', 'max:255'],
             'kind' => ['required', Rule::enum(CommodityKind::class)],
-            'precision' => ['required', 'integer', 'min:0', 'max:8'],
+            'precision' => ['required', 'integer', 'min:0', 'max:255'],
             'symbol' => ['nullable', 'string', 'max:8', 'required_with:symbol_placement'],
             'symbol_placement' => [
                 'nullable',
@@ -51,7 +51,7 @@ class StoreCommodityRequest extends FormRequest
             'precision.required' => 'Enter the commodity precision.',
             'precision.integer' => 'Precision must be a whole number.',
             'precision.min' => 'Precision cannot be negative.',
-            'precision.max' => 'Precision cannot exceed 8 decimal places.',
+            'precision.max' => 'Precision cannot exceed 255 decimal places.',
             'symbol.string' => 'Enter a valid symbol.',
             'symbol.max' => 'Symbols may not exceed 8 characters.',
             'symbol.required_with' => 'Enter a symbol when choosing its placement.',

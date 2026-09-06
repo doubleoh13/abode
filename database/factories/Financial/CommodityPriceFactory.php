@@ -20,7 +20,7 @@ class CommodityPriceFactory extends Factory
     {
         return [
             'financial_commodity_id' => Commodity::factory(),
-            'price' => fake()->randomFloat(4, 0.01, 100000),
+            'price' => number_format(fake()->randomFloat(4, 0.01, 100000), 4, '.', ''),
             'priced_at' => fake()->dateTimeBetween('-2 years', 'now'),
         ];
     }

@@ -5,7 +5,13 @@ import AccountForm from './AccountForm.vue';
 import ComboBox from './ComboBox.vue';
 import ModalDialog from './ModalDialog.vue';
 import PostingRow from './PostingRow.vue';
-import { allocateBasis, amountToInput, formatAmount, parseAmount } from '../money';
+import {
+    allocateBasis,
+    amountToInput,
+    formatAmount,
+    parseAmount,
+    totalCostFromUnitCost,
+} from '../money';
 import type {
     Account,
     Commodity,
@@ -87,7 +93,7 @@ function draftFromPosting(posting: Posting): PostingDraft {
         amount: amountToInput(posting.amount, precision),
         memo: posting.memo ?? '',
         financial_lot_id: posting.financial_lot_id,
-        lotMode: posting.lot && posting.amount > 0 ? 'new' : 'existing',
+        lotMode: posting.lot && BigInt(posting.amount) > 0n ? 'new' : 'existing',
         lotCost: posting.lot ? amountToInput(posting.lot.cost, baseCurrency.value.precision) : '',
         lotCostMode: 'total',
         lotAcquiredAt: posting.lot?.acquired_at ?? '',
@@ -173,34 +179,33 @@ function commodityById(id: number | null): Commodity | null {
     return props.commodities.find((commodity) => commodity.id === id) ?? null;
 }
 
-function lotCostMinor(draft: PostingDraft): number | null {
-    const quantity = commodityById(draft.financial_commodity_id);
+function lotCostMinor(draft: PostingDraft): string | null {
+    const commodity = commodityById(draft.financial_commodity_id);
 
     if (draft.lotCostMode === 'total') {
         return parseAmount(draft.lotCost, baseCurrency.value.precision);
     }
 
-    const unitCost = Number(draft.lotCost);
-    const wholeUnits =
-        quantity === null ? null : parseAmount(draft.amount, quantity.precision);
+    const unitCost = parseAmount(draft.lotCost, baseCurrency.value.precision);
+    const quantity = commodity === null ? null : parseAmount(draft.amount, commodity.precision);
 
-    if (!Number.isFinite(unitCost) || wholeUnits === null || quantity === null) {
+    if (unitCost === null || quantity === null || commodity === null || BigInt(unitCost) < 0n) {
         return null;
     }
 
-    return Math.round((unitCost * wholeUnits) / 10 ** quantity.precision * 10 ** baseCurrency.value.precision);
+    return totalCostFromUnitCost(unitCost, quantity, commodity.precision);
 }
 
 interface Balance {
     faceSums: string[];
-    residual: number | null;
+    residual: string | null;
     approximate: boolean;
 }
 
 function calculateBalance(postingDrafts: PostingDraft[]): Balance {
-    const faceSumsByCommodity = new Map<number, number>();
-    const lotGroups = new Map<number, { cost: number; total: number; amounts: number[] }>();
-    let residual = 0;
+    const faceSumsByCommodity = new Map<number, bigint>();
+    const lotGroups = new Map<number, { cost: string; total: string; amounts: string[] }>();
+    let residual = 0n;
     let approximate = false;
 
     for (const draft of postingDrafts) {
@@ -213,11 +218,11 @@ function calculateBalance(postingDrafts: PostingDraft[]): Balance {
 
         faceSumsByCommodity.set(
             commodity.id,
-            (faceSumsByCommodity.get(commodity.id) ?? 0) + amount,
+            (faceSumsByCommodity.get(commodity.id) ?? 0n) + BigInt(amount),
         );
 
         if (commodity.id === baseCurrency.value.id) {
-            residual += amount;
+            residual += BigInt(amount);
         } else if (draft.lotMode === 'new') {
             const cost = lotCostMinor(draft);
 
@@ -225,7 +230,7 @@ function calculateBalance(postingDrafts: PostingDraft[]): Balance {
                 return { faceSums: [], residual: null, approximate: false };
             }
 
-            residual += cost;
+            residual += BigInt(cost);
         } else {
             const lot =
                 draft.financial_lot_id !== null ? knownLots.value[draft.financial_lot_id] : undefined;
@@ -249,21 +254,25 @@ function calculateBalance(postingDrafts: PostingDraft[]): Balance {
         const shares = allocateBasis(
             group.cost,
             group.total,
-            group.amounts.map((amount) => Math.abs(amount)),
+            group.amounts.map((amount) => {
+                const value = BigInt(amount);
+
+                return (value < 0n ? -value : value).toString();
+            }),
         );
 
         group.amounts.forEach((amount, index) => {
-            residual += Math.sign(amount) * shares[index];
+            residual += (BigInt(amount) < 0n ? -1n : 1n) * BigInt(shares[index]);
         });
     }
 
     const faceSums = [...faceSumsByCommodity.entries()].map(([commodityId, sum]) => {
         const commodity = commodityById(commodityId);
 
-        return commodity === null ? '' : formatAmount(sum, commodity);
+        return commodity === null ? '' : formatAmount(sum.toString(), commodity);
     });
 
-    return { faceSums, residual, approximate };
+    return { faceSums, residual: residual.toString(), approximate };
 }
 
 const balance = computed<Balance>(() => calculateBalance(postings.value));
@@ -283,13 +292,13 @@ const balancingAmount = computed<string | null>(() => {
 
     if (
         precedingBalance.residual === null ||
-        precedingBalance.residual === 0 ||
+        precedingBalance.residual === '0' ||
         precedingBalance.approximate
     ) {
         return null;
     }
 
-    return amountToInput(-precedingBalance.residual, baseCurrency.value.precision);
+    return amountToInput((-BigInt(precedingBalance.residual)).toString(), baseCurrency.value.precision);
 });
 
 function addPosting(): void {
@@ -455,10 +464,10 @@ async function save(): Promise<void> {
                     </span>
                     <span
                         v-if="balance.residual !== null"
-                        :class="balance.residual === 0 ? 'tracking-wider text-accent uppercase' : 'text-danger'"
+                        :class="balance.residual === '0' ? 'tracking-wider text-accent uppercase' : 'text-danger'"
                     >
                         {{
-                            balance.residual === 0
+                            balance.residual === '0'
                                 ? `Balanced${balance.approximate ? ' (approx.)' : ''}`
                                 : `Off by ${formatAmount(balance.residual, baseCurrency)}`
                         }}

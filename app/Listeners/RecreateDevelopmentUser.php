@@ -4,7 +4,6 @@ namespace App\Listeners;
 
 use App\Enums\Permission;
 use App\Models\User;
-use Database\Seeders\DevelopmentFinancialSeeder;
 use Illuminate\Database\Events\DatabaseRefreshed;
 use Illuminate\Support\Str;
 
@@ -36,7 +35,5 @@ class RecreateDevelopmentUser
                 'abilities' => ['*'],
             ]);
         }
-
-        (new DevelopmentFinancialSeeder)->run();
     }
 }

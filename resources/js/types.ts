@@ -48,10 +48,10 @@ export interface Lot {
     financial_commodity_id: number;
     commodity?: Commodity;
     acquired_at: string;
-    cost: number;
+    cost: string;
     metadata: Record<string, unknown>;
-    open_quantity?: number;
-    acquired_quantity?: number;
+    open_quantity?: string;
+    acquired_quantity?: string;
 }
 
 export interface Posting {
@@ -64,7 +64,7 @@ export interface Posting {
     commodity?: Commodity;
     financial_lot_id: number | null;
     lot?: Lot | null;
-    amount: number;
+    amount: string;
     memo: string | null;
     metadata: Record<string, unknown>;
 }
@@ -85,7 +85,7 @@ export interface JournalIssue {
     financial_transaction_id: number;
     financial_lot_id?: number;
     financial_posting_id?: number;
-    residual?: number;
+    residual?: string;
     message: string;
 }
 

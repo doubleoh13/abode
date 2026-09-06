@@ -18,3 +18,6 @@ TypeScript is pinned to 5.x: vue-tsc cannot drive the Go-based TypeScript 7 comp
 CRUD pages follow one pattern (see PayeesPage as the minimal example): full-width layout, header row with h1 left + primary action button right, forms open in ModalDialog (animated, Escape/backdrop close), first field autofocused, per-field 422 errors rendered inline, row actions (Edit/Delete) as mono uppercase buttons revealed on row hover, native confirm() for deletes, 409 messages surfaced via alert().
 Selects are always the ComboBox component (type-to-filter, arrow/Enter/Tab select, explicit "(none)" row when nullable) — never a native select. Shared form styling comes from the .input/.field-label/.button-primary/.button-subtle classes in app.css; never restyle inline.
 Shared API types live in resources/js/types.ts; auth state stays in the plain reactive auth.ts module (no Pinia).
+
+## Exact financial values are JSON strings
+Posting amounts, lot costs and quantities, and journal residuals cross the API as canonical integer strings. Use JavaScript BigInt for exact arithmetic and convert back to strings before JSON serialization; never use Number for scaled financial values.

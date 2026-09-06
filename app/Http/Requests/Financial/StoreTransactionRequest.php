@@ -8,7 +8,9 @@ use App\Models\Financial\Account;
 use App\Models\Financial\Commodity;
 use App\Models\Financial\Lot;
 use App\Models\Financial\Payee;
+use App\Rules\ExactInteger;
 use App\Support\Financial\CostBasisBalancer;
+use Brick\Math\BigInteger;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Collection;
@@ -33,13 +35,19 @@ class StoreTransactionRequest extends FormRequest
             'postings.*.status' => ['nullable', Rule::enum(PostingStatus::class)],
             'postings.*.financial_account_id' => ['required', 'integer', Rule::exists(Account::class, 'id')],
             'postings.*.financial_commodity_id' => ['required', 'integer', Rule::exists(Commodity::class, 'id')],
-            'postings.*.amount' => ['required', 'integer', 'not_in:0'],
+            'postings.*.amount' => [
+                'required',
+                new ExactInteger(allowNegative: true, allowZero: false, message: 'Enter a valid nonzero amount.'),
+            ],
             'postings.*.memo' => ['nullable', 'string', 'max:255'],
             'postings.*.metadata' => ['sometimes', 'array'],
             'postings.*.financial_lot_id' => ['nullable', 'integer', Rule::exists(Lot::class, 'id')],
             'postings.*.lot' => ['nullable', 'array'],
             'postings.*.lot.acquired_at' => ['nullable', 'date'],
-            'postings.*.lot.cost' => ['required_with:postings.*.lot', 'integer', 'min:0'],
+            'postings.*.lot.cost' => [
+                'required_with:postings.*.lot',
+                new ExactInteger(allowNegative: false, allowZero: true, message: 'Enter a valid nonnegative lot cost.'),
+            ],
         ];
     }
 
@@ -67,8 +75,6 @@ class StoreTransactionRequest extends FormRequest
             'postings.*.financial_commodity_id.integer' => 'Choose a valid commodity.',
             'postings.*.financial_commodity_id.exists' => 'Choose a valid commodity.',
             'postings.*.amount.required' => 'Enter an amount.',
-            'postings.*.amount.integer' => 'Enter a valid amount.',
-            'postings.*.amount.not_in' => 'The amount cannot be zero.',
             'postings.*.memo.string' => 'Enter a valid posting memo.',
             'postings.*.memo.max' => 'Posting memos may not exceed 255 characters.',
             'postings.*.metadata.array' => 'Posting metadata must be an array.',
@@ -77,8 +83,6 @@ class StoreTransactionRequest extends FormRequest
             'postings.*.lot.array' => 'New lot details must be an array.',
             'postings.*.lot.acquired_at.date' => 'Enter a valid acquisition date.',
             'postings.*.lot.cost.required_with' => 'Enter the lot cost.',
-            'postings.*.lot.cost.integer' => 'Enter a valid lot cost.',
-            'postings.*.lot.cost.min' => 'Lot cost cannot be negative.',
         ];
     }
 
@@ -166,7 +170,7 @@ class StoreTransactionRequest extends FormRequest
                 );
             }
 
-            if ($createsLot && (int) $posting['amount'] <= 0) {
+            if ($createsLot && BigInteger::of($posting['amount'])->isNegativeOrZero()) {
                 $validator->errors()->add(
                     "postings.{$index}.amount",
                     'A new lot requires a positive amount.',
@@ -200,7 +204,7 @@ class StoreTransactionRequest extends FormRequest
                 continue;
             }
 
-            if ($acquiredQuantities[$lot->id] <= 0) {
+            if ($acquiredQuantities[$lot->id]->isNegativeOrZero()) {
                 $validator->errors()->add(
                     "postings.{$index}.financial_lot_id",
                     'The lot has no acquired quantity to draw basis from.',
@@ -222,18 +226,19 @@ class StoreTransactionRequest extends FormRequest
 
         foreach ($this->postingInputs() as $index => $posting) {
             if ((int) $posting['financial_commodity_id'] === $baseCurrencyId) {
-                $legs[] = ['is_base' => true, 'amount' => (int) $posting['amount'], 'lot_key' => null, 'lot_cost' => null, 'lot_total_quantity' => null];
+                $legs[] = ['is_base' => true, 'amount' => BigInteger::of($posting['amount']), 'lot_key' => null, 'lot_cost' => null, 'lot_total_quantity' => null];
             } elseif (isset($posting['lot'])) {
-                $legs[] = ['is_base' => false, 'amount' => (int) $posting['amount'], 'lot_key' => "new-{$index}", 'lot_cost' => (int) $posting['lot']['cost'], 'lot_total_quantity' => (int) $posting['amount']];
+                $amount = BigInteger::of($posting['amount']);
+                $legs[] = ['is_base' => false, 'amount' => $amount, 'lot_key' => "new-{$index}", 'lot_cost' => BigInteger::of($posting['lot']['cost']), 'lot_total_quantity' => $amount];
             } else {
                 $lot = $lots->get((int) $posting['financial_lot_id']);
-                $legs[] = ['is_base' => false, 'amount' => (int) $posting['amount'], 'lot_key' => $lot->id, 'lot_cost' => $lot->cost, 'lot_total_quantity' => $acquiredQuantities[$lot->id]];
+                $legs[] = ['is_base' => false, 'amount' => BigInteger::of($posting['amount']), 'lot_key' => $lot->id, 'lot_cost' => $lot->cost, 'lot_total_quantity' => $acquiredQuantities[$lot->id]];
             }
         }
 
         $residual = new CostBasisBalancer()->residual($legs);
 
-        if ($residual !== 0) {
+        if (! $residual->isZero()) {
             $validator->errors()->add(
                 'postings',
                 'Postings must balance at cost.',
@@ -264,7 +269,7 @@ class StoreTransactionRequest extends FormRequest
      * outside this transaction plus positive payload amounts drawing on it.
      *
      * @param  Collection<int, Lot>  $lots
-     * @return array<int, int>
+     * @return array<int, BigInteger>
      */
     protected function acquiredQuantities(Collection $lots): array
     {
@@ -275,10 +280,11 @@ class StoreTransactionRequest extends FormRequest
         }
 
         foreach ($this->postingInputs() as $posting) {
-            $amount = (int) ($posting['amount'] ?? 0);
+            $amount = BigInteger::of($posting['amount'] ?? 0);
 
-            if (isset($posting['financial_lot_id']) && $amount > 0) {
-                $quantities[(int) $posting['financial_lot_id']] += $amount;
+            if (isset($posting['financial_lot_id']) && $amount->isPositive()) {
+                $lotId = (int) $posting['financial_lot_id'];
+                $quantities[$lotId] = $quantities[$lotId]->plus($amount);
             }
         }
 

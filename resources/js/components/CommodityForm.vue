@@ -100,7 +100,7 @@ async function save(): Promise<void> {
 
             <label class="flex flex-col gap-1.5">
                 <span class="field-label">Precision</span>
-                <input v-model.number="form.precision" type="number" min="0" max="8" required class="input" />
+                <input v-model.number="form.precision" type="number" min="0" max="255" required class="input" />
                 <p v-if="errors.precision" class="text-sm text-danger">{{ errors.precision[0] }}</p>
             </label>
 

@@ -275,7 +275,7 @@ class DevelopmentFinancialSeeder extends Seeder
 
             CommodityPrice::query()->create([
                 'financial_commodity_id' => $commodity->id,
-                'price' => round($price, 6),
+                'price' => number_format($price, 6, '.', ''),
                 'priced_at' => now()->subDays($daysAgo)->setTime(16, 0),
             ]);
         }

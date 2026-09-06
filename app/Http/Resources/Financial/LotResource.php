@@ -23,10 +23,10 @@ class LotResource extends JsonResource
             'financial_commodity_id' => $this->financial_commodity_id,
             'commodity' => new CommodityResource($this->whenLoaded('commodity')),
             'acquired_at' => $this->acquired_at->toDateString(),
-            'cost' => $this->cost,
+            'cost' => (string) $this->cost,
             'metadata' => $this->metadata,
-            'open_quantity' => $this->when(isset($this->open_quantity), fn (): int => (int) $this->open_quantity),
-            'acquired_quantity' => $this->when(isset($this->acquired_quantity), fn (): int => (int) $this->acquired_quantity),
+            'open_quantity' => $this->when(isset($this->open_quantity), fn (): string => (string) $this->open_quantity),
+            'acquired_quantity' => $this->when(isset($this->acquired_quantity), fn (): string => (string) $this->acquired_quantity),
         ];
     }
 }

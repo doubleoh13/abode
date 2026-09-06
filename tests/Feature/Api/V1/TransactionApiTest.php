@@ -8,19 +8,28 @@ use App\Models\Financial\Lot;
 use App\Models\Financial\Payee;
 use App\Models\Financial\Posting;
 use App\Models\Financial\Transaction;
+use Brick\Math\BigInteger;
 
-function journalLeg(Account $account, Commodity $commodity, int $amount, array $overrides = []): array
+function journalLeg(Account $account, Commodity $commodity, int|string $amount, array $overrides = []): array
 {
-    return [
+    $posting = [
         'status' => in_array($account->account_type, [AccountType::Asset, AccountType::Liability], true) ? 'cleared' : null,
         'financial_account_id' => $account->id,
         'financial_commodity_id' => $commodity->id,
-        'amount' => $amount,
+        'amount' => (string) $amount,
         ...$overrides,
     ];
+
+    $posting['amount'] = (string) $posting['amount'];
+
+    if (isset($posting['lot']['cost'])) {
+        $posting['lot']['cost'] = (string) $posting['lot']['cost'];
+    }
+
+    return $posting;
 }
 
-function journalSeedAcquisition(Account $account, Commodity $commodity, int $quantity, int $cost, string $date = '2026-01-05'): Lot
+function journalSeedAcquisition(Account $account, Commodity $commodity, int|string $quantity, int|string $cost, string $date = '2026-01-05'): Lot
 {
     $lot = Lot::factory()->ofCommodity($commodity)->create(['cost' => $cost, 'acquired_at' => $date]);
     $transaction = Transaction::factory()->on($date)->create();
@@ -66,7 +75,7 @@ describe('with finance permissions', function () {
                     'status' => 'cleared',
                     'financial_account_id' => null,
                     'financial_commodity_id' => $this->usd->id,
-                    'amount' => -100,
+                    'amount' => '-100',
                 ],
                 journalLeg($this->groceries, $this->usd, 100),
             ],
@@ -94,6 +103,26 @@ describe('with finance permissions', function () {
             ->assertJsonPath('data.status', 'cleared')
             ->assertJsonPath('data.postings.0.position', 0)
             ->assertJsonPath('data.postings.1.position', 1);
+    });
+
+    test('an eighteen-decimal on-chain quantity round trips exactly', function () {
+        $ether = Commodity::factory()->create(['code' => 'ETH', 'precision' => 18]);
+        $quantity = '123456789012345678901';
+
+        $response = $this->postJson('/api/v1/financial/transactions', [
+            'date' => '2026-08-01',
+            'postings' => [
+                journalLeg($this->brokerage, $ether, $quantity, ['lot' => ['cost' => '425000']]),
+                journalLeg($this->checking, $this->usd, '-425000'),
+            ],
+        ])->assertCreated()
+            ->assertJsonPath('data.postings.0.amount', $quantity)
+            ->assertJsonPath('data.postings.0.lot.cost', '425000');
+
+        $posting = Posting::query()->findOrFail($response->json('data.postings.0.id'));
+
+        expect($posting->amount)->toBeInstanceOf(BigInteger::class)
+            ->and((string) $posting->amount)->toBe($quantity);
     });
 
     test('the index is date-descending and paginated', function () {
@@ -136,8 +165,45 @@ describe('with finance permissions', function () {
             ],
         ])->assertUnprocessable()
             ->assertJsonValidationErrors([
-                'postings.0.amount' => 'The amount cannot be zero.',
+                'postings.0.amount' => 'Enter a valid nonzero amount.',
                 'postings.0.status' => 'Choose a valid status.',
+            ]);
+    });
+
+    test('posting amounts require canonical integer strings', function (mixed $amount) {
+        $this->postJson('/api/v1/financial/transactions', [
+            'date' => '2026-08-01',
+            'postings' => [
+                [
+                    'status' => 'cleared',
+                    'financial_account_id' => $this->checking->id,
+                    'financial_commodity_id' => $this->usd->id,
+                    'amount' => $amount,
+                ],
+                journalLeg($this->groceries, $this->usd, '100'),
+            ],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'postings.0.amount' => 'Enter a valid nonzero amount.',
+            ]);
+    })->with([
+        'JSON number' => 100,
+        'leading zero' => '01',
+        'plus sign' => '+1',
+        'decimal' => '1.0',
+        'more than 78 digits' => str_repeat('1', 79),
+    ]);
+
+    test('lot costs require canonical nonnegative integer strings', function () {
+        $this->postJson('/api/v1/financial/transactions', [
+            'date' => '2026-08-01',
+            'postings' => [
+                journalLeg($this->brokerage, $this->fbtc, '100', ['lot' => ['cost' => '-1']]),
+                journalLeg($this->checking, $this->usd, '-100'),
+            ],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'postings.0.lot.cost' => 'Enter a valid nonnegative lot cost.',
             ]);
     });
 
@@ -236,7 +302,7 @@ describe('with finance permissions', function () {
         $lot = Lot::query()->findOrFail($response->json('data.postings.0.financial_lot_id'));
 
         expect($lot->acquired_at->toDateString())->toBe('2026-08-01')
-            ->and($lot->cost)->toBe(425_000)
+            ->and((string) $lot->cost)->toBe('425000')
             ->and($lot->financial_commodity_id)->toBe($this->fbtc->id);
     });
 
@@ -254,7 +320,7 @@ describe('with finance permissions', function () {
 
         $this->postJson('/api/v1/financial/transactions', $payload)->assertCreated();
 
-        $payload['postings'][1]['amount'] = 190_001;
+        $payload['postings'][1]['amount'] = '190001';
 
         $this->postJson('/api/v1/financial/transactions', $payload)
             ->assertUnprocessable()
@@ -300,7 +366,7 @@ describe('with finance permissions', function () {
         ])
             ->assertOk()
             ->assertJsonPath('data.postings.0.id', $first['id'])
-            ->assertJsonPath('data.postings.0.amount', -150)
+            ->assertJsonPath('data.postings.0.amount', '-150')
             ->assertJsonPath('data.postings.2.position', 2)
             ->assertJsonPath('data.postings.2.financial_account_id', $dining->id);
 
@@ -378,7 +444,7 @@ describe('with finance permissions', function () {
 
         $lot = Lot::query()->findOrFail($lotId);
 
-        expect($lot->cost)->toBe(430_000)
+        expect((string) $lot->cost)->toBe('430000')
             ->and($lot->acquired_at->toDateString())->toBe('2026-07-15');
     });
 

@@ -2,11 +2,12 @@
 
 namespace App\Support\Financial;
 
+use Brick\Math\BigInteger;
+
 /**
  * The single home of balance-at-cost math: base-currency legs count at face,
  * lot-bearing legs at their pro-rata share of the lot's total cost. All math
- * is plain 64-bit integer arithmetic; cost x quantity stays far inside the
- * signed 64-bit range at personal scale.
+ * uses arbitrary-precision integers so atomic on-chain quantities stay exact.
  */
 class CostBasisBalancer
 {
@@ -16,23 +17,23 @@ class CostBasisBalancer
      * usable lot (missing, or no acquired quantity) contribute nothing,
      * which lets the issue checker value broken history without dividing.
      *
-     * @param  list<array{is_base: bool, amount: int, lot_key: int|string|null, lot_cost: int|null, lot_total_quantity: int|null}>  $legs
+     * @param  list<array{is_base: bool, amount: BigInteger|int|string, lot_key: int|string|null, lot_cost: BigInteger|int|string|null, lot_total_quantity: BigInteger|int|string|null}>  $legs
      */
-    public function residual(array $legs): int
+    public function residual(array $legs): BigInteger
     {
-        $residual = 0;
+        $residual = BigInteger::zero();
 
         /** @var array<int|string, list<int>> $lotGroups */
         $lotGroups = [];
 
         foreach ($legs as $index => $leg) {
             if ($leg['is_base']) {
-                $residual += $leg['amount'];
+                $residual = $residual->plus($leg['amount']);
 
                 continue;
             }
 
-            if ($leg['lot_key'] === null || ($leg['lot_total_quantity'] ?? 0) <= 0) {
+            if ($leg['lot_key'] === null || BigInteger::of($leg['lot_total_quantity'] ?? 0)->isNegativeOrZero()) {
                 continue;
             }
 
@@ -43,13 +44,14 @@ class CostBasisBalancer
             $first = $legs[$indices[0]];
 
             $allocations = $this->allocate(
-                (int) $first['lot_cost'],
-                (int) $first['lot_total_quantity'],
-                array_map(fn (int $index): int => abs($legs[$index]['amount']), $indices),
+                BigInteger::of($first['lot_cost']),
+                BigInteger::of($first['lot_total_quantity']),
+                array_map(fn (int $index): BigInteger => BigInteger::of($legs[$index]['amount'])->abs(), $indices),
             );
 
             foreach ($indices as $offset => $index) {
-                $residual += ($legs[$index]['amount'] <=> 0) * $allocations[$offset];
+                $sign = BigInteger::of($legs[$index]['amount'])->getSign();
+                $residual = $residual->plus($allocations[$offset]->multipliedBy($sign));
             }
         }
 
@@ -62,31 +64,49 @@ class CostBasisBalancer
      * shortfall against the combined target one unit at a time by descending
      * remainder, ties broken by input order.
      *
-     * @param  list<int>  $quantities
-     * @return list<int>
+     * @param  list<BigInteger|int|string>  $quantities
+     * @return list<BigInteger>
      */
-    public function allocate(int $cost, int $totalQuantity, array $quantities): array
+    public function allocate(BigInteger|int|string $cost, BigInteger|int|string $totalQuantity, array $quantities): array
     {
+        $cost = BigInteger::of($cost);
+        $totalQuantity = BigInteger::of($totalQuantity);
+        $quantities = array_map(BigInteger::of(...), $quantities);
         $shares = [];
-        $remainders = [];
+        $remainderOrder = [];
 
         foreach ($quantities as $index => $quantity) {
-            $shares[$index] = intdiv($cost * $quantity, $totalQuantity);
-            $remainders[$index] = ($cost * $quantity) % $totalQuantity;
+            [$share, $remainder] = $cost->multipliedBy($quantity)->quotientAndRemainder($totalQuantity);
+            $shares[$index] = $share;
+            $remainderOrder[] = ['index' => $index, 'remainder' => $remainder];
         }
 
-        $target = intdiv($cost * array_sum($quantities), $totalQuantity);
-        $shortfall = $target - array_sum($shares);
+        $combinedQuantity = array_reduce(
+            $quantities,
+            fn (BigInteger $sum, BigInteger $quantity): BigInteger => $sum->plus($quantity),
+            BigInteger::zero(),
+        );
+        $allocated = array_reduce(
+            $shares,
+            fn (BigInteger $sum, BigInteger $share): BigInteger => $sum->plus($share),
+            BigInteger::zero(),
+        );
+        $target = $cost->multipliedBy($combinedQuantity)->quotient($totalQuantity);
+        $shortfall = $target->minus($allocated);
 
-        arsort($remainders);
+        usort(
+            $remainderOrder,
+            fn (array $first, array $second): int => $second['remainder']->compareTo($first['remainder'])
+                ?: $first['index'] <=> $second['index'],
+        );
 
-        foreach (array_keys($remainders) as $index) {
-            if ($shortfall <= 0) {
+        foreach ($remainderOrder as ['index' => $index]) {
+            if ($shortfall->isNegativeOrZero()) {
                 break;
             }
 
-            $shares[$index]++;
-            $shortfall--;
+            $shares[$index] = $shares[$index]->plus(1);
+            $shortfall = $shortfall->minus(1);
         }
 
         return $shares;

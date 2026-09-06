@@ -89,7 +89,7 @@ describe('with finance permissions', function () {
         $unbalanced = collect($response->json('data'))->where('type', 'unbalanced_transaction')->keyBy('financial_transaction_id');
 
         expect($unbalanced)->toHaveCount(2)
-            ->and($unbalanced[$buy->id]['residual'])->toBe(20)
-            ->and($unbalanced[$sale->id]['residual'])->toBe(-10);
+            ->and($unbalanced[$buy->id]['residual'])->toBe('20')
+            ->and($unbalanced[$sale->id]['residual'])->toBe('-10');
     });
 });

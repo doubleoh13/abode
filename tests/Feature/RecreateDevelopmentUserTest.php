@@ -1,6 +1,9 @@
 <?php
 
 use App\Enums\Permission;
+use App\Models\Financial\Account;
+use App\Models\Financial\Commodity;
+use App\Models\Financial\Transaction;
 use App\Models\User;
 use Illuminate\Database\Events\DatabaseRefreshed;
 use Illuminate\Support\Facades\Hash;
@@ -21,7 +24,10 @@ test('a database refresh recreates the development user and token in the local e
         ->and($token->abilities)->toBe(['*'])
         ->and(Hash::check('development-password', $user->password))->toBeTrue()
         ->and($user->hasPermission(Permission::ViewFinances))->toBeTrue()
-        ->and($user->hasPermission(Permission::ManageFinances))->toBeTrue();
+        ->and($user->hasPermission(Permission::ManageFinances))->toBeTrue()
+        ->and(Account::query()->exists())->toBeFalse()
+        ->and(Transaction::query()->exists())->toBeFalse()
+        ->and(Commodity::query()->where('code', 'FBTC')->exists())->toBeFalse();
 });
 
 test('the development user is recreated without a token when none is configured', function () {

@@ -27,7 +27,31 @@ class UpdateCommodityRequest extends StoreCommodityRequest
 
                 assert($commodity instanceof Commodity);
 
-                if ((int) $this->input('precision') >= $commodity->precision) {
+                $precision = (int) $this->input('precision');
+
+                if ($precision === $commodity->precision) {
+                    return;
+                }
+
+                if ($precision > $commodity->precision) {
+                    $additionalDigits = $precision - $commodity->precision;
+                    $postingDigits = (int) Posting::query()
+                        ->where('financial_commodity_id', $commodity->id)
+                        ->selectRaw('max(length(abs(amount)::text)) as maximum_digits')
+                        ->value('maximum_digits');
+                    $lotCostDigits = $commodity->id === Commodity::baseCurrency()->id
+                        ? (int) Lot::query()
+                            ->selectRaw('max(length(abs(cost)::text)) as maximum_digits')
+                            ->value('maximum_digits')
+                        : 0;
+
+                    if (max($postingDigits, $lotCostDigits) + $additionalDigits > 78) {
+                        $validator->errors()->add(
+                            'precision',
+                            'Precision cannot increase because a stored value would exceed 78 digits.',
+                        );
+                    }
+
                     return;
                 }
 

@@ -28,7 +28,7 @@ class PostingResource extends JsonResource
             'commodity' => new CommodityResource($this->whenLoaded('commodity')),
             'financial_lot_id' => $this->financial_lot_id,
             'lot' => new LotResource($this->whenLoaded('lot')),
-            'amount' => $this->amount,
+            'amount' => (string) $this->amount,
             'memo' => $this->memo,
             'metadata' => $this->metadata,
         ];
