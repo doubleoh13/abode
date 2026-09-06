@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { auth, resolveAuthenticatedUser } from './auth';
 import AccountsPage from './pages/AccountsPage.vue';
 import AppShell from './layouts/AppShell.vue';
+import CommoditiesPage from './pages/CommoditiesPage.vue';
 import FinancesPage from './pages/FinancesPage.vue';
 import HomePage from './pages/HomePage.vue';
 import LoginPage from './pages/LoginPage.vue';
@@ -24,6 +25,11 @@ export const router = createRouter({
                             path: 'accounts',
                             name: 'finances.accounts',
                             component: AccountsPage,
+                        },
+                        {
+                            path: 'commodities',
+                            name: 'finances.commodities',
+                            component: CommoditiesPage,
                         },
                     ],
                 },

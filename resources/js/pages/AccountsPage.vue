@@ -1,15 +1,28 @@
 <script setup lang="ts">
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, ref } from 'vue';
-import type { Account, AccountType } from '../types';
+import AccountForm from '../components/AccountForm.vue';
+import ModalDialog from '../components/ModalDialog.vue';
+import type { Account, AccountType, Institution } from '../types';
 
 const accounts = ref<Account[]>([]);
+const institutions = ref<Institution[]>([]);
 const loaded = ref(false);
+const formOpen = ref(false);
+const editingAccount = ref<Account | null>(null);
 
-onMounted(async () => {
-    accounts.value = (await axios.get<{ data: Account[] }>('/api/v1/accounts')).data.data;
+async function loadAccounts(): Promise<void> {
+    const [accountsResponse, institutionsResponse] = await Promise.all([
+        axios.get<{ data: Account[] }>('/api/v1/accounts'),
+        axios.get<{ data: Institution[] }>('/api/v1/institutions'),
+    ]);
+
+    accounts.value = accountsResponse.data.data;
+    institutions.value = institutionsResponse.data.data;
     loaded.value = true;
-});
+}
+
+onMounted(loadAccounts);
 
 const sections: Array<{ type: AccountType; label: string }> = [
     { type: 'asset', label: 'Assets' },
@@ -63,16 +76,71 @@ const rowsByType = computed<Map<AccountType, AccountRow[]>>(() => {
 });
 
 const hasAccounts = computed(() => accounts.value.length > 0);
+
+function openCreateForm(): void {
+    editingAccount.value = null;
+    formOpen.value = true;
+}
+
+function openEditForm(account: Account): void {
+    editingAccount.value = account;
+    formOpen.value = true;
+}
+
+function closeForm(): void {
+    formOpen.value = false;
+    editingAccount.value = null;
+}
+
+async function accountSaved(): Promise<void> {
+    closeForm();
+    await loadAccounts();
+}
+
+async function deleteAccount(account: Account): Promise<void> {
+    if (!confirm(`Delete ${account.path}?`)) {
+        return;
+    }
+
+    try {
+        await axios.delete(`/api/v1/accounts/${account.id}`);
+        await loadAccounts();
+    } catch (error) {
+        if (isAxiosError(error) && error.response?.status === 409) {
+            alert(error.response.data.message);
+            return;
+        }
+
+        throw error;
+    }
+}
 </script>
 
 <template>
     <div>
-        <h1 class="text-xl font-semibold">Accounts</h1>
+        <div class="flex items-center justify-between">
+            <h1 class="text-xl font-semibold">Accounts</h1>
+
+            <button type="button" class="button-primary" @click="openCreateForm">
+                New account
+            </button>
+        </div>
 
         <template v-if="loaded">
+            <ModalDialog :open="formOpen" @close="closeForm">
+                <AccountForm
+                    :key="editingAccount?.id ?? 'new'"
+                    :account="editingAccount"
+                    :accounts="accounts"
+                    :institutions="institutions"
+                    @saved="accountSaved"
+                    @cancelled="closeForm"
+                />
+            </ModalDialog>
+
             <p v-if="!hasAccounts" class="mt-6 text-sm text-muted">No accounts yet.</p>
 
-            <div v-else class="mt-6 flex max-w-2xl flex-col gap-8">
+            <div v-if="hasAccounts" class="mt-6 flex flex-col gap-8">
                 <section
                     v-for="section in sections.filter((candidate) => rowsByType.get(candidate.type)?.length)"
                     :key="section.type"
@@ -87,7 +155,7 @@ const hasAccounts = computed(() => accounts.value.length > 0);
                         <li
                             v-for="{ account, depth } in rowsByType.get(section.type)"
                             :key="account.id"
-                            class="flex items-center justify-between gap-4 px-4 py-2"
+                            class="group flex items-center justify-between gap-4 px-4 py-2"
                         >
                             <span
                                 class="text-sm"
@@ -100,6 +168,21 @@ const hasAccounts = computed(() => accounts.value.length > 0);
                             <span class="flex items-center gap-3 font-mono text-xs text-muted">
                                 <span v-if="account.institution">{{ account.institution.name }}</span>
                                 <span v-if="account.closed_at">closed {{ account.closed_at }}</span>
+
+                                <button
+                                    type="button"
+                                    class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+                                    @click="openEditForm(account)"
+                                >
+                                    Edit
+                                </button>
+                                <button
+                                    type="button"
+                                    class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
+                                    @click="deleteAccount(account)"
+                                >
+                                    Delete
+                                </button>
                             </span>
                         </li>
                     </ul>

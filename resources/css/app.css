@@ -25,3 +25,21 @@
         @apply bg-background font-sans text-foreground antialiased;
     }
 }
+
+@layer components {
+    .input {
+        @apply rounded-sm border border-edge bg-background px-3 py-2 text-sm transition-colors focus:border-accent focus:ring-1 focus:ring-accent focus:outline-none;
+    }
+
+    .field-label {
+        @apply font-mono text-xs tracking-wider text-muted uppercase;
+    }
+
+    .button-primary {
+        @apply rounded-sm bg-accent px-4 py-2 text-sm font-semibold text-background transition-colors hover:bg-accent/85 disabled:opacity-50;
+    }
+
+    .button-subtle {
+        @apply rounded-sm border border-edge px-4 py-2 text-sm text-muted transition-colors hover:text-foreground;
+    }
+}

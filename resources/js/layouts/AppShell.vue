@@ -81,16 +81,21 @@ async function endSession(): Promise<void> {
                         class="ml-5 flex flex-col gap-1"
                     >
                         <RouterLink
-                            :to="{ name: 'finances.accounts' }"
+                            v-for="subItem in [
+                                { name: 'finances.accounts', label: 'Accounts' },
+                                { name: 'finances.commodities', label: 'Commodities' },
+                            ]"
+                            :key="subItem.name"
+                            :to="{ name: subItem.name }"
                             class="rounded-sm px-3 py-1.5 text-sm transition-colors"
                             :class="
-                                route.name === 'finances.accounts'
+                                route.name === subItem.name
                                     ? 'bg-background text-foreground'
                                     : 'text-muted hover:bg-background/60 hover:text-foreground'
                             "
                             @click="mobileNavigationOpen = false"
                         >
-                            Accounts
+                            {{ subItem.label }}
                         </RouterLink>
                     </div>
                 </template>

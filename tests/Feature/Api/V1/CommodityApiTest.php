@@ -23,16 +23,24 @@ describe('with finance permissions', function () {
         actingWithPermissions(Permission::ViewFinances, Permission::ManageFinances);
     });
 
+    test('USD is present after migrating', function () {
+        $this->getJson('/api/v1/commodities')
+            ->assertOk()
+            ->assertJsonPath('data.0.code', 'USD')
+            ->assertJsonPath('data.0.precision', 2)
+            ->assertJsonPath('data.0.symbol_placement', 'prefix');
+    });
+
     test('a currency commodity can be created with display hints', function () {
         $this->postJson('/api/v1/commodities', [
-            'code' => 'USD',
-            'name' => 'US Dollar',
+            'code' => 'EUR',
+            'name' => 'Euro',
             'kind' => 'currency',
             'precision' => 2,
-            'symbol' => '$',
+            'symbol' => '€',
             'symbol_placement' => 'prefix',
         ])->assertCreated()
-            ->assertJsonPath('data.code', 'USD')
+            ->assertJsonPath('data.code', 'EUR')
             ->assertJsonPath('data.symbol_placement', 'prefix');
     });
 
@@ -48,8 +56,8 @@ describe('with finance permissions', function () {
 
     test('a symbol requires a placement and vice versa', function (array $payload, string $errorField) {
         $this->postJson('/api/v1/commodities', [
-            'code' => 'USD',
-            'name' => 'US Dollar',
+            'code' => 'EUR',
+            'name' => 'Euro',
             'kind' => 'currency',
             'precision' => 2,
             ...$payload,
