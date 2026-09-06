@@ -22,7 +22,7 @@ class StoreAccountRequest extends FormRequest
     {
         return [
             'account_type' => ['required', Rule::enum(AccountType::class)],
-            'institution_id' => ['nullable', 'integer', Rule::exists(Institution::class, 'id')],
+            'financial_institution_id' => ['nullable', 'integer', Rule::exists(Institution::class, 'id')],
             'parent_id' => ['nullable', 'integer', Rule::exists(Account::class, 'id')],
             'name' => [
                 'required',

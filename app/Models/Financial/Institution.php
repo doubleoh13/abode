@@ -23,6 +23,6 @@ class Institution extends Model
      */
     public function accounts(): HasMany
     {
-        return $this->hasMany(Account::class);
+        return $this->hasMany(Account::class, 'financial_institution_id');
     }
 }

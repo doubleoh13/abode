@@ -43,7 +43,7 @@ describe('with finance permissions', function () {
 
         $this->postJson('/api/v1/financial/accounts', [
             'account_type' => 'asset',
-            'institution_id' => $institution->id,
+            'financial_institution_id' => $institution->id,
             'name' => 'checking',
             'opened_at' => '2020-01-15',
         ])->assertCreated()

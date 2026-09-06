@@ -14,7 +14,7 @@ test('duplicate points for the same commodity and instant are rejected', functio
     $price = CommodityPrice::factory()->create();
 
     expect(fn () => CommodityPrice::factory()->create([
-        'commodity_id' => $price->commodity_id,
+        'financial_commodity_id' => $price->financial_commodity_id,
         'priced_at' => $price->priced_at,
     ]))->toThrow(QueryException::class);
 });

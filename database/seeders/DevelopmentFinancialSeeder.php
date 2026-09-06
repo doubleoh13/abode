@@ -87,7 +87,7 @@ class DevelopmentFinancialSeeder extends Seeder
         foreach ($accounts as $name => $definition) {
             $parent = Account::query()->create([
                 'account_type' => $accountType,
-                'institution_id' => isset($definition['institution']) ? $definition['institution']->id : null,
+                'financial_institution_id' => isset($definition['institution']) ? $definition['institution']->id : null,
                 'name' => $name,
                 'opened_at' => $definition['opened_at'] ?? null,
             ]);
@@ -137,7 +137,7 @@ class DevelopmentFinancialSeeder extends Seeder
 
         foreach ([['-2 years', 380000], ['-1 year', 405000], ['-1 month', 430000]] as [$when, $appraisal]) {
             CommodityPrice::query()->create([
-                'commodity_id' => $house->id,
+                'financial_commodity_id' => $house->id,
                 'price' => $appraisal,
                 'priced_at' => now()->modify($when)->setTime(12, 0),
             ]);
@@ -152,7 +152,7 @@ class DevelopmentFinancialSeeder extends Seeder
             $price *= 1 + fake()->randomFloat(4, -$maximumDailyMovePercent, $maximumDailyMovePercent) / 100;
 
             CommodityPrice::query()->create([
-                'commodity_id' => $commodity->id,
+                'financial_commodity_id' => $commodity->id,
                 'price' => round($price, 6),
                 'priced_at' => now()->subDays($daysAgo)->setTime(16, 0),
             ]);

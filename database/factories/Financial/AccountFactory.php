@@ -21,7 +21,7 @@ class AccountFactory extends Factory
     {
         return [
             'account_type' => AccountType::Expense,
-            'institution_id' => null,
+            'financial_institution_id' => null,
             'parent_id' => null,
             'name' => fake()->unique()->word(),
             'opened_at' => null,
@@ -47,7 +47,7 @@ class AccountFactory extends Factory
     public function atInstitution(Institution $institution): static
     {
         return $this->state(fn (array $attributes) => [
-            'institution_id' => $institution->id,
+            'financial_institution_id' => $institution->id,
         ]);
     }
 

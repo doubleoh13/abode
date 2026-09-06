@@ -19,7 +19,7 @@ class CommodityPriceFactory extends Factory
     public function definition(): array
     {
         return [
-            'commodity_id' => Commodity::factory(),
+            'financial_commodity_id' => Commodity::factory(),
             'price' => fake()->randomFloat(4, 0.01, 100000),
             'priced_at' => fake()->dateTimeBetween('-2 years', 'now'),
         ];

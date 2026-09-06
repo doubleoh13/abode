@@ -25,7 +25,7 @@ class Commodity extends Model
      */
     public function prices(): HasMany
     {
-        return $this->hasMany(CommodityPrice::class);
+        return $this->hasMany(CommodityPrice::class, 'financial_commodity_id');
     }
 
     /**

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['commodity_id', 'price', 'priced_at'])]
+#[Fillable(['financial_commodity_id', 'price', 'priced_at'])]
 class CommodityPrice extends Model
 {
     /** @use HasFactory<CommodityPriceFactory> */
@@ -23,7 +23,7 @@ class CommodityPrice extends Model
      */
     public function commodity(): BelongsTo
     {
-        return $this->belongsTo(Commodity::class);
+        return $this->belongsTo(Commodity::class, 'financial_commodity_id');
     }
 
     /**

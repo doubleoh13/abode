@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['account_type', 'institution_id', 'parent_id', 'name', 'opened_at', 'closed_at'])]
+#[Fillable(['account_type', 'financial_institution_id', 'parent_id', 'name', 'opened_at', 'closed_at'])]
 class Account extends Model
 {
     /** @use HasFactory<AccountFactory> */
@@ -26,7 +26,7 @@ class Account extends Model
      */
     public function institution(): BelongsTo
     {
-        return $this->belongsTo(Institution::class);
+        return $this->belongsTo(Institution::class, 'financial_institution_id');
     }
 
     /**

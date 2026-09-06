@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('financial_accounts', function (Blueprint $table) {
             $table->id();
             $table->string('account_type');
-            $table->foreignId('institution_id')->nullable()->constrained('financial_institutions');
+            $table->foreignId('financial_institution_id')->nullable()->constrained('financial_institutions');
             $table->foreignId('parent_id')->nullable()->constrained('financial_accounts');
             $table->string('name');
             $table->date('opened_at')->nullable();

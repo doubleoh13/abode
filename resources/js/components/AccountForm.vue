@@ -24,7 +24,7 @@ const form = reactive({
     name: props.account?.name ?? '',
     account_type: (props.account?.account_type ?? 'expense') as AccountType,
     parent_id: props.account?.parent_id ?? null,
-    institution_id: props.account?.institution?.id ?? null,
+    financial_institution_id: props.account?.institution?.id ?? null,
     opened_at: props.account?.opened_at ?? '',
     closed_at: props.account?.closed_at ?? '',
 });
@@ -66,7 +66,7 @@ async function save(): Promise<void> {
         name: form.name,
         account_type: form.account_type,
         parent_id: form.parent_id,
-        institution_id: form.institution_id,
+        financial_institution_id: form.financial_institution_id,
         opened_at: form.opened_at || null,
         closed_at: form.closed_at || null,
     };
@@ -120,9 +120,9 @@ async function save(): Promise<void> {
 
             <div class="flex flex-col gap-1.5">
                 <span class="field-label">Institution</span>
-                <ComboBox v-model="form.institution_id" :options="institutionOptions" nullable />
-                <p v-if="errors.institution_id" class="text-sm text-danger">
-                    {{ errors.institution_id[0] }}
+                <ComboBox v-model="form.financial_institution_id" :options="institutionOptions" nullable />
+                <p v-if="errors.financial_institution_id" class="text-sm text-danger">
+                    {{ errors.financial_institution_id[0] }}
                 </p>
             </div>
 

@@ -10,12 +10,12 @@ return new class extends Migration
     {
         Schema::create('financial_commodity_prices', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('commodity_id')->constrained('financial_commodities')->cascadeOnDelete();
+            $table->foreignId('financial_commodity_id')->constrained('financial_commodities')->cascadeOnDelete();
             $table->decimal('price', 24, 12);
             $table->timestampTz('priced_at');
             $table->timestampTz('created_at')->nullable();
 
-            $table->unique(['commodity_id', 'priced_at']);
+            $table->unique(['financial_commodity_id', 'priced_at']);
         });
     }
 
