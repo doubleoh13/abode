@@ -6,6 +6,7 @@ import CommoditiesPage from './pages/CommoditiesPage.vue';
 import FinancesPage from './pages/FinancesPage.vue';
 import HomePage from './pages/HomePage.vue';
 import InstitutionsPage from './pages/InstitutionsPage.vue';
+import JournalPage from './pages/JournalPage.vue';
 import LoginPage from './pages/LoginPage.vue';
 import NotFoundPage from './pages/NotFoundPage.vue';
 import PayeesPage from './pages/PayeesPage.vue';
@@ -23,6 +24,11 @@ export const router = createRouter({
                     path: 'finances',
                     children: [
                         { path: '', name: 'finances', component: FinancesPage },
+                        {
+                            path: 'journal',
+                            name: 'finances.journal',
+                            component: JournalPage,
+                        },
                         {
                             path: 'accounts',
                             name: 'finances.accounts',

@@ -2,6 +2,7 @@
 
 use App\Enums\Permission;
 use App\Models\Financial\Payee;
+use App\Models\Financial\Transaction;
 
 test('guests receive a 401', function () {
     $this->getJson('/api/v1/financial/payees')->assertUnauthorized();
@@ -51,6 +52,13 @@ describe('with finance permissions', function () {
         $this->deleteJson("/api/v1/financial/payees/{$payee->id}")->assertNoContent();
 
         $this->assertModelMissing($payee);
+    });
+
+    test('deleting a payee on journal transactions conflicts', function () {
+        $payee = Payee::factory()->create();
+        Transaction::factory()->withPayee($payee)->create();
+
+        $this->deleteJson("/api/v1/financial/payees/{$payee->id}")->assertConflict();
     });
 
     test('a note can be attached to a payee', function () {

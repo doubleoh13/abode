@@ -2,6 +2,8 @@
 
 use App\Enums\Permission;
 use App\Models\Financial\Commodity;
+use App\Models\Financial\Lot;
+use App\Models\Financial\Posting;
 
 test('guests receive a 401', function () {
     $this->getJson('/api/v1/financial/commodities')->assertUnauthorized();
@@ -97,5 +99,56 @@ describe('with finance permissions', function () {
         $this->deleteJson("/api/v1/financial/commodities/{$commodity->id}")->assertNoContent();
 
         $this->assertModelMissing($commodity);
+    });
+
+    test('deleting a commodity with journal postings conflicts', function () {
+        $commodity = Commodity::factory()->create();
+        Posting::factory()->ofCommodity($commodity)->create();
+
+        $this->deleteJson("/api/v1/financial/commodities/{$commodity->id}")->assertConflict();
+    });
+
+    test('precision cannot decrease while postings reference the commodity', function () {
+        $commodity = Commodity::factory()->create(['code' => 'FBTC', 'precision' => 8]);
+        Posting::factory()->ofCommodity($commodity)->create();
+
+        $this->putJson("/api/v1/financial/commodities/{$commodity->id}", [
+            'code' => 'FBTC',
+            'name' => $commodity->name,
+            'kind' => 'traded',
+            'precision' => 6,
+        ])->assertUnprocessable()->assertJsonValidationErrors('precision');
+    });
+
+    test('increasing precision rescales existing posting amounts', function () {
+        $commodity = Commodity::factory()->create(['code' => 'FBTC', 'precision' => 4]);
+        $posting = Posting::factory()->ofCommodity($commodity)->create(['amount' => 12_345]);
+
+        $this->putJson("/api/v1/financial/commodities/{$commodity->id}", [
+            'code' => 'FBTC',
+            'name' => $commodity->name,
+            'kind' => 'traded',
+            'precision' => 6,
+        ])->assertOk();
+
+        expect($posting->refresh()->amount)->toBe(1_234_500);
+    });
+
+    test('increasing the base currency precision also rescales lot costs', function () {
+        $usd = Commodity::query()->where('code', 'USD')->firstOrFail();
+        $posting = Posting::factory()->ofCommodity($usd)->create(['amount' => 500]);
+        $lot = Lot::factory()->create(['cost' => 425_000]);
+
+        $this->putJson("/api/v1/financial/commodities/{$usd->id}", [
+            'code' => 'USD',
+            'name' => $usd->name,
+            'kind' => 'currency',
+            'precision' => 3,
+            'symbol' => $usd->symbol,
+            'symbol_placement' => $usd->symbol_placement?->value,
+        ])->assertOk();
+
+        expect($posting->refresh()->amount)->toBe(5_000)
+            ->and($lot->refresh()->cost)->toBe(4_250_000);
     });
 });

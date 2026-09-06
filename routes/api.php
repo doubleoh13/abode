@@ -4,7 +4,10 @@ use App\Http\Controllers\Api\V1\AttachmentController;
 use App\Http\Controllers\Api\V1\Financial\AccountController;
 use App\Http\Controllers\Api\V1\Financial\CommodityController;
 use App\Http\Controllers\Api\V1\Financial\InstitutionController;
+use App\Http\Controllers\Api\V1\Financial\JournalIssueController;
+use App\Http\Controllers\Api\V1\Financial\LotController;
 use App\Http\Controllers\Api\V1\Financial\PayeeController;
+use App\Http\Controllers\Api\V1\Financial\TransactionController;
 use App\Http\Controllers\Api\V1\NoteController;
 use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
@@ -26,6 +29,9 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('institutions', InstitutionController::class)->only(['index', 'show']);
             Route::apiResource('commodities', CommodityController::class)->only(['index', 'show']);
             Route::apiResource('payees', PayeeController::class)->only(['index', 'show']);
+            Route::apiResource('transactions', TransactionController::class)->only(['index', 'show']);
+            Route::get('lots', [LotController::class, 'index'])->name('lots.index');
+            Route::get('journal-issues', [JournalIssueController::class, 'index'])->name('journal-issues.index');
         });
 
         Route::middleware('can:manage-finances')->group(function () {
@@ -33,6 +39,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('institutions', InstitutionController::class)->only(['store', 'update', 'destroy']);
             Route::apiResource('commodities', CommodityController::class)->only(['store', 'update', 'destroy']);
             Route::apiResource('payees', PayeeController::class)->only(['store', 'update', 'destroy']);
+            Route::apiResource('transactions', TransactionController::class)->only(['store', 'update', 'destroy']);
         });
     });
 });

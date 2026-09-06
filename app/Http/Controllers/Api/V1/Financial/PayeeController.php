@@ -7,6 +7,7 @@ use App\Http\Requests\Financial\StorePayeeRequest;
 use App\Http\Requests\Financial\UpdatePayeeRequest;
 use App\Http\Resources\Financial\PayeeResource;
 use App\Models\Financial\Payee;
+use App\Models\Financial\Transaction;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
@@ -38,6 +39,12 @@ class PayeeController extends Controller
 
     public function destroy(Payee $payee): Response
     {
+        abort_if(
+            Transaction::query()->where('financial_payee_id', $payee->id)->exists(),
+            Response::HTTP_CONFLICT,
+            'It is the payee on journal transactions.',
+        );
+
         $payee->delete();
 
         return response()->noContent();

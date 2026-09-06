@@ -3,11 +3,12 @@
 namespace App\Http\Controllers\Api\V1\Financial;
 
 use App\Http\Controllers\Controller;
-use Dedoc\Scramble\Attributes\Group;
 use App\Http\Requests\Financial\StoreAccountRequest;
 use App\Http\Requests\Financial\UpdateAccountRequest;
 use App\Http\Resources\Financial\AccountResource;
 use App\Models\Financial\Account;
+use App\Models\Financial\Posting;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 
@@ -54,6 +55,12 @@ class AccountController extends Controller
             $account->children()->exists(),
             Response::HTTP_CONFLICT,
             'Delete or reparent its child accounts first.',
+        );
+
+        abort_if(
+            Posting::query()->where('financial_account_id', $account->id)->exists(),
+            Response::HTTP_CONFLICT,
+            'It has journal postings.',
         );
 
         $account->delete();

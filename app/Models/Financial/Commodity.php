@@ -18,7 +18,16 @@ class Commodity extends Model
     /** @use HasFactory<CommodityFactory> */
     use HasAttachments, HasFactory, HasNotes;
 
+    public const string BASE_CURRENCY_CODE = 'USD';
+
     protected $table = 'financial_commodities';
+
+    private static ?self $baseCurrency = null;
+
+    public static function baseCurrency(): self
+    {
+        return self::$baseCurrency ??= self::query()->where('code', self::BASE_CURRENCY_CODE)->firstOrFail();
+    }
 
     /**
      * @return HasMany<CommodityPrice, $this>

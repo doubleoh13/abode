@@ -3,6 +3,7 @@
 use App\Enums\Permission;
 use App\Models\Financial\Account;
 use App\Models\Financial\Institution;
+use App\Models\Financial\Posting;
 
 test('guests receive a 401', function () {
     $this->getJson('/api/v1/financial/accounts')->assertUnauthorized();
@@ -141,6 +142,13 @@ describe('with finance permissions', function () {
         Account::factory()->childOf($food)->create(['name' => 'groceries']);
 
         $this->deleteJson("/api/v1/financial/accounts/{$food->id}")->assertConflict();
+    });
+
+    test('deleting an account with journal postings conflicts', function () {
+        $account = Account::factory()->create();
+        Posting::factory()->inAccount($account)->create();
+
+        $this->deleteJson("/api/v1/financial/accounts/{$account->id}")->assertConflict();
     });
 
     test('a leaf account can be deleted', function () {

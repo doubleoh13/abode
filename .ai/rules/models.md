@@ -17,11 +17,11 @@ commodities is one uniform table, hledger-style — a future posting is always (
 kind is BEHAVIORAL, not descriptive: Currency (unit of account), Traded (market-priced), Custom (manually valued, e.g. HOUSE). Resist adding descriptive cases that behave identically.
 precision is display decimals per commodity and will inform amount storage when postings are designed (not designed yet).
 symbol + symbol_placement (prefix/suffix) render "$1,234.56" vs "10.500 SPAXX"; both null = code-as-suffix. They are a pair: validation requires placement with symbol.
-USD-as-base-currency is config-in-code when needed, never a flag column. Price history, lots/cost basis: deliberately undesigned.
+USD-as-base-currency is config-in-code: Commodity::BASE_CURRENCY_CODE plus the memoized Commodity::baseCurrency() helper — never a flag column. Lots/cost basis are designed in .ai/rules/financial.md.
 
 ## Amount storage: bigint minor units scaled by commodity precision
 All journal/posting amounts are signed BIGINT in the commodity's minor units; commodity precision is the STORAGE SCALE, not just display ($12.34 = 1234 at precision 2). Balances are per-commodity integer SUMs — exact on Postgres and SQLite alike (never use decimal columns for amounts; SQLite makes them floats).
-precision is effectively immutable once amounts reference the commodity — changing it requires an explicit rescaling migration; validation should refuse it otherwise.
+precision immutability is ONE-DIRECTIONAL once postings/lots reference the commodity: decreases are refused in validation (lossy); increases are allowed and CommodityController::update rescales referencing posting amounts x10^delta in the same DB transaction (plus all lot costs when the base currency's own precision changes).
 Cap precision at 8 in validation: 64-bit range leaves ~9.2 billion whole units at scale 8. Never store ETH at native 18 (caps at 9.2 ETH). If display ever needs to differ from storage, add display_precision then.
 PHP int is 64-bit signed and matches bigint exactly — plain integer math, no bcmath.
 

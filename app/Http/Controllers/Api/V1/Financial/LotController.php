@@ -1,0 +1,57 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1\Financial;
+
+use App\Http\Controllers\Controller;
+use App\Http\Resources\Financial\LotResource;
+use App\Models\Financial\Account;
+use App\Models\Financial\Commodity;
+use App\Models\Financial\Lot;
+use Dedoc\Scramble\Attributes\Group;
+use Illuminate\Contracts\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Validation\Rule;
+
+#[Group('Financial / Lots')]
+class LotController extends Controller
+{
+    /**
+     * Lots of a commodity with open quantity in an account, for picking
+     * which lot a reduction draws from. Open quantity is guidance as of the
+     * given date; acquired quantity is the global allocation denominator.
+     */
+    public function index(Request $request): AnonymousResourceCollection
+    {
+        $validated = $request->validate([
+            'financial_account_id' => ['required', 'integer', Rule::exists(Account::class, 'id')],
+            'financial_commodity_id' => ['required', 'integer', Rule::exists(Commodity::class, 'id')],
+            'as_of' => ['nullable', 'date'],
+        ]);
+
+        $lots = Lot::query()
+            ->where('financial_commodity_id', $validated['financial_commodity_id'])
+            ->whereHas('postings', fn (Builder $query) => $query->where('financial_account_id', $validated['financial_account_id']))
+            ->withSum([
+                'postings as open_quantity' => fn (Builder $query) => $query
+                    ->where('financial_account_id', $validated['financial_account_id'])
+                    ->when(
+                        $validated['as_of'] ?? null,
+                        fn (Builder $withinDate, string $asOf) => $withinDate->whereHas(
+                            'transaction',
+                            fn (Builder $transaction) => $transaction->where('date', '<=', $asOf),
+                        ),
+                    ),
+            ], 'amount')
+            ->withSum([
+                'postings as acquired_quantity' => fn (Builder $query) => $query->where('amount', '>', 0),
+            ], 'amount')
+            ->orderBy('acquired_at')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (Lot $lot): bool => (int) $lot->open_quantity > 0)
+            ->values();
+
+        return LotResource::collection($lots);
+    }
+}
