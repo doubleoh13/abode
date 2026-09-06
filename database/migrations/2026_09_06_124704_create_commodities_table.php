@@ -16,7 +16,7 @@ return new class extends Migration
             $table->unsignedTinyInteger('precision');
             $table->string('symbol')->nullable();
             $table->string('symbol_placement')->nullable();
-            $table->timestamps();
+            $table->timestampsTz();
         });
     }
 

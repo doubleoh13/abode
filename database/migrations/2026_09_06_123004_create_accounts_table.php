@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('name');
             $table->date('opened_at')->nullable();
             $table->date('closed_at')->nullable();
-            $table->timestamps();
+            $table->timestampsTz();
 
             $table->index('account_type');
         });

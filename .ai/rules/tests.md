@@ -5,6 +5,6 @@ paths:
 
 # Tests
 
-## Tests run on in-memory SQLite until Postgres-specific behavior exists
-Dev runs Postgres; the test suite deliberately stays on in-memory SQLite (phpunit.xml) for speed.
-Switch the suite outright to Postgres (not both) when the first jsonb column, raw Postgres expression, or case-sensitivity-dependent LIKE appears.
+## Tests run on Postgres (abode_testing)
+The suite runs against the local Postgres database abode_testing (phpunit.xml), matching dev. Switched from in-memory SQLite on 2026-09-06 when timestamptz columns landed — the agreed trigger for Postgres-specific behavior.
+`php artisan test` will offer to create the database if it is missing.
