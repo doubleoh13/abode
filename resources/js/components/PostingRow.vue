@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import ComboBox from './ComboBox.vue';
 import LotPicker from './LotPicker.vue';
 import type { Account, Commodity, Lot, PostingDraft, PostingStatus } from '../types';
@@ -17,6 +17,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{ remove: []; lotsLoaded: [Lot[]] }>();
+const memoOpen = ref(props.draft.memo !== '');
 
 const statusOptions: Array<{ value: PostingStatus; label: string }> = [
     { value: 'pending', label: 'Pending' },
@@ -81,13 +82,10 @@ function errorFor(field: string): string | null {
 </script>
 
 <template>
-    <div class="rounded-md border border-edge bg-background/40 p-3">
-        <div
-            class="grid grid-cols-1 gap-3 sm:grid-cols-2"
-            :class="carriesStatus ? 'lg:grid-cols-5' : 'lg:grid-cols-4'"
-        >
-            <div class="flex flex-col gap-1.5 lg:col-span-2">
-                <span class="field-label">Account</span>
+    <div class="px-3 py-2.5">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,1fr)_9rem_8rem_8rem_2rem] lg:items-start">
+            <div class="flex flex-col gap-1.5">
+                <span class="field-label lg:sr-only">Account</span>
                 <ComboBox v-model="draft.financial_account_id" :options="accountOptions" nullable />
                 <p v-if="errorFor('financial_account_id')" class="text-sm text-danger">
                     {{ errorFor('financial_account_id') }}
@@ -95,29 +93,45 @@ function errorFor(field: string): string | null {
             </div>
 
             <label class="flex flex-col gap-1.5">
-                <span class="field-label">Amount</span>
+                <span class="field-label lg:sr-only">Amount</span>
                 <input v-model="draft.amount" type="text" inputmode="decimal" class="input text-right font-mono" />
                 <p v-if="errorFor('amount')" class="text-sm text-danger">{{ errorFor('amount') }}</p>
             </label>
 
             <div class="flex flex-col gap-1.5">
-                <span class="field-label">Commodity</span>
+                <span class="field-label lg:sr-only">Commodity</span>
                 <ComboBox v-model="draft.financial_commodity_id" :options="commodityOptions" nullable />
                 <p v-if="errorFor('financial_commodity_id')" class="text-sm text-danger">
                     {{ errorFor('financial_commodity_id') }}
                 </p>
             </div>
 
-            <div v-if="carriesStatus" class="flex flex-col gap-1.5">
-                <span class="field-label">Status</span>
-                <ComboBox v-model="draft.status" :options="statusOptions" />
-                <p v-if="errorFor('status')" class="text-sm text-danger">{{ errorFor('status') }}</p>
+            <div class="flex flex-col gap-1.5">
+                <span v-if="carriesStatus" class="field-label lg:sr-only">Status</span>
+                <template v-if="carriesStatus">
+                    <ComboBox v-model="draft.status" :options="statusOptions" />
+                    <p v-if="errorFor('status')" class="text-sm text-danger">
+                        {{ errorFor('status') }}
+                    </p>
+                </template>
             </div>
+
+            <button
+                v-if="removable"
+                type="button"
+                class="self-center font-mono text-lg leading-none text-muted transition-colors hover:text-danger"
+                title="Remove posting"
+                aria-label="Remove posting"
+                @click="emit('remove')"
+            >
+                ×
+            </button>
+            <span v-else class="hidden lg:block"></span>
         </div>
 
-        <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div v-if="memoOpen || needsLot" class="mt-2 grid grid-cols-1 gap-3 border-l border-edge pl-3 sm:grid-cols-2 lg:ml-3 lg:grid-cols-4">
             <label class="flex flex-col gap-1.5 lg:col-span-2">
-                <span class="field-label">Memo</span>
+                <span class="field-label">Posting memo</span>
                 <input v-model="draft.memo" type="text" class="input" />
                 <p v-if="errorFor('memo')" class="text-sm text-danger">{{ errorFor('memo') }}</p>
             </label>
@@ -192,13 +206,13 @@ function errorFor(field: string): string | null {
             </template>
         </div>
 
-        <div v-if="removable" class="mt-2 flex justify-end">
+        <div v-else class="mt-1.5 pl-1">
             <button
                 type="button"
-                class="font-mono text-xs tracking-wider text-muted uppercase transition-colors hover:text-danger"
-                @click="emit('remove')"
+                class="font-mono text-xs tracking-wider text-muted uppercase transition-colors hover:text-foreground"
+                @click="memoOpen = true"
             >
-                Remove
+                + Memo
             </button>
         </div>
     </div>

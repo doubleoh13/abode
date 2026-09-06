@@ -257,7 +257,7 @@ async function save(): Promise<void> {
 </script>
 
 <template>
-    <form class="rounded-md border border-edge bg-surface p-6" @submit.prevent="save">
+    <form class="rounded-md border border-edge bg-surface p-5" @submit.prevent="save">
         <h2 class="font-mono text-xs tracking-wider text-muted uppercase">
             {{ transaction ? 'Edit transaction' : 'New transaction' }}
         </h2>
@@ -284,49 +284,66 @@ async function save(): Promise<void> {
             </label>
         </div>
 
-        <div class="mt-6 flex items-center justify-between">
-            <span class="field-label">Postings</span>
-            <button type="button" class="button-subtle" @click="addPosting">Add posting</button>
+        <div class="mt-6 overflow-visible rounded-sm border border-edge bg-background/40">
+            <div class="hidden grid-cols-[minmax(16rem,1fr)_9rem_8rem_8rem_2rem] gap-3 border-b border-edge px-3 py-2 lg:grid">
+                <span class="field-label">Account</span>
+                <span class="field-label text-right">Amount</span>
+                <span class="field-label">Commodity</span>
+                <span class="field-label">Status</span>
+                <span></span>
+            </div>
+
+            <div class="divide-y divide-edge">
+                <PostingRow
+                    v-for="(draft, index) in postings"
+                    :key="index"
+                    :draft="draft"
+                    :index="index"
+                    :accounts="accounts"
+                    :commodities="commodities"
+                    :base-currency="baseCurrency"
+                    :transaction-date="form.date"
+                    :known-lots="knownLots"
+                    :errors="errors"
+                    :removable="postings.length > 2"
+                    @remove="removePosting(index)"
+                    @lots-loaded="registerLots"
+                />
+            </div>
+
+            <p v-if="errors.postings" class="border-t border-edge px-3 py-2 text-sm text-danger">
+                {{ errors.postings[0] }}
+            </p>
+
+            <div class="flex items-center justify-between gap-4 border-t border-edge px-3 py-2 font-mono text-xs">
+                <button
+                    type="button"
+                    class="tracking-wider text-muted uppercase transition-colors hover:text-foreground"
+                    @click="addPosting"
+                >
+                    + Add posting
+                </button>
+
+                <div class="flex items-center gap-5">
+                    <span class="text-muted">
+                        {{ balance.faceSums.join(' · ') || '—' }}
+                    </span>
+                    <span
+                        v-if="balance.residual !== null"
+                        :class="balance.residual === 0 ? 'tracking-wider text-accent uppercase' : 'text-danger'"
+                    >
+                        {{
+                            balance.residual === 0
+                                ? `Balanced${balance.approximate ? ' (approx.)' : ''}`
+                                : `Off by ${formatAmount(balance.residual, baseCurrency)}`
+                        }}
+                    </span>
+                    <span v-else class="tracking-wider text-muted uppercase">Incomplete</span>
+                </div>
+            </div>
         </div>
 
-        <div class="mt-2 flex flex-col gap-3">
-            <PostingRow
-                v-for="(draft, index) in postings"
-                :key="index"
-                :draft="draft"
-                :index="index"
-                :accounts="accounts"
-                :commodities="commodities"
-                :base-currency="baseCurrency"
-                :transaction-date="form.date"
-                :known-lots="knownLots"
-                :errors="errors"
-                :removable="postings.length > 2"
-                @remove="removePosting(index)"
-                @lots-loaded="registerLots"
-            />
-        </div>
-
-        <p v-if="errors.postings" class="mt-3 text-sm text-danger">{{ errors.postings[0] }}</p>
-
-        <div class="mt-3 flex items-center justify-between rounded-md border border-edge bg-background/40 px-4 py-2 font-mono text-xs">
-            <span class="tracking-wider text-muted uppercase">
-                {{ balance.faceSums.join(' · ') || '—' }}
-            </span>
-            <span
-                v-if="balance.residual !== null"
-                :class="balance.residual === 0 ? 'tracking-wider text-accent uppercase' : 'text-danger'"
-            >
-                {{
-                    balance.residual === 0
-                        ? `Balanced${balance.approximate ? ' (approx.)' : ''}`
-                        : `Off by ${formatAmount(balance.residual, baseCurrency)}`
-                }}
-            </span>
-            <span v-else class="tracking-wider text-muted uppercase">Incomplete</span>
-        </div>
-
-        <div class="mt-6 flex gap-3">
+        <div class="mt-5 flex gap-3">
             <button type="submit" :disabled="submitting" class="button-primary">Save</button>
             <button type="button" class="button-subtle" @click="emit('cancelled')">Cancel</button>
         </div>

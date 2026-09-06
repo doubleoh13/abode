@@ -20,10 +20,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown));
         <Transition name="modal">
             <div
                 v-if="open"
-                class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-6 pt-[10vh]"
+                class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-6 pt-[6vh]"
                 @click.self="emit('close')"
             >
-                <div class="modal-panel w-full max-w-3xl" role="dialog" aria-modal="true">
+                <div class="modal-panel w-full max-w-5xl" role="dialog" aria-modal="true">
                     <slot />
                 </div>
             </div>
