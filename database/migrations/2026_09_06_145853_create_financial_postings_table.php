@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('financial_transaction_id')->constrained('financial_transactions')->cascadeOnDelete();
             $table->unsignedSmallInteger('position');
-            $table->string('status');
+            $table->string('status')->nullable();
             $table->foreignId('financial_account_id')->constrained('financial_accounts');
             $table->foreignId('financial_commodity_id')->constrained('financial_commodities');
             $table->foreignId('financial_lot_id')->nullable()->constrained('financial_lots');

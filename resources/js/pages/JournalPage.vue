@@ -10,6 +10,7 @@ import type {
     JournalIssue,
     Paginated,
     Payee,
+    PostingStatus,
     Transaction,
 } from '../types';
 
@@ -24,18 +25,33 @@ const loaded = ref(false);
 const formOpen = ref(false);
 const editingTransaction = ref<Transaction | null>(null);
 
-const baseCurrency = computed(
-    () => commodities.value.find((commodity) => commodity.code === 'USD') ?? null,
-);
-
 const issuesByTransaction = computed(() => {
     const map = new Map<number, JournalIssue[]>();
 
     for (const issue of issues.value) {
+        if (issue.financial_posting_id !== undefined) {
+            continue;
+        }
+
         map.set(issue.financial_transaction_id, [
             ...(map.get(issue.financial_transaction_id) ?? []),
             issue,
         ]);
+    }
+
+    return map;
+});
+
+const issuesByPosting = computed(() => {
+    const map = new Map<number, JournalIssue[]>();
+
+    for (const issue of issues.value) {
+        if (issue.financial_posting_id !== undefined) {
+            map.set(issue.financial_posting_id, [
+                ...(map.get(issue.financial_posting_id) ?? []),
+                issue,
+            ]);
+        }
     }
 
     return map;
@@ -98,6 +114,36 @@ async function transactionSaved(): Promise<void> {
     await Promise.all([loadTransactions(), loadIssues()]);
 }
 
+function accountPathAncestor(path: string | undefined): string {
+    const segments = path?.split(':') ?? [];
+
+    return segments.length > 1 ? `${segments.slice(0, -1).join(':')}:` : '';
+}
+
+function accountPathLeaf(path: string | undefined): string {
+    return path?.split(':').at(-1) ?? '';
+}
+
+function statusSymbol(status: PostingStatus | null): string {
+    if (status === 'pending') {
+        return '○';
+    }
+
+    if (status === 'cleared') {
+        return '✓';
+    }
+
+    if (status === 'reconciled') {
+        return '✓✓';
+    }
+
+    return '—';
+}
+
+function statusLabel(status: PostingStatus | null): string {
+    return status === null ? 'No status' : status[0].toUpperCase() + status.slice(1);
+}
+
 async function deleteTransaction(transaction: Transaction): Promise<void> {
     if (!confirm(`Delete the ${transaction.date} transaction?`)) {
         return;
@@ -117,22 +163,6 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
     await Promise.all([loadTransactions(), loadIssues()]);
 }
 
-function displayTotal(transaction: Transaction): string {
-    if (baseCurrency.value === null) {
-        return '';
-    }
-
-    const total = (transaction.postings ?? [])
-        .filter(
-            (posting) =>
-                posting.financial_commodity_id === baseCurrency.value?.id &&
-                (posting.account?.account_type === 'asset' ||
-                    posting.account?.account_type === 'liability'),
-        )
-        .reduce((sum, posting) => sum + posting.amount, 0);
-
-    return formatAmount(total, baseCurrency.value);
-}
 </script>
 
 <template>
@@ -170,52 +200,85 @@ function displayTotal(transaction: Transaction): string {
                 v-else
                 class="mt-6 divide-y divide-edge overflow-hidden rounded-md border border-edge bg-surface"
             >
-                <li
-                    v-for="transaction in transactions"
-                    :key="transaction.id"
-                    class="group flex items-center gap-4 px-4 py-2"
-                >
-                    <span class="font-mono text-xs text-muted">{{ transaction.date }}</span>
+                <li v-for="transaction in transactions" :key="transaction.id" class="group px-4 py-2">
+                    <div class="flex items-center gap-4">
+                        <span class="font-mono text-xs text-muted">{{ transaction.date }}</span>
 
-                    <span
-                        v-if="issuesByTransaction.has(transaction.id)"
-                        class="cursor-help text-danger"
-                        :title="issuesByTransaction.get(transaction.id)?.map((issue) => issue.message).join('\n')"
-                    >
-                        ⚠
-                    </span>
-
-                    <span class="min-w-0 flex-1 truncate text-sm">
-                        {{ transaction.payee?.name ?? transaction.memo ?? '—' }}
-                        <span v-if="transaction.payee && transaction.memo" class="text-muted">
-                            · {{ transaction.memo }}
+                        <span
+                            v-if="issuesByTransaction.has(transaction.id)"
+                            class="cursor-help text-danger"
+                            :title="issuesByTransaction.get(transaction.id)?.map((issue) => issue.message).join('\n')"
+                        >
+                            ⚠
                         </span>
-                    </span>
 
-                    <span class="font-mono text-xs tracking-wider text-muted uppercase">
-                        {{ transaction.status }}
-                    </span>
-
-                    <span class="w-28 text-right font-mono text-sm">
-                        {{ displayTotal(transaction) }}
-                    </span>
-
-                    <span class="flex items-center gap-3 font-mono text-xs text-muted">
-                        <button
-                            type="button"
-                            class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
-                            @click="openEditForm(transaction)"
+                        <span
+                            class="w-8 shrink-0 font-mono text-sm text-muted"
+                            :title="statusLabel(transaction.status)"
                         >
-                            Edit
-                        </button>
-                        <button
-                            type="button"
-                            class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
-                            @click="deleteTransaction(transaction)"
+                            <span aria-hidden="true">{{ statusSymbol(transaction.status) }}</span>
+                            <span class="sr-only">{{ statusLabel(transaction.status) }}</span>
+                        </span>
+
+                        <span class="min-w-0 flex-1 truncate text-sm">
+                            {{ transaction.payee?.name ?? transaction.memo ?? '—' }}
+                            <span v-if="transaction.payee && transaction.memo" class="text-muted">
+                                · {{ transaction.memo }}
+                            </span>
+                        </span>
+
+                        <span class="flex items-center gap-3 font-mono text-xs text-muted">
+                            <button
+                                type="button"
+                                class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+                                @click="openEditForm(transaction)"
+                            >
+                                Edit
+                            </button>
+                            <button
+                                type="button"
+                                class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
+                                @click="deleteTransaction(transaction)"
+                            >
+                                Delete
+                            </button>
+                        </span>
+                    </div>
+
+                    <div class="mt-1 flex flex-col">
+                        <div
+                            v-for="posting in transaction.postings"
+                            :key="posting.id"
+                            class="flex items-center gap-4 py-0.5 pl-24"
                         >
-                            Delete
-                        </button>
-                    </span>
+                            <span
+                                v-if="issuesByPosting.has(posting.id)"
+                                class="-ml-6 w-6 cursor-help text-danger"
+                                :title="issuesByPosting.get(posting.id)?.map((issue) => issue.message).join('\n')"
+                            >
+                                ⚠
+                            </span>
+
+                            <span
+                                class="w-8 shrink-0 font-mono text-sm text-muted"
+                                :title="posting.status !== null && posting.status !== transaction.status ? statusLabel(posting.status) : undefined"
+                            >
+                                <template v-if="posting.status !== null && posting.status !== transaction.status">
+                                    <span aria-hidden="true">{{ statusSymbol(posting.status) }}</span>
+                                    <span class="sr-only">{{ statusLabel(posting.status) }}</span>
+                                </template>
+                            </span>
+
+                            <span class="min-w-0 flex-1 truncate text-sm">
+                                <span class="text-muted">{{ accountPathAncestor(posting.account?.path) }}</span><span>{{ accountPathLeaf(posting.account?.path) }}</span>
+                                <span v-if="posting.memo" class="text-muted"> · {{ posting.memo }}</span>
+                            </span>
+
+                            <span class="text-right font-mono text-sm">
+                                {{ posting.commodity ? formatAmount(posting.amount, posting.commodity) : posting.amount }}
+                            </span>
+                        </div>
+                    </div>
                 </li>
             </ul>
 

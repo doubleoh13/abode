@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import ComboBox from './ComboBox.vue';
 import LotPicker from './LotPicker.vue';
 import type { Account, Commodity, Lot, PostingDraft, PostingStatus } from '../types';
@@ -41,6 +41,30 @@ const commodity = computed(
         ) ?? null,
 );
 
+const account = computed(
+    () =>
+        props.accounts.find((candidate) => candidate.id === props.draft.financial_account_id) ??
+        null,
+);
+
+const carriesStatus = computed(
+    () => account.value?.account_type === 'asset' || account.value?.account_type === 'liability',
+);
+
+watch(
+    carriesStatus,
+    (statusApplies) => {
+        if (statusApplies && props.draft.status === null) {
+            props.draft.status = 'cleared';
+        }
+
+        if (!statusApplies) {
+            props.draft.status = null;
+        }
+    },
+    { immediate: true },
+);
+
 const needsLot = computed(
     () => commodity.value !== null && commodity.value.id !== props.baseCurrency.id,
 );
@@ -58,7 +82,10 @@ function errorFor(field: string): string | null {
 
 <template>
     <div class="rounded-md border border-edge bg-background/40 p-3">
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div
+            class="grid grid-cols-1 gap-3 sm:grid-cols-2"
+            :class="carriesStatus ? 'lg:grid-cols-5' : 'lg:grid-cols-4'"
+        >
             <div class="flex flex-col gap-1.5 lg:col-span-2">
                 <span class="field-label">Account</span>
                 <ComboBox v-model="draft.financial_account_id" :options="accountOptions" nullable />
@@ -81,7 +108,7 @@ function errorFor(field: string): string | null {
                 </p>
             </div>
 
-            <div class="flex flex-col gap-1.5">
+            <div v-if="carriesStatus" class="flex flex-col gap-1.5">
                 <span class="field-label">Status</span>
                 <ComboBox v-model="draft.status" :options="statusOptions" />
                 <p v-if="errorFor('status')" class="text-sm text-danger">{{ errorFor('status') }}</p>

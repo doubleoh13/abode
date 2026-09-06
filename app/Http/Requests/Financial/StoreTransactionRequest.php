@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Financial;
 
+use App\Enums\Financial\AccountType;
 use App\Enums\Financial\PostingStatus;
 use App\Models\Financial\Account;
 use App\Models\Financial\Commodity;
@@ -29,7 +30,7 @@ class StoreTransactionRequest extends FormRequest
             'memo' => ['nullable', 'string', 'max:255'],
             'metadata' => ['sometimes', 'array'],
             'postings' => ['required', 'array', 'min:2'],
-            'postings.*.status' => ['required', Rule::enum(PostingStatus::class)],
+            'postings.*.status' => ['nullable', Rule::enum(PostingStatus::class)],
             'postings.*.financial_account_id' => ['required', 'integer', Rule::exists(Account::class, 'id')],
             'postings.*.financial_commodity_id' => ['required', 'integer', Rule::exists(Commodity::class, 'id')],
             'postings.*.amount' => ['required', 'integer', 'not_in:0'],
@@ -52,10 +53,41 @@ class StoreTransactionRequest extends FormRequest
     public function after(): array
     {
         return [
+            fn (Validator $validator) => $this->validatePostingStatuses($validator),
             fn (Validator $validator) => $this->validateLotStructure($validator),
             fn (Validator $validator) => $this->validateReferencedLots($validator),
             fn (Validator $validator) => $this->validateBalance($validator),
         ];
+    }
+
+    protected function validatePostingStatuses(Validator $validator): void
+    {
+        if ($validator->errors()->isNotEmpty()) {
+            return;
+        }
+
+        $accounts = Account::query()
+            ->findMany(collect($this->postingInputs())->pluck('financial_account_id')->unique())
+            ->keyBy('id');
+
+        foreach ($this->postingInputs() as $index => $posting) {
+            $account = $accounts->get((int) $posting['financial_account_id']);
+
+            if ($account === null) {
+                continue;
+            }
+
+            $status = $posting['status'] ?? null;
+            $carriesStatus = in_array($account->account_type, [AccountType::Asset, AccountType::Liability], true);
+
+            if ($carriesStatus && $status === null) {
+                $validator->errors()->add("postings.{$index}.status", 'A status is required for asset and liability postings.');
+            }
+
+            if (! $carriesStatus && $status !== null) {
+                $validator->errors()->add("postings.{$index}.status", 'Only asset and liability postings may have a status.');
+            }
+        }
     }
 
     protected function validateLotStructure(Validator $validator): void

@@ -87,7 +87,7 @@ class TransactionWriter
 
             $attributes = [
                 'position' => $position,
-                'status' => $payload['status'],
+                'status' => $payload['status'] ?? null,
                 'financial_account_id' => $payload['financial_account_id'],
                 'financial_commodity_id' => $payload['financial_commodity_id'],
                 'financial_lot_id' => $this->resolveLot($transaction, $payload, $persisted, $baseCurrencyId, $sweepCandidates),

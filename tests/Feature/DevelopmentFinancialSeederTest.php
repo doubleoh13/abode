@@ -4,6 +4,7 @@ use App\Models\Financial\Account;
 use App\Models\Financial\Commodity;
 use App\Models\Financial\CommodityPrice;
 use App\Models\Financial\Institution;
+use App\Models\Financial\Posting;
 use Database\Seeders\DevelopmentFinancialSeeder;
 
 test('the seeder populates the finance domain in the local environment', function () {
@@ -14,7 +15,11 @@ test('the seeder populates the finance domain in the local environment', functio
     expect(Institution::query()->count())->toBeGreaterThan(0)
         ->and(Account::query()->count())->toBeGreaterThan(0)
         ->and(Commodity::query()->where('code', 'FBTC')->exists())->toBeTrue()
-        ->and(CommodityPrice::query()->count())->toBeGreaterThan(90);
+        ->and(CommodityPrice::query()->count())->toBeGreaterThan(90)
+        ->and(Posting::query()
+            ->whereNotNull('status')
+            ->whereHas('account', fn ($query) => $query->whereNotIn('account_type', ['asset', 'liability']))
+            ->exists())->toBeFalse();
 });
 
 test('the seeder is idempotent', function () {

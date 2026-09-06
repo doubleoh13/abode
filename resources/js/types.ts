@@ -57,7 +57,7 @@ export interface Lot {
 export interface Posting {
     id: number;
     position: number;
-    status: PostingStatus;
+    status: PostingStatus | null;
     financial_account_id: number;
     account?: Account;
     financial_commodity_id: number;
@@ -76,7 +76,7 @@ export interface Transaction {
     payee?: Payee | null;
     memo: string | null;
     metadata: Record<string, unknown>;
-    status: PostingStatus;
+    status: PostingStatus | null;
     postings?: Posting[];
 }
 
@@ -91,7 +91,7 @@ export interface JournalIssue {
 
 export interface PostingDraft {
     id: number | null;
-    status: PostingStatus;
+    status: PostingStatus | null;
     financial_account_id: number | null;
     financial_commodity_id: number | null;
     amount: string;

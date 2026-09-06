@@ -47,22 +47,21 @@ class Transaction extends Model
     }
 
     /**
-     * Least-advanced status among Asset/Liability postings; transactions
-     * without such postings aggregate over all of their postings instead.
+     * Least-advanced status among Asset/Liability postings — the only legs
+     * that carry one. Null for transactions touching neither.
      */
     protected function status(): Attribute
     {
         return Attribute::make(
-            get: function (): PostingStatus {
-                $assetOrLiability = $this->postings->filter(
-                    fn (Posting $posting): bool => in_array($posting->account->account_type, [AccountType::Asset, AccountType::Liability], true),
-                );
-
-                $pool = $assetOrLiability->isNotEmpty() ? $assetOrLiability : $this->postings;
-
-                return $pool->map(fn (Posting $posting): PostingStatus => $posting->status)
+            get: function (): ?PostingStatus {
+                return $this->postings
+                    ->filter(
+                        fn (Posting $posting): bool => $posting->status !== null
+                            && in_array($posting->account->account_type, [AccountType::Asset, AccountType::Liability], true),
+                    )
+                    ->map(fn (Posting $posting): PostingStatus => $posting->status)
                     ->sortBy(fn (PostingStatus $status): int => $status->rank())
-                    ->first() ?? PostingStatus::Pending;
+                    ->first();
             },
         );
     }

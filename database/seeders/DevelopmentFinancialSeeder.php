@@ -255,7 +255,7 @@ class DevelopmentFinancialSeeder extends Seeder
             Posting::query()->create([
                 'financial_transaction_id' => $transaction->id,
                 'position' => $position,
-                'status' => $status,
+                'status' => in_array($account->account_type, [AccountType::Asset, AccountType::Liability], true) ? $status : null,
                 'financial_account_id' => $account->id,
                 'financial_commodity_id' => $commodity->id,
                 'financial_lot_id' => $lotId,

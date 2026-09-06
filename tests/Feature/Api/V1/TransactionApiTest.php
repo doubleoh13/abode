@@ -12,7 +12,7 @@ use App\Models\Financial\Transaction;
 function journalLeg(Account $account, Commodity $commodity, int $amount, array $overrides = []): array
 {
     return [
-        'status' => 'cleared',
+        'status' => in_array($account->account_type, [AccountType::Asset, AccountType::Liability], true) ? 'cleared' : null,
         'financial_account_id' => $account->id,
         'financial_commodity_id' => $commodity->id,
         'amount' => $amount,
@@ -110,6 +110,19 @@ describe('with finance permissions', function () {
                 journalLeg($this->groceries, $this->usd, 100),
             ],
         ])->assertUnprocessable()->assertJsonValidationErrors(['postings.0.amount', 'postings.0.status']);
+    });
+
+    test('status is required only for asset and liability postings', function () {
+        $this->postJson('/api/v1/financial/transactions', [
+            'date' => '2026-08-01',
+            'postings' => [
+                journalLeg($this->checking, $this->usd, -100, ['status' => null]),
+                journalLeg($this->groceries, $this->usd, 100, ['status' => 'cleared']),
+            ],
+        ])->assertUnprocessable()->assertJsonValidationErrors([
+            'postings.0.status',
+            'postings.1.status',
+        ]);
     });
 
     test('a base-currency posting cannot reference a lot', function () {
@@ -351,31 +364,31 @@ describe('with finance permissions', function () {
     test('transaction status is the least advanced asset or liability posting', function () {
         $transaction = Transaction::factory()->create();
         Posting::factory()->forTransaction($transaction, 0)->inAccount($this->checking)->pending()->create();
-        Posting::factory()->forTransaction($transaction, 1)->inAccount($this->groceries)->reconciled()->create();
+        Posting::factory()->forTransaction($transaction, 1)->inAccount($this->groceries)->create();
 
         $this->getJson("/api/v1/financial/transactions/{$transaction->id}")
             ->assertOk()
             ->assertJsonPath('data.status', 'pending');
     });
 
-    test('non asset or liability postings do not hold a transaction back', function () {
+    test('non asset or liability postings do not contribute to transaction status', function () {
         $transaction = Transaction::factory()->create();
         Posting::factory()->forTransaction($transaction, 0)->inAccount($this->checking)->reconciled()->create();
-        Posting::factory()->forTransaction($transaction, 1)->inAccount($this->groceries)->pending()->create();
+        Posting::factory()->forTransaction($transaction, 1)->inAccount($this->groceries)->create();
 
         $this->getJson("/api/v1/financial/transactions/{$transaction->id}")
             ->assertOk()
             ->assertJsonPath('data.status', 'reconciled');
     });
 
-    test('a transaction without asset or liability postings aggregates all postings', function () {
+    test('a transaction without asset or liability postings has no status', function () {
         $transaction = Transaction::factory()->create();
-        Posting::factory()->forTransaction($transaction, 0)->inAccount($this->gains)->create();
-        Posting::factory()->forTransaction($transaction, 1)->inAccount($this->groceries)->pending()->create();
+        Posting::factory()->forTransaction($transaction, 0)->inAccount($this->gains)->create(['status' => null]);
+        Posting::factory()->forTransaction($transaction, 1)->inAccount($this->groceries)->create(['status' => null]);
 
         $this->getJson("/api/v1/financial/transactions/{$transaction->id}")
             ->assertOk()
-            ->assertJsonPath('data.status', 'pending');
+            ->assertJsonPath('data.status', null);
     });
 
     test('metadata round-trips on transactions and postings', function () {

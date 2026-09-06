@@ -2,6 +2,7 @@
 
 namespace Database\Factories\Financial;
 
+use App\Enums\Financial\AccountType;
 use App\Enums\Financial\PostingStatus;
 use App\Models\Financial\Account;
 use App\Models\Financial\Commodity;
@@ -25,7 +26,7 @@ class PostingFactory extends Factory
         return [
             'financial_transaction_id' => Transaction::factory(),
             'position' => 0,
-            'status' => PostingStatus::Cleared,
+            'status' => null,
             'financial_account_id' => Account::factory(),
             'financial_commodity_id' => Commodity::factory(),
             'financial_lot_id' => null,
@@ -47,6 +48,9 @@ class PostingFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'financial_account_id' => $account->id,
+            'status' => in_array($account->account_type, [AccountType::Asset, AccountType::Liability], true)
+                ? PostingStatus::Cleared
+                : null,
         ]);
     }
 
