@@ -2,6 +2,8 @@
 
 namespace App\Models\Financial;
 
+use App\Models\Concerns\HasAttachments;
+use App\Models\Concerns\HasNotes;
 use Database\Factories\Financial\InstitutionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Institution extends Model
 {
     /** @use HasFactory<InstitutionFactory> */
-    use HasFactory;
+    use HasAttachments, HasFactory, HasNotes;
 
     protected $table = 'financial_institutions';
 

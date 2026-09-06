@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AttachmentController;
 use App\Http\Controllers\Api\V1\Financial\AccountController;
 use App\Http\Controllers\Api\V1\Financial\CommodityController;
 use App\Http\Controllers\Api\V1\Financial\InstitutionController;
+use App\Http\Controllers\Api\V1\NoteController;
 use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -11,6 +13,11 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {
         return new UserResource($request->user()->load('permissions'));
     });
+
+    Route::apiResource('notes', NoteController::class)->except('show');
+    Route::apiResource('attachments', AttachmentController::class)->only(['index', 'store', 'destroy']);
+    Route::get('/attachments/{attachment}/download', [AttachmentController::class, 'download'])
+        ->name('attachments.download');
 
     Route::prefix('financial')->name('financial.')->group(function () {
         Route::middleware('can:view-finances')->group(function () {

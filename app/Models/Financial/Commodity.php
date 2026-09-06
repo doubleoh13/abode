@@ -4,6 +4,8 @@ namespace App\Models\Financial;
 
 use App\Enums\Financial\CommodityKind;
 use App\Enums\Financial\SymbolPlacement;
+use App\Models\Concerns\HasAttachments;
+use App\Models\Concerns\HasNotes;
 use Database\Factories\Financial\CommodityFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Commodity extends Model
 {
     /** @use HasFactory<CommodityFactory> */
-    use HasFactory;
+    use HasAttachments, HasFactory, HasNotes;
 
     protected $table = 'financial_commodities';
 

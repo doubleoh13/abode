@@ -3,6 +3,8 @@
 namespace App\Models\Financial;
 
 use App\Enums\Financial\AccountType;
+use App\Models\Concerns\HasAttachments;
+use App\Models\Concerns\HasNotes;
 use Database\Factories\Financial\AccountFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -15,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Account extends Model
 {
     /** @use HasFactory<AccountFactory> */
-    use HasFactory;
+    use HasAttachments, HasFactory, HasNotes;
 
     protected $table = 'financial_accounts';
 
