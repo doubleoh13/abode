@@ -24,3 +24,13 @@ All journal/posting amounts are signed BIGINT in the commodity's minor units; co
 precision is effectively immutable once amounts reference the commodity — changing it requires an explicit rescaling migration; validation should refuse it otherwise.
 Cap precision at 8 in validation: 64-bit range leaves ~9.2 billion whole units at scale 8. Never store ETH at native 18 (caps at 9.2 ETH). If display ever needs to differ from storage, add display_precision then.
 PHP int is 64-bit signed and matches bigint exactly — plain integer math, no bcmath.
+
+## Commodity price modeling decisions
+commodity_prices rows are immutable data points: price decimal(24,12) ALWAYS denominated in the base currency (USD) — there is deliberately no price_commodity_id; priced_at timestamptz (not date — intraday crypto points wanted); created_at only, no updated_at, hard deletes allowed. Unique (commodity_id, priced_at).
+This is the documented carve-out from the bigint-amounts rule: prices are never summed, need more precision than any commodity's display precision, and Postgres numeric is exact (tests run on Postgres). Ledger AMOUNTS remain bigint minor units — never copy this pattern for them.
+Valuation math: exact bigint amount x numeric price via bcmath when exactness matters; floats acceptable for charting only.
+
+## Domain prefixes: financial_ tables, App\Models\Financial namespace
+Finance-domain tables are prefixed financial_ (financial_accounts, financial_commodities, financial_commodity_prices, financial_institutions) and their models live in App\Models\Financial (factories in Database\Factories\Financial) with explicit protected $table. The Financial sub-namespace carries through the whole domain: App\Enums\Financial, App\Http\Controllers\Api\V1\Financial, App\Http\Requests\Financial, App\Http\Resources\Financial. Future domains get their own prefix + namespaces the same way. API URLs carry the domain too: /api/v1/financial/accounts, route names financial.accounts.index (Route::prefix('financial')->name('financial.')).
+Cross-domain artifacts (users, user_permissions, the Permission enum, UserResource) stay unprefixed at their namespace roots.
+Use Rule::unique(Model::class)/Rule::exists(Model::class) in validation, never string table names — this is what made the rename safe.

@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\Financial;
 
+use App\Models\Financial\Institution;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -23,6 +24,6 @@ class StoreInstitutionRequest extends FormRequest
 
     protected function uniqueNameRule(): Unique
     {
-        return Rule::unique('institutions', 'name');
+        return Rule::unique(Institution::class, 'name');
     }
 }

@@ -1,10 +1,10 @@
 <?php
 
-namespace Database\Factories;
+namespace Database\Factories\Financial;
 
-use App\Enums\AccountType;
-use App\Models\Account;
-use App\Models\Institution;
+use App\Enums\Financial\AccountType;
+use App\Models\Financial\Account;
+use App\Models\Financial\Institution;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

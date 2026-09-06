@@ -1,19 +1,30 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Financial;
 
-use App\Enums\CommodityKind;
-use App\Enums\SymbolPlacement;
-use Database\Factories\CommodityFactory;
+use App\Enums\Financial\CommodityKind;
+use App\Enums\Financial\SymbolPlacement;
+use Database\Factories\Financial\CommodityFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['code', 'name', 'kind', 'precision', 'symbol', 'symbol_placement'])]
 class Commodity extends Model
 {
     /** @use HasFactory<CommodityFactory> */
     use HasFactory;
+
+    protected $table = 'financial_commodities';
+
+    /**
+     * @return HasMany<CommodityPrice, $this>
+     */
+    public function prices(): HasMany
+    {
+        return $this->hasMany(CommodityPrice::class);
+    }
 
     /**
      * Get the attributes that should be cast.

@@ -49,9 +49,9 @@ async function save(): Promise<void> {
 
     try {
         if (props.commodity) {
-            await axios.put(`/api/v1/commodities/${props.commodity.id}`, payload);
+            await axios.put(`/api/v1/financial/commodities/${props.commodity.id}`, payload);
         } else {
-            await axios.post('/api/v1/commodities', payload);
+            await axios.post('/api/v1/financial/commodities', payload);
         }
 
         emit('saved');

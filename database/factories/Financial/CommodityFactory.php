@@ -1,10 +1,10 @@
 <?php
 
-namespace Database\Factories;
+namespace Database\Factories\Financial;
 
-use App\Enums\CommodityKind;
-use App\Enums\SymbolPlacement;
-use App\Models\Commodity;
+use App\Enums\Financial\CommodityKind;
+use App\Enums\Financial\SymbolPlacement;
+use App\Models\Financial\Commodity;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

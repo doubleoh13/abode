@@ -1,8 +1,8 @@
 <?php
 
-use App\Http\Controllers\Api\V1\AccountController;
-use App\Http\Controllers\Api\V1\CommodityController;
-use App\Http\Controllers\Api\V1\InstitutionController;
+use App\Http\Controllers\Api\V1\Financial\AccountController;
+use App\Http\Controllers\Api\V1\Financial\CommodityController;
+use App\Http\Controllers\Api\V1\Financial\InstitutionController;
 use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -12,15 +12,17 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         return new UserResource($request->user()->load('permissions'));
     });
 
-    Route::middleware('can:view-finances')->group(function () {
-        Route::apiResource('accounts', AccountController::class)->only(['index', 'show']);
-        Route::apiResource('institutions', InstitutionController::class)->only(['index', 'show']);
-        Route::apiResource('commodities', CommodityController::class)->only(['index', 'show']);
-    });
+    Route::prefix('financial')->name('financial.')->group(function () {
+        Route::middleware('can:view-finances')->group(function () {
+            Route::apiResource('accounts', AccountController::class)->only(['index', 'show']);
+            Route::apiResource('institutions', InstitutionController::class)->only(['index', 'show']);
+            Route::apiResource('commodities', CommodityController::class)->only(['index', 'show']);
+        });
 
-    Route::middleware('can:manage-finances')->group(function () {
-        Route::apiResource('accounts', AccountController::class)->only(['store', 'update', 'destroy']);
-        Route::apiResource('institutions', InstitutionController::class)->only(['store', 'update', 'destroy']);
-        Route::apiResource('commodities', CommodityController::class)->only(['store', 'update', 'destroy']);
+        Route::middleware('can:manage-finances')->group(function () {
+            Route::apiResource('accounts', AccountController::class)->only(['store', 'update', 'destroy']);
+            Route::apiResource('institutions', InstitutionController::class)->only(['store', 'update', 'destroy']);
+            Route::apiResource('commodities', CommodityController::class)->only(['store', 'update', 'destroy']);
+        });
     });
 });

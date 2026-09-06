@@ -11,7 +11,7 @@ const formOpen = ref(false);
 const editingCommodity = ref<Commodity | null>(null);
 
 async function loadCommodities(): Promise<void> {
-    commodities.value = (await axios.get<{ data: Commodity[] }>('/api/v1/commodities')).data.data;
+    commodities.value = (await axios.get<{ data: Commodity[] }>('/api/v1/financial/commodities')).data.data;
     loaded.value = true;
 }
 
@@ -42,7 +42,7 @@ async function deleteCommodity(commodity: Commodity): Promise<void> {
         return;
     }
 
-    await axios.delete(`/api/v1/commodities/${commodity.id}`);
+    await axios.delete(`/api/v1/financial/commodities/${commodity.id}`);
     await loadCommodities();
 }
 

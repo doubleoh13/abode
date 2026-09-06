@@ -1,15 +1,17 @@
 <?php
 
-namespace App\Http\Controllers\Api\V1;
+namespace App\Http\Controllers\Api\V1\Financial;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreInstitutionRequest;
-use App\Http\Requests\UpdateInstitutionRequest;
-use App\Http\Resources\InstitutionResource;
-use App\Models\Institution;
+use Dedoc\Scramble\Attributes\Group;
+use App\Http\Requests\Financial\StoreInstitutionRequest;
+use App\Http\Requests\Financial\UpdateInstitutionRequest;
+use App\Http\Resources\Financial\InstitutionResource;
+use App\Models\Financial\Institution;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 
+#[Group('Financial / Institutions')]
 class InstitutionController extends Controller
 {
     public function index(): AnonymousResourceCollection

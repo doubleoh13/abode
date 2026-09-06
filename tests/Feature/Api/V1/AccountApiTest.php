@@ -1,23 +1,23 @@
 <?php
 
 use App\Enums\Permission;
-use App\Models\Account;
-use App\Models\Institution;
+use App\Models\Financial\Account;
+use App\Models\Financial\Institution;
 
 test('guests receive a 401', function () {
-    $this->getJson('/api/v1/accounts')->assertUnauthorized();
+    $this->getJson('/api/v1/financial/accounts')->assertUnauthorized();
 });
 
 test('a user without view-finances is forbidden', function () {
     actingWithPermissions();
 
-    $this->getJson('/api/v1/accounts')->assertForbidden();
+    $this->getJson('/api/v1/financial/accounts')->assertForbidden();
 });
 
 test('a viewer cannot write', function () {
     actingWithPermissions(Permission::ViewFinances);
 
-    $this->postJson('/api/v1/accounts', [
+    $this->postJson('/api/v1/financial/accounts', [
         'account_type' => 'expense',
         'name' => 'food',
     ])->assertForbidden();
@@ -32,7 +32,7 @@ describe('with finance permissions', function () {
         $food = Account::factory()->create(['name' => 'food']);
         Account::factory()->childOf($food)->create(['name' => 'dining-out']);
 
-        $this->getJson('/api/v1/accounts')
+        $this->getJson('/api/v1/financial/accounts')
             ->assertOk()
             ->assertJsonPath('data.0.path', 'expenses:food:dining-out')
             ->assertJsonPath('data.1.path', 'expenses:food');
@@ -41,7 +41,7 @@ describe('with finance permissions', function () {
     test('an account can be created at an institution', function () {
         $institution = Institution::factory()->create();
 
-        $this->postJson('/api/v1/accounts', [
+        $this->postJson('/api/v1/financial/accounts', [
             'account_type' => 'asset',
             'institution_id' => $institution->id,
             'name' => 'checking',
@@ -54,7 +54,7 @@ describe('with finance permissions', function () {
     test('a child must match its parent type', function () {
         $food = Account::factory()->create(['name' => 'food']);
 
-        $this->postJson('/api/v1/accounts', [
+        $this->postJson('/api/v1/financial/accounts', [
             'account_type' => 'asset',
             'parent_id' => $food->id,
             'name' => 'checking',
@@ -63,7 +63,7 @@ describe('with finance permissions', function () {
     });
 
     test('a colon is not allowed in a name', function () {
-        $this->postJson('/api/v1/accounts', [
+        $this->postJson('/api/v1/financial/accounts', [
             'account_type' => 'expense',
             'name' => 'food:snacks',
         ])->assertUnprocessable()
@@ -74,7 +74,7 @@ describe('with finance permissions', function () {
         $food = Account::factory()->create(['name' => 'food']);
         Account::factory()->childOf($food)->create(['name' => 'groceries']);
 
-        $this->postJson('/api/v1/accounts', [
+        $this->postJson('/api/v1/financial/accounts', [
             'account_type' => 'expense',
             'parent_id' => $food->id,
             'name' => 'groceries',
@@ -87,7 +87,7 @@ describe('with finance permissions', function () {
         $travel = Account::factory()->create(['name' => 'travel']);
         Account::factory()->childOf($food)->create(['name' => 'misc']);
 
-        $this->postJson('/api/v1/accounts', [
+        $this->postJson('/api/v1/financial/accounts', [
             'account_type' => 'expense',
             'parent_id' => $travel->id,
             'name' => 'misc',
@@ -95,7 +95,7 @@ describe('with finance permissions', function () {
     });
 
     test('closing before opening is rejected', function () {
-        $this->postJson('/api/v1/accounts', [
+        $this->postJson('/api/v1/financial/accounts', [
             'account_type' => 'asset',
             'name' => 'checking',
             'opened_at' => '2024-06-01',
@@ -108,7 +108,7 @@ describe('with finance permissions', function () {
         $food = Account::factory()->create(['name' => 'food']);
         $groceries = Account::factory()->childOf($food)->create(['name' => 'groceries']);
 
-        $this->putJson("/api/v1/accounts/{$food->id}", [
+        $this->putJson("/api/v1/financial/accounts/{$food->id}", [
             'account_type' => 'expense',
             'parent_id' => $groceries->id,
             'name' => 'food',
@@ -120,7 +120,7 @@ describe('with finance permissions', function () {
         $food = Account::factory()->create(['name' => 'food']);
         Account::factory()->childOf($food)->create(['name' => 'groceries']);
 
-        $this->putJson("/api/v1/accounts/{$food->id}", [
+        $this->putJson("/api/v1/financial/accounts/{$food->id}", [
             'account_type' => 'income',
             'name' => 'food',
         ])->assertUnprocessable()
@@ -130,7 +130,7 @@ describe('with finance permissions', function () {
     test('renaming an account keeps its own name available', function () {
         $food = Account::factory()->create(['name' => 'food']);
 
-        $this->putJson("/api/v1/accounts/{$food->id}", [
+        $this->putJson("/api/v1/financial/accounts/{$food->id}", [
             'account_type' => 'expense',
             'name' => 'food',
         ])->assertOk();
@@ -140,13 +140,13 @@ describe('with finance permissions', function () {
         $food = Account::factory()->create(['name' => 'food']);
         Account::factory()->childOf($food)->create(['name' => 'groceries']);
 
-        $this->deleteJson("/api/v1/accounts/{$food->id}")->assertConflict();
+        $this->deleteJson("/api/v1/financial/accounts/{$food->id}")->assertConflict();
     });
 
     test('a leaf account can be deleted', function () {
         $account = Account::factory()->create();
 
-        $this->deleteJson("/api/v1/accounts/{$account->id}")->assertNoContent();
+        $this->deleteJson("/api/v1/financial/accounts/{$account->id}")->assertNoContent();
 
         $this->assertModelMissing($account);
     });

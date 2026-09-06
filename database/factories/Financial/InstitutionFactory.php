@@ -1,8 +1,8 @@
 <?php
 
-namespace Database\Factories;
+namespace Database\Factories\Financial;
 
-use App\Models\Institution;
+use App\Models\Financial\Institution;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

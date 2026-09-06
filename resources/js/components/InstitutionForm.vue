@@ -23,9 +23,9 @@ async function save(): Promise<void> {
 
     try {
         if (props.institution) {
-            await axios.put(`/api/v1/institutions/${props.institution.id}`, { name: form.name });
+            await axios.put(`/api/v1/financial/institutions/${props.institution.id}`, { name: form.name });
         } else {
-            await axios.post('/api/v1/institutions', { name: form.name });
+            await axios.post('/api/v1/financial/institutions', { name: form.name });
         }
 
         emit('saved');

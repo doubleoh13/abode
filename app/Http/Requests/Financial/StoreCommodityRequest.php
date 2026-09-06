@@ -1,9 +1,10 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\Financial;
 
-use App\Enums\CommodityKind;
-use App\Enums\SymbolPlacement;
+use App\Enums\Financial\CommodityKind;
+use App\Enums\Financial\SymbolPlacement;
+use App\Models\Financial\Commodity;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -34,6 +35,6 @@ class StoreCommodityRequest extends FormRequest
 
     protected function uniqueCodeRule(): Unique
     {
-        return Rule::unique('commodities', 'code');
+        return Rule::unique(Commodity::class, 'code');
     }
 }

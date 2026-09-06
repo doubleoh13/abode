@@ -13,8 +13,8 @@ const editingAccount = ref<Account | null>(null);
 
 async function loadAccounts(): Promise<void> {
     const [accountsResponse, institutionsResponse] = await Promise.all([
-        axios.get<{ data: Account[] }>('/api/v1/accounts'),
-        axios.get<{ data: Institution[] }>('/api/v1/institutions'),
+        axios.get<{ data: Account[] }>('/api/v1/financial/accounts'),
+        axios.get<{ data: Institution[] }>('/api/v1/financial/institutions'),
     ]);
 
     accounts.value = accountsResponse.data.data;
@@ -103,7 +103,7 @@ async function deleteAccount(account: Account): Promise<void> {
     }
 
     try {
-        await axios.delete(`/api/v1/accounts/${account.id}`);
+        await axios.delete(`/api/v1/financial/accounts/${account.id}`);
         await loadAccounts();
     } catch (error) {
         if (isAxiosError(error) && error.response?.status === 409) {

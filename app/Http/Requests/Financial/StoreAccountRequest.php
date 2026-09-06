@@ -1,9 +1,10 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\Financial;
 
-use App\Enums\AccountType;
-use App\Models\Account;
+use App\Enums\Financial\AccountType;
+use App\Models\Financial\Account;
+use App\Models\Financial\Institution;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -21,8 +22,8 @@ class StoreAccountRequest extends FormRequest
     {
         return [
             'account_type' => ['required', Rule::enum(AccountType::class)],
-            'institution_id' => ['nullable', 'integer', 'exists:institutions,id'],
-            'parent_id' => ['nullable', 'integer', 'exists:accounts,id'],
+            'institution_id' => ['nullable', 'integer', Rule::exists(Institution::class, 'id')],
+            'parent_id' => ['nullable', 'integer', Rule::exists(Account::class, 'id')],
             'name' => [
                 'required',
                 'string',
@@ -62,7 +63,7 @@ class StoreAccountRequest extends FormRequest
 
     protected function siblingUniqueNameRule(): Unique
     {
-        return Rule::unique('accounts', 'name')
+        return Rule::unique(Account::class, 'name')
             ->where('parent_id', $this->input('parent_id'))
             ->where('account_type', $this->input('account_type'));
     }

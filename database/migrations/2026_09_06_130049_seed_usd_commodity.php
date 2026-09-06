@@ -7,7 +7,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::table('commodities')->insert([
+        DB::table('financial_commodities')->insert([
             'code' => 'USD',
             'name' => 'US Dollar',
             'kind' => 'currency',
@@ -21,6 +21,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::table('commodities')->where('code', 'USD')->delete();
+        DB::table('financial_commodities')->where('code', 'USD')->delete();
     }
 };

@@ -1,15 +1,17 @@
 <?php
 
-namespace App\Http\Controllers\Api\V1;
+namespace App\Http\Controllers\Api\V1\Financial;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreCommodityRequest;
-use App\Http\Requests\UpdateCommodityRequest;
-use App\Http\Resources\CommodityResource;
-use App\Models\Commodity;
+use Dedoc\Scramble\Attributes\Group;
+use App\Http\Requests\Financial\StoreCommodityRequest;
+use App\Http\Requests\Financial\UpdateCommodityRequest;
+use App\Http\Resources\Financial\CommodityResource;
+use App\Models\Financial\Commodity;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 
+#[Group('Financial / Commodities')]
 class CommodityController extends Controller
 {
     public function index(): AnonymousResourceCollection

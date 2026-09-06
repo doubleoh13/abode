@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\Financial;
 
-use App\Models\Account;
+use App\Models\Financial\Account;
 use Illuminate\Validation\Rules\Unique;
 use Illuminate\Validation\Validator;
 

@@ -1,7 +1,7 @@
 <?php
 
-use App\Enums\AccountType;
-use App\Models\Account;
+use App\Enums\Financial\AccountType;
+use App\Models\Financial\Account;
 use Illuminate\Database\QueryException;
 
 test('path derives from ancestry with the type prefix', function () {

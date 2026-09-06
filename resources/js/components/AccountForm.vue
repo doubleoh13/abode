@@ -73,9 +73,9 @@ async function save(): Promise<void> {
 
     try {
         if (props.account) {
-            await axios.put(`/api/v1/accounts/${props.account.id}`, payload);
+            await axios.put(`/api/v1/financial/accounts/${props.account.id}`, payload);
         } else {
-            await axios.post('/api/v1/accounts', payload);
+            await axios.post('/api/v1/financial/accounts', payload);
         }
 
         emit('saved');

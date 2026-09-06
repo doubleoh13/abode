@@ -11,7 +11,7 @@ const formOpen = ref(false);
 const editingInstitution = ref<Institution | null>(null);
 
 async function loadInstitutions(): Promise<void> {
-    institutions.value = (await axios.get<{ data: Institution[] }>('/api/v1/institutions')).data
+    institutions.value = (await axios.get<{ data: Institution[] }>('/api/v1/financial/institutions')).data
         .data;
     loaded.value = true;
 }
@@ -44,7 +44,7 @@ async function deleteInstitution(institution: Institution): Promise<void> {
     }
 
     try {
-        await axios.delete(`/api/v1/institutions/${institution.id}`);
+        await axios.delete(`/api/v1/financial/institutions/${institution.id}`);
         await loadInstitutions();
     } catch (error) {
         if (isAxiosError(error) && error.response?.status === 409) {

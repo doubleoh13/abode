@@ -1,15 +1,17 @@
 <?php
 
-namespace App\Http\Controllers\Api\V1;
+namespace App\Http\Controllers\Api\V1\Financial;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreAccountRequest;
-use App\Http\Requests\UpdateAccountRequest;
-use App\Http\Resources\AccountResource;
-use App\Models\Account;
+use Dedoc\Scramble\Attributes\Group;
+use App\Http\Requests\Financial\StoreAccountRequest;
+use App\Http\Requests\Financial\UpdateAccountRequest;
+use App\Http\Resources\Financial\AccountResource;
+use App\Models\Financial\Account;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 
+#[Group('Financial / Accounts')]
 class AccountController extends Controller
 {
     public function index(): AnonymousResourceCollection

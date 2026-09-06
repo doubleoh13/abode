@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Financial;
 
-use App\Enums\AccountType;
-use Database\Factories\AccountFactory;
+use App\Enums\Financial\AccountType;
+use Database\Factories\Financial\AccountFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,6 +16,8 @@ class Account extends Model
 {
     /** @use HasFactory<AccountFactory> */
     use HasFactory;
+
+    protected $table = 'financial_accounts';
 
     /**
      * @return BelongsTo<Institution, $this>

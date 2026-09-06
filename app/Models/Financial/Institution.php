@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Financial;
 
-use Database\Factories\InstitutionFactory;
+use Database\Factories\Financial\InstitutionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +13,8 @@ class Institution extends Model
 {
     /** @use HasFactory<InstitutionFactory> */
     use HasFactory;
+
+    protected $table = 'financial_institutions';
 
     /**
      * @return HasMany<Account, $this>
