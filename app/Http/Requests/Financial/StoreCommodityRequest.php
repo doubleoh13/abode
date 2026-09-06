@@ -33,6 +33,33 @@ class StoreCommodityRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'code.required' => 'Enter a commodity code.',
+            'code.string' => 'Enter a valid commodity code.',
+            'code.max' => 'Commodity codes may not exceed 16 characters.',
+            'code.unique' => 'This commodity code is already in use.',
+            'name.required' => 'Enter a commodity name.',
+            'name.string' => 'Enter a valid commodity name.',
+            'name.max' => 'Commodity names may not exceed 255 characters.',
+            'kind.required' => 'Choose a commodity kind.',
+            'kind.enum' => 'Choose a valid commodity kind.',
+            'precision.required' => 'Enter the commodity precision.',
+            'precision.integer' => 'Precision must be a whole number.',
+            'precision.min' => 'Precision cannot be negative.',
+            'precision.max' => 'Precision cannot exceed 8 decimal places.',
+            'symbol.string' => 'Enter a valid symbol.',
+            'symbol.max' => 'Symbols may not exceed 8 characters.',
+            'symbol.required_with' => 'Enter a symbol when choosing its placement.',
+            'symbol_placement.enum' => 'Choose a valid symbol placement.',
+            'symbol_placement.required_with' => 'Choose where the symbol appears.',
+        ];
+    }
+
     protected function uniqueCodeRule(): Unique
     {
         return Rule::unique(Commodity::class, 'code');

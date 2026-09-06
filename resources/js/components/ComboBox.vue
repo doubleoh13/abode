@@ -6,6 +6,8 @@ const props = defineProps<{
     options: Array<{ value: TValue; label: string }>;
     nullable?: boolean;
     creatable?: boolean;
+    createOptionLabel?: string;
+    fuzzy?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -36,11 +38,43 @@ watch(selectedLabel, (label) => {
     displayValue.value = label;
 });
 
+function fuzzyMatchScore(label: string, query: string): number | null {
+    const normalizedLabel = label.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    const normalizedQuery = query.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    const substringIndex = normalizedLabel.indexOf(normalizedQuery);
+
+    if (substringIndex !== -1) {
+        return substringIndex;
+    }
+
+    let labelIndex = 0;
+    let previousMatchIndex = -1;
+    let score = 100;
+
+    for (const character of normalizedQuery) {
+        const matchIndex = normalizedLabel.indexOf(character, labelIndex);
+
+        if (matchIndex === -1) {
+            return null;
+        }
+
+        score += previousMatchIndex === -1 ? matchIndex : matchIndex - previousMatchIndex - 1;
+        previousMatchIndex = matchIndex;
+        labelIndex = matchIndex + 1;
+    }
+
+    return score;
+}
+
 const choices = computed<Choice[]>(() => {
     const query = search.value.trim().toLowerCase();
 
     if (query === '') {
         const options: Choice[] = props.options.map((option) => ({ type: 'option', ...option }));
+
+        if (props.creatable && props.createOptionLabel) {
+            options.push({ type: 'create', query: '', label: props.createOptionLabel });
+        }
 
         return props.nullable
             ? [{ type: 'option', value: null, label: '(none)' }, ...options]
@@ -48,13 +82,26 @@ const choices = computed<Choice[]>(() => {
     }
 
     const matchingOptions: Choice[] = props.options
-        .filter((option) => option.label.toLowerCase().includes(query))
-        .map((option) => ({ type: 'option', ...option }));
+        .map((option) => ({
+            option,
+            score: props.fuzzy
+                ? fuzzyMatchScore(option.label, query)
+                : option.label.toLowerCase().includes(query) ? 0 : null,
+        }))
+        .filter((match): match is { option: { value: TValue; label: string }; score: number } => match.score !== null)
+        .toSorted((first, second) => first.score - second.score)
+        .map(({ option }) => ({ type: 'option', ...option }));
     const exactMatchExists = props.options.some(
         (option) => option.label.toLowerCase() === query,
     );
 
-    if (props.creatable && !exactMatchExists) {
+    if (props.creatable && props.createOptionLabel) {
+        matchingOptions.push({
+            type: 'create',
+            query: search.value.trim(),
+            label: props.createOptionLabel,
+        });
+    } else if (props.creatable && !exactMatchExists) {
         matchingOptions.push({
             type: 'create',
             query: search.value.trim(),

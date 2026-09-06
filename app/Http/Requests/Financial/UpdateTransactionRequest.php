@@ -17,7 +17,19 @@ class UpdateTransactionRequest extends StoreTransactionRequest
     {
         return [
             ...parent::rules(),
-            'postings.*.id' => ['nullable', 'integer'],
+            'postings.*.id' => ['nullable', 'integer', 'distinct:strict'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            ...parent::messages(),
+            'postings.*.id.integer' => 'The posting is invalid.',
+            'postings.*.id.distinct' => 'Each posting may appear only once.',
         ];
     }
 

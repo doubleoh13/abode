@@ -7,6 +7,7 @@ import { formatAmount } from '../money';
 import type {
     Account,
     Commodity,
+    Institution,
     JournalIssue,
     Paginated,
     Payee,
@@ -19,6 +20,7 @@ const page = ref(1);
 const lastPage = ref(1);
 const accounts = ref<Account[]>([]);
 const commodities = ref<Commodity[]>([]);
+const institutions = ref<Institution[]>([]);
 const payees = ref<Payee[]>([]);
 const issues = ref<JournalIssue[]>([]);
 const loaded = ref(false);
@@ -75,9 +77,10 @@ async function loadIssues(): Promise<void> {
 }
 
 onMounted(async () => {
-    const [accountsResponse, commoditiesResponse, payeesResponse] = await Promise.all([
+    const [accountsResponse, commoditiesResponse, institutionsResponse, payeesResponse] = await Promise.all([
         axios.get<{ data: Account[] }>('/api/v1/financial/accounts'),
         axios.get<{ data: Commodity[] }>('/api/v1/financial/commodities'),
+        axios.get<{ data: Institution[] }>('/api/v1/financial/institutions'),
         axios.get<{ data: Payee[] }>('/api/v1/financial/payees'),
         loadTransactions(),
         loadIssues(),
@@ -85,6 +88,7 @@ onMounted(async () => {
 
     accounts.value = accountsResponse.data.data;
     commodities.value = commoditiesResponse.data.data;
+    institutions.value = institutionsResponse.data.data;
     payees.value = payeesResponse.data.data;
     loaded.value = true;
 });
@@ -107,6 +111,12 @@ function openEditForm(transaction: Transaction): void {
 function registerPayee(payee: Payee): void {
     if (!payees.value.some((candidate) => candidate.id === payee.id)) {
         payees.value.push(payee);
+    }
+}
+
+function registerAccount(account: Account): void {
+    if (!accounts.value.some((candidate) => candidate.id === account.id)) {
+        accounts.value.push(account);
     }
 }
 
@@ -188,10 +198,12 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                     :transaction="editingTransaction"
                     :accounts="accounts"
                     :commodities="commodities"
+                    :institutions="institutions"
                     :payees="payees"
                     @saved="transactionSaved"
                     @cancelled="closeForm"
                     @payee-created="registerPayee"
+                    @account-created="registerAccount"
                 />
             </ModalDialog>
 

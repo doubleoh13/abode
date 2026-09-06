@@ -22,6 +22,19 @@ class StoreInstitutionRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'Enter an institution name.',
+            'name.string' => 'Enter a valid institution name.',
+            'name.max' => 'Institution names may not exceed 255 characters.',
+            'name.unique' => 'This institution already exists.',
+        ];
+    }
+
     protected function uniqueNameRule(): Unique
     {
         return Rule::unique(Institution::class, 'name');

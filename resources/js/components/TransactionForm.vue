@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, ref } from 'vue';
+import AccountForm from './AccountForm.vue';
 import ComboBox from './ComboBox.vue';
+import ModalDialog from './ModalDialog.vue';
 import PostingRow from './PostingRow.vue';
 import { allocateBasis, amountToInput, formatAmount, parseAmount } from '../money';
 import type {
     Account,
     Commodity,
+    Institution,
     Lot,
     Payee,
     Posting,
@@ -18,10 +21,16 @@ const props = defineProps<{
     transaction: Transaction | null;
     accounts: Account[];
     commodities: Commodity[];
+    institutions: Institution[];
     payees: Payee[];
 }>();
 
-const emit = defineEmits<{ saved: []; cancelled: []; payeeCreated: [Payee] }>();
+const emit = defineEmits<{
+    saved: [];
+    cancelled: [];
+    payeeCreated: [Payee];
+    accountCreated: [Account];
+}>();
 
 const baseCurrency = computed(() => {
     const usd = props.commodities.find((commodity) => commodity.code === 'USD');
@@ -35,8 +44,11 @@ const baseCurrency = computed(() => {
 
 const knownLots = ref<Record<number, Lot>>({});
 const availablePayees = ref([...props.payees]);
+const availableAccounts = ref([...props.accounts]);
 const creatingPayee = ref(false);
 const payeeCreationError = ref<string | null>(null);
+const accountFormOpen = ref(false);
+const accountPostingIndex = ref<number | null>(null);
 
 function registerLots(lots: Lot[]): void {
     for (const lot of lots) {
@@ -136,6 +148,27 @@ function selectPayee(payeeId: number | null): void {
     payeeCreationError.value = null;
 }
 
+function openAccountForm(postingIndex: number): void {
+    accountPostingIndex.value = postingIndex;
+    accountFormOpen.value = true;
+}
+
+function closeAccountForm(): void {
+    accountFormOpen.value = false;
+    accountPostingIndex.value = null;
+}
+
+function accountCreated(account: Account): void {
+    availableAccounts.value.push(account);
+
+    if (accountPostingIndex.value !== null) {
+        postings.value[accountPostingIndex.value].financial_account_id = account.id;
+    }
+
+    emit('accountCreated', account);
+    closeAccountForm();
+}
+
 function commodityById(id: number | null): Commodity | null {
     return props.commodities.find((commodity) => commodity.id === id) ?? null;
 }
@@ -158,13 +191,19 @@ function lotCostMinor(draft: PostingDraft): number | null {
     return Math.round((unitCost * wholeUnits) / 10 ** quantity.precision * 10 ** baseCurrency.value.precision);
 }
 
-const balance = computed<{ faceSums: string[]; residual: number | null; approximate: boolean }>(() => {
+interface Balance {
+    faceSums: string[];
+    residual: number | null;
+    approximate: boolean;
+}
+
+function calculateBalance(postingDrafts: PostingDraft[]): Balance {
     const faceSumsByCommodity = new Map<number, number>();
     const lotGroups = new Map<number, { cost: number; total: number; amounts: number[] }>();
     let residual = 0;
     let approximate = false;
 
-    for (const draft of postings.value) {
+    for (const draft of postingDrafts) {
         const commodity = commodityById(draft.financial_commodity_id);
         const amount = commodity === null ? null : parseAmount(draft.amount, commodity.precision);
 
@@ -225,6 +264,32 @@ const balance = computed<{ faceSums: string[]; residual: number | null; approxim
     });
 
     return { faceSums, residual, approximate };
+}
+
+const balance = computed<Balance>(() => calculateBalance(postings.value));
+
+const balancingAmount = computed<string | null>(() => {
+    const lastPosting = postings.value.at(-1);
+
+    if (
+        lastPosting === undefined ||
+        lastPosting.amount.trim() !== '' ||
+        lastPosting.financial_commodity_id !== baseCurrency.value.id
+    ) {
+        return null;
+    }
+
+    const precedingBalance = calculateBalance(postings.value.slice(0, -1));
+
+    if (
+        precedingBalance.residual === null ||
+        precedingBalance.residual === 0 ||
+        precedingBalance.approximate
+    ) {
+        return null;
+    }
+
+    return amountToInput(-precedingBalance.residual, baseCurrency.value.precision);
 });
 
 function addPosting(): void {
@@ -295,6 +360,16 @@ async function save(): Promise<void> {
 </script>
 
 <template>
+    <ModalDialog :open="accountFormOpen" nested @close="closeAccountForm">
+        <AccountForm
+            :account="null"
+            :accounts="availableAccounts"
+            :institutions="institutions"
+            @saved="accountCreated"
+            @cancelled="closeAccountForm"
+        />
+    </ModalDialog>
+
     <form class="rounded-md border border-edge bg-surface p-5" @submit.prevent="save">
         <h2 class="font-mono text-xs tracking-wider text-muted uppercase">
             {{ transaction ? 'Edit transaction' : 'New transaction' }}
@@ -347,15 +422,17 @@ async function save(): Promise<void> {
                     :key="index"
                     :draft="draft"
                     :index="index"
-                    :accounts="accounts"
+                    :accounts="availableAccounts"
                     :commodities="commodities"
                     :base-currency="baseCurrency"
                     :transaction-date="form.date"
                     :known-lots="knownLots"
                     :errors="errors"
                     :removable="postings.length > 2"
+                    :suggested-amount="index === postings.length - 1 ? balancingAmount : null"
                     @remove="removePosting(index)"
                     @lots-loaded="registerLots"
+                    @create-account="openAccountForm(index)"
                 />
             </div>
 

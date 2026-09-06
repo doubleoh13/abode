@@ -14,9 +14,10 @@ const props = defineProps<{
     knownLots: Record<number, Lot>;
     errors: Record<string, string[]>;
     removable: boolean;
+    suggestedAmount: string | null;
 }>();
 
-const emit = defineEmits<{ remove: []; lotsLoaded: [Lot[]] }>();
+const emit = defineEmits<{ remove: []; lotsLoaded: [Lot[]]; createAccount: [] }>();
 const memoOpen = ref(props.draft.memo !== '');
 
 const statusOptions: Array<{ value: PostingStatus; label: string }> = [
@@ -86,7 +87,14 @@ function errorFor(field: string): string | null {
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,1fr)_9rem_8rem_8rem_2rem] lg:items-start">
             <div class="flex flex-col gap-1.5">
                 <span class="field-label lg:sr-only">Account</span>
-                <ComboBox v-model="draft.financial_account_id" :options="accountOptions" nullable />
+                <ComboBox
+                    v-model="draft.financial_account_id"
+                    :options="accountOptions"
+                    fuzzy
+                    creatable
+                    create-option-label="Create new account"
+                    @create="emit('createAccount')"
+                />
                 <p v-if="errorFor('financial_account_id')" class="text-sm text-danger">
                     {{ errorFor('financial_account_id') }}
                 </p>
@@ -94,13 +102,31 @@ function errorFor(field: string): string | null {
 
             <label class="flex flex-col gap-1.5">
                 <span class="field-label lg:sr-only">Amount</span>
-                <input v-model="draft.amount" type="text" inputmode="decimal" class="input text-right font-mono" />
+                <span class="relative">
+                    <input
+                        v-model="draft.amount"
+                        type="text"
+                        inputmode="decimal"
+                        class="input w-full text-right font-mono"
+                        :class="suggestedAmount !== null ? 'pr-8' : ''"
+                    />
+                    <button
+                        v-if="suggestedAmount !== null"
+                        type="button"
+                        class="absolute top-1/2 right-2 -translate-y-1/2 font-mono text-sm text-accent transition-colors hover:text-foreground"
+                        title="Fill balancing amount"
+                        aria-label="Fill balancing amount"
+                        @click="draft.amount = suggestedAmount"
+                    >
+                        =
+                    </button>
+                </span>
                 <p v-if="errorFor('amount')" class="text-sm text-danger">{{ errorFor('amount') }}</p>
             </label>
 
             <div class="flex flex-col gap-1.5">
                 <span class="field-label lg:sr-only">Commodity</span>
-                <ComboBox v-model="draft.financial_commodity_id" :options="commodityOptions" nullable />
+                <ComboBox v-model="draft.financial_commodity_id" :options="commodityOptions" />
                 <p v-if="errorFor('financial_commodity_id')" class="text-sm text-danger">
                     {{ errorFor('financial_commodity_id') }}
                 </p>
@@ -129,8 +155,16 @@ function errorFor(field: string): string | null {
             <span v-else class="hidden lg:block"></span>
         </div>
 
-        <div v-if="memoOpen || needsLot" class="mt-2 grid grid-cols-1 gap-3 border-l border-edge pl-3 sm:grid-cols-2 lg:ml-3 lg:grid-cols-4">
-            <label class="flex flex-col gap-1.5 lg:col-span-2">
+        <div
+            v-if="memoOpen || needsLot"
+            class="mt-2 grid grid-cols-1 gap-3 border-l border-edge pl-3 sm:grid-cols-2 lg:ml-3"
+            :class="memoOpen ? 'lg:grid-cols-4' : 'lg:grid-cols-3'"
+        >
+            <label
+                v-if="memoOpen"
+                class="flex flex-col gap-1.5"
+                :class="needsLot ? '' : 'sm:col-span-2 lg:col-span-4'"
+            >
                 <span class="field-label">Posting memo</span>
                 <input v-model="draft.memo" type="text" class="input" />
                 <p v-if="errorFor('memo')" class="text-sm text-danger">{{ errorFor('memo') }}</p>
@@ -206,7 +240,7 @@ function errorFor(field: string): string | null {
             </template>
         </div>
 
-        <div v-else class="mt-1.5 pl-1">
+        <div v-if="!memoOpen" class="mt-1.5 pl-1">
             <button
                 type="button"
                 class="font-mono text-xs tracking-wider text-muted uppercase transition-colors hover:text-foreground"

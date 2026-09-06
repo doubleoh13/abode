@@ -19,6 +19,12 @@ describe('with finance permissions', function () {
         actingWithPermissions(Permission::ViewFinances, Permission::ManageFinances);
     });
 
+    test('a payee name is required with form language', function () {
+        $this->postJson('/api/v1/financial/payees', [])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.name.0', 'Enter a payee name.');
+    });
+
     test('payees are listed alphabetically', function () {
         Payee::factory()->create(['name' => 'Kroger']);
         Payee::factory()->create(['name' => 'Costco']);
@@ -43,7 +49,7 @@ describe('with finance permissions', function () {
 
         $this->postJson('/api/v1/financial/payees', ['name' => 'Kroger'])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors('name');
+            ->assertJsonPath('errors.name.0', 'This payee already exists.');
     });
 
     test('a payee can be deleted', function () {

@@ -10,7 +10,7 @@ const props = defineProps<{
     institutions: Institution[];
 }>();
 
-const emit = defineEmits<{ saved: []; cancelled: [] }>();
+const emit = defineEmits<{ saved: [Account]; cancelled: [] }>();
 
 const accountTypes: Array<{ value: AccountType; label: string }> = [
     { value: 'asset', label: 'Asset' },
@@ -72,13 +72,19 @@ async function save(): Promise<void> {
     };
 
     try {
+        let account: Account;
+
         if (props.account) {
-            await axios.put(`/api/v1/financial/accounts/${props.account.id}`, payload);
+            account = (
+                await axios.put<{ data: Account }>(`/api/v1/financial/accounts/${props.account.id}`, payload)
+            ).data.data;
         } else {
-            await axios.post('/api/v1/financial/accounts', payload);
+            account = (
+                await axios.post<{ data: Account }>('/api/v1/financial/accounts', payload)
+            ).data.data;
         }
 
-        emit('saved');
+        emit('saved', account);
     } catch (error) {
         if (isAxiosError(error) && error.response?.status === 422) {
             errors.value = error.response.data.errors;
@@ -108,7 +114,7 @@ async function save(): Promise<void> {
 
             <div class="flex flex-col gap-1.5">
                 <span class="field-label">Parent</span>
-                <ComboBox v-model="form.parent_id" :options="parentOptions" nullable />
+                <ComboBox v-model="form.parent_id" :options="parentOptions" nullable fuzzy />
                 <p v-if="errors.parent_id" class="text-sm text-danger">{{ errors.parent_id[0] }}</p>
             </div>
 

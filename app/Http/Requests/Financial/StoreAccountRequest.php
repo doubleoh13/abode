@@ -37,6 +37,29 @@ class StoreAccountRequest extends FormRequest
     }
 
     /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'account_type.required' => 'Choose an account type.',
+            'account_type.enum' => 'Choose a valid account type.',
+            'financial_institution_id.integer' => 'Choose a valid institution.',
+            'financial_institution_id.exists' => 'Choose a valid institution.',
+            'parent_id.integer' => 'Choose a valid parent account.',
+            'parent_id.exists' => 'Choose a valid parent account.',
+            'name.required' => 'Enter an account name.',
+            'name.string' => 'Enter a valid account name.',
+            'name.max' => 'Account names may not exceed 255 characters.',
+            'name.not_regex' => 'Account names cannot contain a colon.',
+            'name.unique' => 'An account with this name already exists under the selected parent.',
+            'opened_at.date' => 'Enter a valid opening date.',
+            'closed_at.date' => 'Enter a valid closing date.',
+            'closed_at.after_or_equal' => 'The closing date must be on or after the opening date.',
+        ];
+    }
+
+    /**
      * Get the "after" validation callables for the request.
      *
      * @return array<int, callable(Validator): void>

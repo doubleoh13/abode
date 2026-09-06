@@ -44,6 +44,45 @@ class StoreTransactionRequest extends FormRequest
     }
 
     /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'date.required' => 'Enter a transaction date.',
+            'date.date' => 'Enter a valid transaction date.',
+            'financial_payee_id.integer' => 'Choose a valid payee.',
+            'financial_payee_id.exists' => 'Choose a valid payee.',
+            'memo.string' => 'Enter a valid memo.',
+            'memo.max' => 'The transaction memo may not exceed 255 characters.',
+            'metadata.array' => 'Transaction metadata must be an array.',
+            'postings.required' => 'Add at least two postings.',
+            'postings.array' => 'Postings must be an array.',
+            'postings.min' => 'Add at least two postings.',
+            'postings.*.status.enum' => 'Choose a valid status.',
+            'postings.*.financial_account_id.required' => 'Choose an account.',
+            'postings.*.financial_account_id.integer' => 'Choose a valid account.',
+            'postings.*.financial_account_id.exists' => 'Choose a valid account.',
+            'postings.*.financial_commodity_id.required' => 'Choose a commodity.',
+            'postings.*.financial_commodity_id.integer' => 'Choose a valid commodity.',
+            'postings.*.financial_commodity_id.exists' => 'Choose a valid commodity.',
+            'postings.*.amount.required' => 'Enter an amount.',
+            'postings.*.amount.integer' => 'Enter a valid amount.',
+            'postings.*.amount.not_in' => 'The amount cannot be zero.',
+            'postings.*.memo.string' => 'Enter a valid posting memo.',
+            'postings.*.memo.max' => 'Posting memos may not exceed 255 characters.',
+            'postings.*.metadata.array' => 'Posting metadata must be an array.',
+            'postings.*.financial_lot_id.integer' => 'Choose a valid lot.',
+            'postings.*.financial_lot_id.exists' => 'Choose a valid lot.',
+            'postings.*.lot.array' => 'New lot details must be an array.',
+            'postings.*.lot.acquired_at.date' => 'Enter a valid acquisition date.',
+            'postings.*.lot.cost.required_with' => 'Enter the lot cost.',
+            'postings.*.lot.cost.integer' => 'Enter a valid lot cost.',
+            'postings.*.lot.cost.min' => 'Lot cost cannot be negative.',
+        ];
+    }
+
+    /**
      * Get the "after" validation callables for the request. Each check skips
      * when anything before it failed, so the balance check only ever runs
      * against structurally sound postings.
@@ -197,7 +236,7 @@ class StoreTransactionRequest extends FormRequest
         if ($residual !== 0) {
             $validator->errors()->add(
                 'postings',
-                "Postings must balance at cost (off by {$residual} USD minor units).",
+                'Postings must balance at cost.',
             );
         }
     }

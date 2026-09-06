@@ -51,6 +51,31 @@ describe('with finance permissions', function () {
         $this->fbtc = Commodity::factory()->create(['precision' => 8]);
     });
 
+    test('required transaction fields use form language', function () {
+        $this->postJson('/api/v1/financial/transactions', [])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.date.0', 'Enter a transaction date.')
+            ->assertJsonPath('errors.postings.0', 'Add at least two postings.');
+    });
+
+    test('posting fields use form language', function () {
+        $this->postJson('/api/v1/financial/transactions', [
+            'date' => '2026-08-01',
+            'postings' => [
+                [
+                    'status' => 'cleared',
+                    'financial_account_id' => null,
+                    'financial_commodity_id' => $this->usd->id,
+                    'amount' => -100,
+                ],
+                journalLeg($this->groceries, $this->usd, 100),
+            ],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'postings.0.financial_account_id' => 'Choose an account.',
+            ]);
+    });
+
     test('a simple transaction is created with server-assigned positions and derived status', function () {
         $payee = Payee::factory()->create();
 
@@ -92,14 +117,14 @@ describe('with finance permissions', function () {
         ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('postings')
-            ->assertJsonPath('errors.postings.0', 'Postings must balance at cost (off by -1 USD minor units).');
+            ->assertJsonPath('errors.postings.0', 'Postings must balance at cost.');
     });
 
     test('a transaction needs at least two postings', function () {
         $this->postJson('/api/v1/financial/transactions', [
             'date' => '2026-08-01',
             'postings' => [journalLeg($this->checking, $this->usd, -100)],
-        ])->assertUnprocessable()->assertJsonValidationErrors('postings');
+        ])->assertUnprocessable()->assertJsonPath('errors.postings.0', 'Add at least two postings.');
     });
 
     test('zero amounts and unknown statuses are rejected', function () {
@@ -109,7 +134,11 @@ describe('with finance permissions', function () {
                 journalLeg($this->checking, $this->usd, 0, ['status' => 'settled']),
                 journalLeg($this->groceries, $this->usd, 100),
             ],
-        ])->assertUnprocessable()->assertJsonValidationErrors(['postings.0.amount', 'postings.0.status']);
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'postings.0.amount' => 'The amount cannot be zero.',
+                'postings.0.status' => 'Choose a valid status.',
+            ]);
     });
 
     test('status is required only for asset and liability postings', function () {
@@ -276,6 +305,30 @@ describe('with finance permissions', function () {
             ->assertJsonPath('data.postings.2.financial_account_id', $dining->id);
 
         $this->assertModelMissing($droppedPosting);
+    });
+
+    test('an update rejects duplicate posting ids', function () {
+        $created = $this->postJson('/api/v1/financial/transactions', [
+            'date' => '2026-08-01',
+            'postings' => [
+                journalLeg($this->checking, $this->usd, -100),
+                journalLeg($this->groceries, $this->usd, 100),
+            ],
+        ])->assertCreated();
+
+        $transactionId = $created->json('data.id');
+        $postingId = $created->json('data.postings.0.id');
+
+        $this->putJson("/api/v1/financial/transactions/{$transactionId}", [
+            'date' => '2026-08-01',
+            'postings' => [
+                journalLeg($this->checking, $this->usd, -100, ['id' => $postingId]),
+                journalLeg($this->groceries, $this->usd, 100, ['id' => $postingId]),
+            ],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'postings.1.id' => 'Each posting may appear only once.',
+            ]);
     });
 
     test('a posting id from another transaction is rejected', function () {

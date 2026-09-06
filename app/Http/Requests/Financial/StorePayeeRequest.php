@@ -22,6 +22,19 @@ class StorePayeeRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'Enter a payee name.',
+            'name.string' => 'Enter a valid payee name.',
+            'name.max' => 'Payee names may not exceed 255 characters.',
+            'name.unique' => 'This payee already exists.',
+        ];
+    }
+
     protected function uniqueNameRule(): Unique
     {
         return Rule::unique(Payee::class, 'name');

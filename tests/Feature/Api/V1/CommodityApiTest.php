@@ -25,6 +25,15 @@ describe('with finance permissions', function () {
         actingWithPermissions(Permission::ViewFinances, Permission::ManageFinances);
     });
 
+    test('required commodity fields use form language', function () {
+        $this->postJson('/api/v1/financial/commodities', [])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.code.0', 'Enter a commodity code.')
+            ->assertJsonPath('errors.name.0', 'Enter a commodity name.')
+            ->assertJsonPath('errors.kind.0', 'Choose a commodity kind.')
+            ->assertJsonPath('errors.precision.0', 'Enter the commodity precision.');
+    });
+
     test('USD is present after migrating', function () {
         $this->getJson('/api/v1/financial/commodities')
             ->assertOk()
@@ -53,7 +62,7 @@ describe('with finance permissions', function () {
             'kind' => 'traded',
             'precision' => 18,
         ])->assertUnprocessable()
-            ->assertJsonValidationErrors('precision');
+            ->assertJsonPath('errors.precision.0', 'Precision cannot exceed 8 decimal places.');
     });
 
     test('a symbol requires a placement and vice versa', function (array $payload, string $errorField) {
@@ -64,7 +73,9 @@ describe('with finance permissions', function () {
             'precision' => 2,
             ...$payload,
         ])->assertUnprocessable()
-            ->assertJsonValidationErrors($errorField);
+            ->assertJsonPath("errors.{$errorField}.0", $errorField === 'symbol'
+                ? 'Enter a symbol when choosing its placement.'
+                : 'Choose where the symbol appears.');
     })->with([
         'symbol only' => [['symbol' => '$'], 'symbol_placement'],
         'placement only' => [['symbol_placement' => 'prefix'], 'symbol'],
@@ -79,7 +90,7 @@ describe('with finance permissions', function () {
             'kind' => 'traded',
             'precision' => 8,
         ])->assertUnprocessable()
-            ->assertJsonValidationErrors('code');
+            ->assertJsonPath('errors.code.0', 'This commodity code is already in use.');
     });
 
     test('updating a commodity keeps its own code available', function () {

@@ -29,6 +29,13 @@ describe('with finance permissions', function () {
         actingWithPermissions(Permission::ViewFinances, Permission::ManageFinances);
     });
 
+    test('required account fields use form language', function () {
+        $this->postJson('/api/v1/financial/accounts', [])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.account_type.0', 'Choose an account type.')
+            ->assertJsonPath('errors.name.0', 'Enter an account name.');
+    });
+
     test('the index derives full paths for the whole tree', function () {
         $food = Account::factory()->create(['name' => 'food']);
         Account::factory()->childOf($food)->create(['name' => 'dining-out']);
@@ -68,7 +75,7 @@ describe('with finance permissions', function () {
             'account_type' => 'expense',
             'name' => 'food:snacks',
         ])->assertUnprocessable()
-            ->assertJsonValidationErrors('name');
+            ->assertJsonPath('errors.name.0', 'Account names cannot contain a colon.');
     });
 
     test('sibling names must be unique', function () {
@@ -80,7 +87,7 @@ describe('with finance permissions', function () {
             'parent_id' => $food->id,
             'name' => 'groceries',
         ])->assertUnprocessable()
-            ->assertJsonValidationErrors('name');
+            ->assertJsonPath('errors.name.0', 'An account with this name already exists under the selected parent.');
     });
 
     test('the same name is allowed under a different parent', function () {
@@ -102,7 +109,7 @@ describe('with finance permissions', function () {
             'opened_at' => '2024-06-01',
             'closed_at' => '2024-01-01',
         ])->assertUnprocessable()
-            ->assertJsonValidationErrors('closed_at');
+            ->assertJsonPath('errors.closed_at.0', 'The closing date must be on or after the opening date.');
     });
 
     test('an account cannot be reparented under its own descendant', function () {

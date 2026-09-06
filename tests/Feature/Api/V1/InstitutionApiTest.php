@@ -19,6 +19,12 @@ describe('with finance permissions', function () {
         actingWithPermissions(Permission::ViewFinances, Permission::ManageFinances);
     });
 
+    test('an institution name is required with form language', function () {
+        $this->postJson('/api/v1/financial/institutions', [])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.name.0', 'Enter an institution name.');
+    });
+
     test('institutions are listed alphabetically', function () {
         Institution::factory()->create(['name' => 'Vanguard']);
         Institution::factory()->create(['name' => 'Fidelity']);
@@ -43,7 +49,7 @@ describe('with finance permissions', function () {
 
         $this->postJson('/api/v1/financial/institutions', ['name' => 'Fidelity'])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors('name');
+            ->assertJsonPath('errors.name.0', 'This institution already exists.');
     });
 
     test('deleting an institution with accounts conflicts', function () {

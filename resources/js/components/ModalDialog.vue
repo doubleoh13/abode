@@ -1,18 +1,46 @@
-<script setup lang="ts">
-import { onBeforeUnmount, onMounted } from 'vue';
+<script lang="ts">
+const openDialogs: symbol[] = [];
+</script>
 
-const props = defineProps<{ open: boolean }>();
+<script setup lang="ts">
+import { onBeforeUnmount, onMounted, watch } from 'vue';
+
+const props = defineProps<{ open: boolean; nested?: boolean }>();
 
 const emit = defineEmits<{ close: [] }>();
+const dialogId = Symbol();
+
+function removeFromStack(): void {
+    const index = openDialogs.indexOf(dialogId);
+
+    if (index !== -1) {
+        openDialogs.splice(index, 1);
+    }
+}
+
+watch(
+    () => props.open,
+    (open) => {
+        removeFromStack();
+
+        if (open) {
+            openDialogs.push(dialogId);
+        }
+    },
+    { immediate: true },
+);
 
 function handleKeydown(event: KeyboardEvent): void {
-    if (props.open && event.key === 'Escape') {
+    if (props.open && event.key === 'Escape' && openDialogs.at(-1) === dialogId) {
         emit('close');
     }
 }
 
 onMounted(() => window.addEventListener('keydown', handleKeydown));
-onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown));
+onBeforeUnmount(() => {
+    removeFromStack();
+    window.removeEventListener('keydown', handleKeydown);
+});
 </script>
 
 <template>
@@ -20,7 +48,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown));
         <Transition name="modal">
             <div
                 v-if="open"
-                class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-6 pt-[6vh]"
+                class="fixed inset-0 flex items-start justify-center overflow-y-auto p-6 pt-[6vh]"
+                :class="nested ? 'z-[60] bg-black/40' : 'z-50 bg-black/60'"
                 @click.self="emit('close')"
             >
                 <div class="modal-panel w-full max-w-5xl" role="dialog" aria-modal="true">
