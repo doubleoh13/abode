@@ -104,6 +104,12 @@ function openEditForm(transaction: Transaction): void {
     formOpen.value = true;
 }
 
+function registerPayee(payee: Payee): void {
+    if (!payees.value.some((candidate) => candidate.id === payee.id)) {
+        payees.value.push(payee);
+    }
+}
+
 function closeForm(): void {
     formOpen.value = false;
     editingTransaction.value = null;
@@ -185,6 +191,7 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                     :payees="payees"
                     @saved="transactionSaved"
                     @cancelled="closeForm"
+                    @payee-created="registerPayee"
                 />
             </ModalDialog>
 

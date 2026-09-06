@@ -8,6 +8,7 @@ import type {
     Account,
     Commodity,
     Lot,
+    Payee,
     Posting,
     PostingDraft,
     Transaction,
@@ -17,10 +18,10 @@ const props = defineProps<{
     transaction: Transaction | null;
     accounts: Account[];
     commodities: Commodity[];
-    payees: Array<{ id: number; name: string }>;
+    payees: Payee[];
 }>();
 
-const emit = defineEmits<{ saved: []; cancelled: [] }>();
+const emit = defineEmits<{ saved: []; cancelled: []; payeeCreated: [Payee] }>();
 
 const baseCurrency = computed(() => {
     const usd = props.commodities.find((commodity) => commodity.code === 'USD');
@@ -33,6 +34,9 @@ const baseCurrency = computed(() => {
 });
 
 const knownLots = ref<Record<number, Lot>>({});
+const availablePayees = ref([...props.payees]);
+const creatingPayee = ref(false);
+const payeeCreationError = ref<string | null>(null);
 
 function registerLots(lots: Lot[]): void {
     for (const lot of lots) {
@@ -95,8 +99,42 @@ const dateInput = ref<HTMLInputElement | null>(null);
 onMounted(() => dateInput.value?.focus());
 
 const payeeOptions = computed(() =>
-    props.payees.map((payee) => ({ value: payee.id, label: payee.name })),
+    availablePayees.value
+        .toSorted((first, second) => first.name.localeCompare(second.name))
+        .map((payee) => ({ value: payee.id, label: payee.name })),
 );
+
+async function createPayee(name: string): Promise<void> {
+    if (creatingPayee.value) {
+        return;
+    }
+
+    creatingPayee.value = true;
+    payeeCreationError.value = null;
+
+    try {
+        const payee = (
+            await axios.post<{ data: Payee }>('/api/v1/financial/payees', { name })
+        ).data.data;
+
+        availablePayees.value.push(payee);
+        form.value.financial_payee_id = payee.id;
+        emit('payeeCreated', payee);
+    } catch (error) {
+        if (isAxiosError(error) && error.response?.status === 422) {
+            payeeCreationError.value = error.response.data.errors.name?.[0] ?? 'Unable to create payee.';
+        } else {
+            throw error;
+        }
+    } finally {
+        creatingPayee.value = false;
+    }
+}
+
+function selectPayee(payeeId: number | null): void {
+    form.value.financial_payee_id = payeeId;
+    payeeCreationError.value = null;
+}
 
 function commodityById(id: number | null): Commodity | null {
     return props.commodities.find((commodity) => commodity.id === id) ?? null;
@@ -271,9 +309,19 @@ async function save(): Promise<void> {
 
             <div class="flex flex-col gap-1.5">
                 <span class="field-label">Payee</span>
-                <ComboBox v-model="form.financial_payee_id" :options="payeeOptions" nullable />
+                <ComboBox
+                    :model-value="form.financial_payee_id"
+                    :options="payeeOptions"
+                    nullable
+                    creatable
+                    @update:model-value="selectPayee"
+                    @create="createPayee"
+                />
                 <p v-if="errors.financial_payee_id" class="text-sm text-danger">
                     {{ errors.financial_payee_id[0] }}
+                </p>
+                <p v-if="payeeCreationError" class="text-sm text-danger">
+                    {{ payeeCreationError }}
                 </p>
             </div>
 

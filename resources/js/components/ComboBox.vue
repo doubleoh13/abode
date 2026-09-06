@@ -5,9 +5,17 @@ const props = defineProps<{
     modelValue: TValue | null;
     options: Array<{ value: TValue; label: string }>;
     nullable?: boolean;
+    creatable?: boolean;
 }>();
 
-const emit = defineEmits<{ 'update:modelValue': [TValue | null] }>();
+const emit = defineEmits<{
+    'update:modelValue': [TValue | null];
+    create: [string];
+}>();
+
+type Choice =
+    | { type: 'option'; value: TValue | null; label: string }
+    | { type: 'create'; query: string; label: string };
 
 const open = ref(false);
 const search = ref('');
@@ -28,21 +36,42 @@ watch(selectedLabel, (label) => {
     displayValue.value = label;
 });
 
-const filteredOptions = computed<Array<{ value: TValue | null; label: string }>>(() => {
+const choices = computed<Choice[]>(() => {
     const query = search.value.trim().toLowerCase();
 
     if (query === '') {
-        return props.nullable ? [{ value: null, label: '(none)' }, ...props.options] : props.options;
+        const options: Choice[] = props.options.map((option) => ({ type: 'option', ...option }));
+
+        return props.nullable
+            ? [{ type: 'option', value: null, label: '(none)' }, ...options]
+            : options;
     }
 
-    return props.options.filter((option) => option.label.toLowerCase().includes(query));
+    const matchingOptions: Choice[] = props.options
+        .filter((option) => option.label.toLowerCase().includes(query))
+        .map((option) => ({ type: 'option', ...option }));
+    const exactMatchExists = props.options.some(
+        (option) => option.label.toLowerCase() === query,
+    );
+
+    if (props.creatable && !exactMatchExists) {
+        matchingOptions.push({
+            type: 'create',
+            query: search.value.trim(),
+            label: `Create “${search.value.trim()}”`,
+        });
+    }
+
+    return matchingOptions;
 });
 
 function openList(): void {
     open.value = true;
     search.value = '';
     highlightedIndex.value = Math.max(
-        filteredOptions.value.findIndex((option) => option.value === props.modelValue),
+        choices.value.findIndex(
+            (choice) => choice.type === 'option' && choice.value === props.modelValue,
+        ),
         0,
     );
 }
@@ -54,9 +83,16 @@ function handleInput(event: Event): void {
     highlightedIndex.value = 0;
 }
 
-function choose(option: { value: TValue | null; label: string }): void {
-    emit('update:modelValue', option.value);
-    displayValue.value = option.value === null ? '' : option.label;
+function choose(choice: Choice): void {
+    if (choice.type === 'create') {
+        emit('create', choice.query);
+        open.value = false;
+
+        return;
+    }
+
+    emit('update:modelValue', choice.value);
+    displayValue.value = choice.value === null ? '' : choice.label;
     open.value = false;
 }
 
@@ -81,7 +117,12 @@ function handleKeydown(event: KeyboardEvent): void {
         }
 
         const direction = event.key === 'ArrowDown' ? 1 : -1;
-        const count = filteredOptions.value.length;
+        const count = choices.value.length;
+
+        if (count === 0) {
+            return;
+        }
+
         highlightedIndex.value = (highlightedIndex.value + direction + count) % count;
     }
 
@@ -90,10 +131,10 @@ function handleKeydown(event: KeyboardEvent): void {
             event.preventDefault();
         }
 
-        const option = filteredOptions.value[highlightedIndex.value];
+        const choice = choices.value[highlightedIndex.value];
 
-        if (option) {
-            choose(option);
+        if (choice) {
+            choose(choice);
         }
     }
 
@@ -112,6 +153,7 @@ function handleKeydown(event: KeyboardEvent): void {
             type="text"
             role="combobox"
             :aria-expanded="open"
+            aria-autocomplete="list"
             autocomplete="off"
             class="input w-full pr-8"
             :value="displayValue"
@@ -132,21 +174,25 @@ function handleKeydown(event: KeyboardEvent): void {
         </svg>
 
         <ul
-            v-if="open && filteredOptions.length"
+            v-if="open && choices.length"
             role="listbox"
             class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-sm border border-edge bg-surface py-1"
         >
             <li
-                v-for="(option, index) in filteredOptions"
-                :key="option.label"
+                v-for="(choice, index) in choices"
+                :key="choice.type === 'create' ? `create:${choice.query}` : `option:${choice.label}`"
                 role="option"
-                :aria-selected="option.value === modelValue"
+                :aria-selected="choice.type === 'option' && choice.value === modelValue"
                 class="cursor-pointer px-3 py-1.5 text-sm"
-                :class="index === highlightedIndex ? 'bg-background text-foreground' : 'text-muted'"
-                @mousedown.prevent="choose(option)"
+                :class="[
+                    index === highlightedIndex ? 'bg-background text-foreground' : 'text-muted',
+                    choice.type === 'create' ? 'font-medium' : '',
+                    choice.type === 'create' && index > 0 ? 'border-t border-edge' : '',
+                ]"
+                @mousedown.prevent="choose(choice)"
                 @mousemove="highlightedIndex = index"
             >
-                {{ option.label }}
+                {{ choice.label }}
             </li>
         </ul>
     </div>
