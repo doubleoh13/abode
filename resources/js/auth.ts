@@ -1,13 +1,13 @@
 import axios from 'axios';
 import { reactive } from 'vue';
 
+export type PermissionName = 'view-finances' | 'manage-finances';
+
 export interface AuthenticatedUser {
     id: number;
     name: string;
     email: string;
-    email_verified_at: string | null;
-    created_at: string;
-    updated_at: string;
+    permissions: PermissionName[];
 }
 
 export interface LoginCredentials {
@@ -26,12 +26,16 @@ export const auth = reactive<{
 
 export async function resolveAuthenticatedUser(): Promise<void> {
     try {
-        auth.user = (await axios.get<AuthenticatedUser>('/api/v1/user')).data;
+        auth.user = (await axios.get<{ data: AuthenticatedUser }>('/api/v1/user')).data.data;
     } catch {
         auth.user = null;
     } finally {
         auth.resolved = true;
     }
+}
+
+export function hasPermission(permission: PermissionName): boolean {
+    return auth.user?.permissions.includes(permission) ?? false;
 }
 
 export async function login(credentials: LoginCredentials): Promise<void> {

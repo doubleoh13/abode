@@ -2,6 +2,7 @@
 
 namespace App\Listeners;
 
+use App\Enums\Permission;
 use App\Models\User;
 use Illuminate\Database\Events\DatabaseRefreshed;
 use Illuminate\Support\Str;
@@ -18,6 +19,11 @@ class RecreateDevelopmentUser
             'name' => 'Jake Richhart',
             'email' => 'jake@jakerichhart.com',
             'password' => config('development.user_password') ?? Str::password(),
+        ]);
+
+        $user->permissions()->createMany([
+            ['permission' => Permission::ViewFinances],
+            ['permission' => Permission::ManageFinances],
         ]);
 
         $plainTextToken = config('development.api_token');

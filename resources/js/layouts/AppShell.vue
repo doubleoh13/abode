@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { auth, logout } from '../auth';
+import { useRoute, useRouter } from 'vue-router';
+import { auth, hasPermission, logout } from '../auth';
 
+const route = useRoute();
 const router = useRouter();
 const mobileNavigationOpen = ref(false);
 
@@ -61,18 +62,38 @@ async function endSession(): Promise<void> {
             </div>
 
             <nav class="flex flex-1 flex-col gap-1 px-3 py-2">
-                <a
-                    href="#"
-                    class="rounded-sm border-l-2 border-accent bg-background px-3 py-2 text-sm text-foreground"
-                >
-                    Dashboard
-                </a>
-                <a
-                    href="#"
-                    class="rounded-sm border-l-2 border-transparent px-3 py-2 text-sm text-muted transition-colors hover:bg-background/60 hover:text-foreground"
-                >
-                    Devices
-                </a>
+                <template v-if="hasPermission('view-finances')">
+                    <RouterLink
+                        :to="{ name: 'finances' }"
+                        class="rounded-sm border-l-2 px-3 py-2 text-sm transition-colors"
+                        :class="
+                            String(route.name).startsWith('finances')
+                                ? 'border-accent bg-background text-foreground'
+                                : 'border-transparent text-muted hover:bg-background/60 hover:text-foreground'
+                        "
+                        @click="mobileNavigationOpen = false"
+                    >
+                        Finances
+                    </RouterLink>
+
+                    <div
+                        v-if="String(route.name).startsWith('finances')"
+                        class="ml-5 flex flex-col gap-1"
+                    >
+                        <RouterLink
+                            :to="{ name: 'finances.accounts' }"
+                            class="rounded-sm px-3 py-1.5 text-sm transition-colors"
+                            :class="
+                                route.name === 'finances.accounts'
+                                    ? 'bg-background text-foreground'
+                                    : 'text-muted hover:bg-background/60 hover:text-foreground'
+                            "
+                            @click="mobileNavigationOpen = false"
+                        >
+                            Accounts
+                        </RouterLink>
+                    </div>
+                </template>
             </nav>
 
             <div class="border-t border-edge px-6 py-4">
