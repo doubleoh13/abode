@@ -8,6 +8,7 @@ use App\Models\Financial\Account;
 use App\Models\Financial\Commodity;
 use App\Models\Financial\CommodityPrice;
 use App\Models\Financial\Institution;
+use App\Models\Financial\Payee;
 use Illuminate\Database\Seeder;
 
 class DevelopmentFinancialSeeder extends Seeder
@@ -27,6 +28,23 @@ class DevelopmentFinancialSeeder extends Seeder
 
         $this->seedAccounts($fidelity, $chase);
         $this->seedCommoditiesWithPrices();
+        $this->seedPayees();
+    }
+
+    private function seedPayees(): void
+    {
+        foreach ([
+            'Kroger',
+            'Costco',
+            'Amazon',
+            'Shell',
+            'Netflix',
+            'City Utilities',
+            'State Farm',
+            'Chipotle',
+        ] as $name) {
+            Payee::query()->create(['name' => $name]);
+        }
     }
 
     private function seedAccounts(Institution $fidelity, Institution $chase): void

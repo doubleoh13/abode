@@ -25,6 +25,11 @@ export interface Institution {
     name: string;
 }
 
+export interface Payee {
+    id: number;
+    name: string;
+}
+
 export interface Account {
     id: number;
     account_type: AccountType;

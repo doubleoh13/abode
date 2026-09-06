@@ -8,6 +8,7 @@ import HomePage from './pages/HomePage.vue';
 import InstitutionsPage from './pages/InstitutionsPage.vue';
 import LoginPage from './pages/LoginPage.vue';
 import NotFoundPage from './pages/NotFoundPage.vue';
+import PayeesPage from './pages/PayeesPage.vue';
 
 export const router = createRouter({
     history: createWebHistory(),
@@ -36,6 +37,11 @@ export const router = createRouter({
                             path: 'institutions',
                             name: 'finances.institutions',
                             component: InstitutionsPage,
+                        },
+                        {
+                            path: 'payees',
+                            name: 'finances.payees',
+                            component: PayeesPage,
                         },
                     ],
                 },

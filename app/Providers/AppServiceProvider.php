@@ -6,6 +6,7 @@ use App\Enums\Permission;
 use App\Models\Financial\Account;
 use App\Models\Financial\Commodity;
 use App\Models\Financial\Institution;
+use App\Models\Financial\Payee;
 use App\Models\User;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
@@ -46,6 +47,7 @@ class AppServiceProvider extends ServiceProvider
             'financial.account' => Account::class,
             'financial.commodity' => Commodity::class,
             'financial.institution' => Institution::class,
+            'financial.payee' => Payee::class,
         ]);
     }
 }

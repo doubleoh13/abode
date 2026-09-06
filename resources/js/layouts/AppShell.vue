@@ -85,6 +85,7 @@ async function endSession(): Promise<void> {
                                 { name: 'finances.accounts', label: 'Accounts' },
                                 { name: 'finances.commodities', label: 'Commodities' },
                                 { name: 'finances.institutions', label: 'Institutions' },
+                                { name: 'finances.payees', label: 'Payees' },
                             ]"
                             :key="subItem.name"
                             :to="{ name: subItem.name }"

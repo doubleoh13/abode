@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AttachmentController;
 use App\Http\Controllers\Api\V1\Financial\AccountController;
 use App\Http\Controllers\Api\V1\Financial\CommodityController;
 use App\Http\Controllers\Api\V1\Financial\InstitutionController;
+use App\Http\Controllers\Api\V1\Financial\PayeeController;
 use App\Http\Controllers\Api\V1\NoteController;
 use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
@@ -24,12 +25,14 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('accounts', AccountController::class)->only(['index', 'show']);
             Route::apiResource('institutions', InstitutionController::class)->only(['index', 'show']);
             Route::apiResource('commodities', CommodityController::class)->only(['index', 'show']);
+            Route::apiResource('payees', PayeeController::class)->only(['index', 'show']);
         });
 
         Route::middleware('can:manage-finances')->group(function () {
             Route::apiResource('accounts', AccountController::class)->only(['store', 'update', 'destroy']);
             Route::apiResource('institutions', InstitutionController::class)->only(['store', 'update', 'destroy']);
             Route::apiResource('commodities', CommodityController::class)->only(['store', 'update', 'destroy']);
+            Route::apiResource('payees', PayeeController::class)->only(['store', 'update', 'destroy']);
         });
     });
 });
