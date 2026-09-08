@@ -11,6 +11,7 @@ import type {
     JournalIssue,
     Paginated,
     Payee,
+    Posting,
     PostingStatus,
     Transaction,
 } from '../types';
@@ -146,18 +147,53 @@ function accountPathLeaf(path: string | undefined): string {
 
 function statusSymbol(status: PostingStatus | null): string {
     if (status === 'pending') {
-        return '○';
+        return 'P';
     }
 
     if (status === 'cleared') {
-        return '✓';
+        return 'C';
     }
 
     if (status === 'reconciled') {
-        return '✓✓';
+        return 'R';
     }
 
-    return '—';
+    return ' ';
+}
+
+function statusClass(status: PostingStatus | null): string {
+    return status === 'reconciled' ? 'text-accent' : 'text-muted';
+}
+
+function nextStatus(status: PostingStatus): PostingStatus {
+    if (status === 'pending') {
+        return 'cleared';
+    }
+
+    if (status === 'cleared') {
+        return 'reconciled';
+    }
+
+    return 'pending';
+}
+
+async function flipStatus(transaction: Transaction, posting: Posting): Promise<void> {
+    if (posting.status === null) {
+        return;
+    }
+
+    await axios.patch(`/api/v1/financial/postings/${posting.id}`, {
+        status: nextStatus(posting.status),
+    });
+
+    const refreshed = (
+        await axios.get<{ data: Transaction }>(`/api/v1/financial/transactions/${transaction.id}`)
+    ).data.data;
+    const index = transactions.value.findIndex((candidate) => candidate.id === transaction.id);
+
+    if (index !== -1) {
+        transactions.value[index] = refreshed;
+    }
 }
 
 function statusLabel(status: PostingStatus | null): string {
@@ -228,7 +264,7 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                 class="mt-6 divide-y divide-edge overflow-hidden rounded-md border border-edge bg-surface"
             >
                 <li v-for="transaction in transactions" :key="transaction.id" class="group px-4 py-2">
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-4" :class="{ italic: transaction.status === 'pending' }">
                         <span class="font-mono text-xs text-muted">{{ transaction.date }}</span>
 
                         <span
@@ -239,14 +275,6 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                             ⚠
                         </span>
 
-                        <span
-                            class="w-8 shrink-0 font-mono text-sm text-muted"
-                            :title="statusLabel(transaction.status)"
-                        >
-                            <span aria-hidden="true">{{ statusSymbol(transaction.status) }}</span>
-                            <span class="sr-only">{{ statusLabel(transaction.status) }}</span>
-                        </span>
-
                         <span class="min-w-0 flex-1 truncate text-sm">
                             {{ transaction.payee?.name ?? transaction.memo ?? '—' }}
                             <span v-if="transaction.payee && transaction.memo" class="text-muted">
@@ -254,7 +282,7 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                             </span>
                         </span>
 
-                        <span class="flex items-center gap-3 font-mono text-xs text-muted">
+                        <span class="flex items-center gap-3 font-mono text-xs text-muted not-italic">
                             <button
                                 type="button"
                                 class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
@@ -270,6 +298,8 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                                 Delete
                             </button>
                         </span>
+
+                        <span class="w-8 shrink-0"></span>
                     </div>
 
                     <div class="mt-1 flex flex-col">
@@ -277,6 +307,12 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                             v-for="posting in transaction.postings"
                             :key="posting.id"
                             class="flex items-center gap-4 py-0.5 pl-24"
+                            :class="{
+                                italic:
+                                    transaction.status === 'pending' &&
+                                    posting.status !== 'cleared' &&
+                                    posting.status !== 'reconciled',
+                            }"
                         >
                             <span
                                 v-if="issuesByPosting.has(posting.id)"
@@ -284,16 +320,6 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                                 :title="issuesByPosting.get(posting.id)?.map((issue) => issue.message).join('\n')"
                             >
                                 ⚠
-                            </span>
-
-                            <span
-                                class="w-8 shrink-0 font-mono text-sm text-muted"
-                                :title="posting.status !== null && posting.status !== transaction.status ? statusLabel(posting.status) : undefined"
-                            >
-                                <template v-if="posting.status !== null && posting.status !== transaction.status">
-                                    <span aria-hidden="true">{{ statusSymbol(posting.status) }}</span>
-                                    <span class="sr-only">{{ statusLabel(posting.status) }}</span>
-                                </template>
                             </span>
 
                             <span class="min-w-0 flex-1 truncate text-sm">
@@ -304,6 +330,20 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                             <span class="text-right font-mono text-sm">
                                 {{ posting.commodity ? formatAmount(posting.amount, posting.commodity) : posting.amount }}
                             </span>
+
+                            <button
+                                v-if="posting.status !== null"
+                                type="button"
+                                class="w-8 shrink-0 rounded-sm text-right font-mono text-sm transition-colors hover:bg-edge/60 hover:text-foreground"
+                                :class="statusClass(posting.status)"
+                                :title="`${statusLabel(posting.status)} — click to mark ${statusLabel(nextStatus(posting.status)).toLowerCase()}`"
+                                @click="flipStatus(transaction, posting)"
+                            >
+                                <span aria-hidden="true">{{ statusSymbol(posting.status) }}</span>
+                                <span class="sr-only">{{ statusLabel(posting.status) }}</span>
+                            </button>
+
+                            <span v-else class="w-8 shrink-0"></span>
                         </div>
                     </div>
                 </li>
