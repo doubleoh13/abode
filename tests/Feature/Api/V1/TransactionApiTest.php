@@ -610,6 +610,75 @@ describe('with finance permissions', function () {
             ->assertJsonPath('data.status', null);
     });
 
+    describe('index filtering', function () {
+        function journalEntry(string $date, Account $debit, Account $credit, array $attributes = [], string $debitStatus = 'cleared'): Transaction
+        {
+            $transaction = Transaction::factory()->on($date)->create($attributes);
+            $usd = Commodity::query()->where('code', 'USD')->firstOrFail();
+
+            Posting::factory()->forTransaction($transaction, 0)->inAccount($debit)->ofCommodity($usd)
+                ->create(['amount' => 100, 'status' => $debitStatus]);
+            Posting::factory()->forTransaction($transaction, 1)->inAccount($credit)->ofCommodity($usd)
+                ->create(['amount' => -100, 'status' => null]);
+
+            return $transaction;
+        }
+
+        function indexIds(object $context, string $query): array
+        {
+            return collect($context->getJson("/api/v1/financial/transactions?{$query}")->assertOk()->json('data'))
+                ->pluck('id')
+                ->all();
+        }
+
+        test('an account filter matches the account and its descendants', function () {
+            $child = Account::factory()->ofType(AccountType::Asset)->create(['parent_id' => $this->checking->id]);
+            $inChild = journalEntry('2026-08-01', $child, $this->groceries);
+            $inParent = journalEntry('2026-08-02', $this->checking, $this->groceries);
+            journalEntry('2026-08-03', $this->brokerage, $this->groceries);
+
+            expect(indexIds($this, "financial_account_id={$this->checking->id}"))
+                ->toBe([$inParent->id, $inChild->id]);
+        });
+
+        test('a search matches payee names and memos case-insensitively', function () {
+            $payee = Payee::factory()->create(['name' => 'Meijer']);
+            $byPayee = journalEntry('2026-08-01', $this->checking, $this->groceries, ['financial_payee_id' => $payee->id]);
+            $byMemo = journalEntry('2026-08-02', $this->checking, $this->groceries, ['memo' => 'Meijer run']);
+            journalEntry('2026-08-03', $this->checking, $this->groceries, ['memo' => 'Costco']);
+
+            expect(indexIds($this, 'search=meijer'))->toBe([$byMemo->id, $byPayee->id]);
+        });
+
+        test('a date range brackets the journal', function () {
+            journalEntry('2026-08-01', $this->checking, $this->groceries);
+            $within = journalEntry('2026-08-15', $this->checking, $this->groceries);
+            journalEntry('2026-09-01', $this->checking, $this->groceries);
+
+            expect(indexIds($this, 'from=2026-08-10&to=2026-08-20'))->toBe([$within->id]);
+        });
+
+        test('a status filter applies the least-advanced derivation', function () {
+            $pending = journalEntry('2026-08-01', $this->checking, $this->groceries, [], 'pending');
+            Posting::factory()->forTransaction($pending, 2)->inAccount($this->brokerage)->ofCommodity($this->usd)
+                ->create(['amount' => '0.5', 'status' => 'cleared']);
+            $cleared = journalEntry('2026-08-02', $this->checking, $this->groceries);
+            $reconciled = journalEntry('2026-08-03', $this->checking, $this->groceries, [], 'reconciled');
+
+            expect(indexIds($this, 'status[]=pending'))->toBe([$pending->id])
+                ->and(indexIds($this, 'status[]=cleared'))->toBe([$cleared->id])
+                ->and(indexIds($this, 'status[]=reconciled'))->toBe([$reconciled->id])
+                ->and(indexIds($this, 'status[]=cleared&status[]=reconciled'))
+                ->toBe([$reconciled->id, $cleared->id]);
+        });
+
+        test('an unknown filter account is rejected', function () {
+            $this->getJson('/api/v1/financial/transactions?financial_account_id=999999')
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('financial_account_id');
+        });
+    });
+
     test('metadata round-trips on transactions and postings', function () {
         $this->postJson('/api/v1/financial/transactions', [
             'date' => '2026-08-01',

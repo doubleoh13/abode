@@ -2,15 +2,20 @@
 
 namespace App\Http\Controllers\Api\V1\Financial;
 
+use App\Enums\Financial\PostingStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Financial\StoreTransactionRequest;
 use App\Http\Requests\Financial\UpdateTransactionRequest;
 use App\Http\Resources\Financial\TransactionResource;
+use App\Models\Financial\Account;
 use App\Models\Financial\Transaction;
 use App\Support\Financial\TransactionWriter;
 use Dedoc\Scramble\Attributes\Group;
+use Illuminate\Contracts\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Validation\Rule;
 
 #[Group('Financial / Transactions')]
 class TransactionController extends Controller
@@ -19,15 +24,81 @@ class TransactionController extends Controller
 
     public function __construct(private readonly TransactionWriter $transactionWriter) {}
 
-    public function index(): AnonymousResourceCollection
+    /**
+     * Journal transactions, newest first. Optional filters: an account
+     * (including its descendants), a payee/memo search, a date range, and
+     * the derived transaction status.
+     */
+    public function index(Request $request): AnonymousResourceCollection
     {
+        $validated = $request->validate([
+            'financial_account_id' => ['nullable', 'integer', Rule::exists(Account::class, 'id')],
+            'search' => ['nullable', 'string', 'max:255'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+            'status' => ['nullable', 'array'],
+            'status.*' => [Rule::enum(PostingStatus::class)],
+        ]);
+
         return TransactionResource::collection(
             Transaction::query()
                 ->with(self::EAGER_LOADS)
+                ->when($validated['financial_account_id'] ?? null, fn (Builder $query, int $accountId) => $query
+                    ->whereHas('postings', fn (Builder $postings) => $postings
+                        ->whereIn('financial_account_id', $this->accountAndDescendantIds($accountId))))
+                ->when($validated['search'] ?? null, fn (Builder $query, string $search) => $query
+                    ->where(fn (Builder $matches) => $matches
+                        ->where('memo', 'ilike', "%{$search}%")
+                        ->orWhereHas('payee', fn (Builder $payee) => $payee->where('name', 'ilike', "%{$search}%"))))
+                ->when($validated['from'] ?? null, fn (Builder $query, string $from) => $query->where('date', '>=', $from))
+                ->when($validated['to'] ?? null, fn (Builder $query, string $to) => $query->where('date', '<=', $to))
+                ->when($validated['status'] ?? null, fn (Builder $query, array $statuses) => $query
+                    ->where(function (Builder $matches) use ($statuses): void {
+                        foreach ($statuses as $status) {
+                            $matches->orWhere(fn (Builder $derived) => $this
+                                ->whereDerivedStatus($derived, PostingStatus::from($status)));
+                        }
+                    }))
                 ->orderByDesc('date')
                 ->orderByDesc('id')
-                ->paginate(50),
+                ->paginate(50)
+                ->withQueryString(),
         );
+    }
+
+    /**
+     * Derived status is the least-advanced Asset/Liability posting status;
+     * match transactions holding the target status with nothing less advanced.
+     */
+    private function whereDerivedStatus(Builder $query, PostingStatus $status): void
+    {
+        $lessAdvanced = array_filter(
+            PostingStatus::cases(),
+            fn (PostingStatus $candidate): bool => $candidate->rank() < $status->rank(),
+        );
+
+        $query->whereHas('postings', fn (Builder $postings) => $postings->where('status', $status));
+
+        if ($lessAdvanced !== []) {
+            $query->whereDoesntHave('postings', fn (Builder $postings) => $postings->whereIn('status', $lessAdvanced));
+        }
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function accountAndDescendantIds(int $accountId): array
+    {
+        $childrenByParent = Account::query()->get(['id', 'parent_id'])->groupBy('parent_id');
+        $ids = [$accountId];
+
+        for ($index = 0; $index < count($ids); $index++) {
+            foreach ($childrenByParent->get($ids[$index]) ?? [] as $child) {
+                $ids[] = $child->id;
+            }
+        }
+
+        return $ids;
     }
 
     public function store(StoreTransactionRequest $request): TransactionResource
