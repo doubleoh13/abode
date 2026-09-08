@@ -4,6 +4,7 @@ import AccountPage from './pages/AccountPage.vue';
 import AccountsPage from './pages/AccountsPage.vue';
 import AppShell from './layouts/AppShell.vue';
 import CommoditiesPage from './pages/CommoditiesPage.vue';
+import CommodityPage from './pages/CommodityPage.vue';
 import FinancesPage from './pages/FinancesPage.vue';
 import HomePage from './pages/HomePage.vue';
 import InstitutionsPage from './pages/InstitutionsPage.vue';
@@ -44,6 +45,11 @@ export const router = createRouter({
                             path: 'commodities',
                             name: 'finances.commodities',
                             component: CommoditiesPage,
+                        },
+                        {
+                            path: 'commodities/:id',
+                            name: 'finances.commodity',
+                            component: CommodityPage,
                         },
                         {
                             path: 'institutions',

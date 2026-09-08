@@ -363,10 +363,14 @@ watch(accountId, () => {
                                                 <span class="text-muted"> · {{ holding.commodity.name }}</span>
                                             </span>
                                         </button>
-                                        <template v-else>
+                                        <RouterLink
+                                            v-else
+                                            :to="{ name: 'finances.commodity', params: { id: holding.commodity.id } }"
+                                            class="transition-colors hover:text-accent"
+                                        >
                                             {{ holding.commodity.code }}
                                             <span class="text-muted"> · {{ holding.commodity.name }}</span>
-                                        </template>
+                                        </RouterLink>
                                     </td>
                                     <td class="px-4 py-2 text-right font-mono">
                                         {{ formatAmount(holding.quantity, holding.commodity) }}

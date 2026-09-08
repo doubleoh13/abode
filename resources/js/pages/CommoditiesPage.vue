@@ -89,7 +89,14 @@ function exampleAmount(commodity: Commodity): string {
                     </thead>
                     <tbody class="divide-y divide-edge">
                         <tr v-for="commodity in commodities" :key="commodity.id" class="group">
-                            <td class="px-4 py-2 font-mono">{{ commodity.code }}</td>
+                            <td class="px-4 py-2 font-mono">
+                                <RouterLink
+                                    :to="{ name: 'finances.commodity', params: { id: commodity.id } }"
+                                    class="transition-colors hover:text-accent"
+                                >
+                                    {{ commodity.code }}
+                                </RouterLink>
+                            </td>
                             <td class="px-4 py-2">{{ commodity.name }}</td>
                             <td class="px-4 py-2 text-muted">{{ commodity.kind }}</td>
                             <td class="px-4 py-2 text-right font-mono text-muted">

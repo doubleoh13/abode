@@ -76,6 +76,11 @@ export interface AccountBalance {
     balance: string;
 }
 
+export interface CommodityBalance {
+    financial_account_id: number;
+    balance: string;
+}
+
 export interface Transaction {
     id: number;
     date: string;
@@ -83,7 +88,7 @@ export interface Transaction {
     payee?: Payee | null;
     memo: string | null;
     metadata: Record<string, unknown>;
-    status: PostingStatus | null;
+    status?: PostingStatus | null;
     postings?: Posting[];
 }
 
