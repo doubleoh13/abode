@@ -19,7 +19,7 @@ class BigDecimalCast implements CastsAttributes
      */
     public function get(Model $model, string $key, mixed $value, array $attributes): ?BigDecimal
     {
-        return $value === null ? null : BigDecimal::of($value);
+        return $value === null ? null : BigDecimal::of($value)->strippedOfTrailingZeros();
     }
 
     /**
@@ -33,6 +33,16 @@ class BigDecimalCast implements CastsAttributes
             throw new InvalidArgumentException('Exact decimals must be assigned as strings, integers, or BigDecimal values.');
         }
 
-        return $value === null ? null : (string) BigDecimal::of($value);
+        if ($value === null) {
+            return null;
+        }
+
+        $decimal = BigDecimal::of($value)->toScale(25);
+
+        if ($decimal->abs()->isGreaterThanOrEqualTo('1'.str_repeat('0', 53))) {
+            throw new InvalidArgumentException('Exact decimals cannot exceed 53 integer digits.');
+        }
+
+        return (string) $decimal->strippedOfTrailingZeros();
     }
 }

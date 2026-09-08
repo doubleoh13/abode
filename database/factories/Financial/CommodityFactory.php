@@ -23,7 +23,7 @@ class CommodityFactory extends Factory
             'code' => strtoupper(fake()->unique()->lexify('?????')),
             'name' => fake()->company(),
             'kind' => CommodityKind::Traded,
-            'precision' => 4,
+            'display_precision' => 4,
             'symbol' => null,
             'symbol_placement' => null,
         ];
@@ -33,7 +33,7 @@ class CommodityFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'kind' => CommodityKind::Currency,
-            'precision' => 2,
+            'display_precision' => 2,
             'symbol' => '$',
             'symbol_placement' => SymbolPlacement::Prefix,
         ]);
@@ -43,7 +43,7 @@ class CommodityFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'kind' => CommodityKind::Custom,
-            'precision' => 0,
+            'display_precision' => 0,
         ]);
     }
 }

@@ -15,7 +15,7 @@ export interface Commodity {
     code: string;
     name: string;
     kind: CommodityKind;
-    precision: number;
+    display_precision: number;
     symbol: string | null;
     symbol_placement: SymbolPlacement | null;
 }

@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['code', 'name', 'kind', 'precision', 'symbol', 'symbol_placement'])]
+#[Fillable(['code', 'name', 'kind', 'display_precision', 'symbol', 'symbol_placement'])]
 class Commodity extends Model
 {
     /** @use HasFactory<CommodityFactory> */
@@ -46,7 +46,7 @@ class Commodity extends Model
     {
         return [
             'kind' => CommodityKind::class,
-            'precision' => 'integer',
+            'display_precision' => 'integer',
             'symbol_placement' => SymbolPlacement::class,
         ];
     }

@@ -5,6 +5,7 @@
     "scripts": {
         "build": "vue-tsc --noEmit && vite build",
         "dev": "vite",
+        "test": "node --test 'tests/Unit/**/*.test.mjs'",
         "types": "vue-tsc --noEmit"
     },
     "devDependencies": {

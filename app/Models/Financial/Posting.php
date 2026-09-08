@@ -2,7 +2,7 @@
 
 namespace App\Models\Financial;
 
-use App\Casts\BigIntegerCast;
+use App\Casts\BigDecimalCast;
 use App\Enums\Financial\PostingStatus;
 use Database\Factories\Financial\PostingFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -60,7 +60,7 @@ class Posting extends Model
         return [
             'position' => 'integer',
             'status' => PostingStatus::class,
-            'amount' => BigIntegerCast::class,
+            'amount' => BigDecimalCast::class,
             'metadata' => 'array',
         ];
     }

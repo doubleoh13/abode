@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Financial;
 
 use App\Models\Financial\Lot;
+use Brick\Math\BigDecimal;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -25,8 +26,8 @@ class LotResource extends JsonResource
             'acquired_at' => $this->acquired_at->toDateString(),
             'cost' => (string) $this->cost,
             'metadata' => $this->metadata,
-            'open_quantity' => $this->when(isset($this->open_quantity), fn (): string => (string) $this->open_quantity),
-            'acquired_quantity' => $this->when(isset($this->acquired_quantity), fn (): string => (string) $this->acquired_quantity),
+            'open_quantity' => $this->when(isset($this->open_quantity), fn (): string => (string) BigDecimal::of($this->open_quantity)->strippedOfTrailingZeros()),
+            'acquired_quantity' => $this->when(isset($this->acquired_quantity), fn (): string => (string) BigDecimal::of($this->acquired_quantity)->strippedOfTrailingZeros()),
         ];
     }
 }

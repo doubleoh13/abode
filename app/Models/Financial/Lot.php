@@ -2,8 +2,8 @@
 
 namespace App\Models\Financial;
 
-use App\Casts\BigIntegerCast;
-use Brick\Math\BigInteger;
+use App\Casts\BigDecimalCast;
+use Brick\Math\BigDecimal;
 use Database\Factories\Financial\LotFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -35,9 +35,9 @@ class Lot extends Model
         return $this->hasMany(Posting::class, 'financial_lot_id');
     }
 
-    public function acquiredQuantity(?int $excludeTransactionId = null): BigInteger
+    public function acquiredQuantity(?int $excludeTransactionId = null): BigDecimal
     {
-        return BigInteger::of(
+        return BigDecimal::of(
             $this->postings()
                 ->where('amount', '>', 0)
                 ->when($excludeTransactionId !== null, fn ($query) => $query->where('financial_transaction_id', '!=', $excludeTransactionId))
@@ -54,7 +54,7 @@ class Lot extends Model
     {
         return [
             'acquired_at' => 'date',
-            'cost' => BigIntegerCast::class,
+            'cost' => BigDecimalCast::class,
             'metadata' => 'array',
         ];
     }

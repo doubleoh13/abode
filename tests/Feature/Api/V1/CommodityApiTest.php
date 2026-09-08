@@ -16,7 +16,7 @@ test('a viewer cannot write', function () {
         'code' => 'USD',
         'name' => 'US Dollar',
         'kind' => 'currency',
-        'precision' => 2,
+        'display_precision' => 2,
     ])->assertForbidden();
 });
 
@@ -31,14 +31,14 @@ describe('with finance permissions', function () {
             ->assertJsonPath('errors.code.0', 'Enter a commodity code.')
             ->assertJsonPath('errors.name.0', 'Enter a commodity name.')
             ->assertJsonPath('errors.kind.0', 'Choose a commodity kind.')
-            ->assertJsonPath('errors.precision.0', 'Enter the commodity precision.');
+            ->assertJsonPath('errors.display_precision.0', 'Enter the display precision.');
     });
 
     test('USD is present after migrating', function () {
         $this->getJson('/api/v1/financial/commodities')
             ->assertOk()
             ->assertJsonPath('data.0.code', 'USD')
-            ->assertJsonPath('data.0.precision', 2)
+            ->assertJsonPath('data.0.display_precision', 2)
             ->assertJsonPath('data.0.symbol_placement', 'prefix');
     });
 
@@ -47,7 +47,7 @@ describe('with finance permissions', function () {
             'code' => 'EUR',
             'name' => 'Euro',
             'kind' => 'currency',
-            'precision' => 2,
+            'display_precision' => 2,
             'symbol' => '€',
             'symbol_placement' => 'prefix',
         ])->assertCreated()
@@ -55,24 +55,24 @@ describe('with finance permissions', function () {
             ->assertJsonPath('data.symbol_placement', 'prefix');
     });
 
-    test('precision above the commodity scale cap is rejected', function () {
+    test('display precision above the display cap is rejected', function () {
         $this->postJson('/api/v1/financial/commodities', [
             'code' => 'ETH',
             'name' => 'Ether',
             'kind' => 'traded',
-            'precision' => 256,
+            'display_precision' => 26,
         ])->assertUnprocessable()
-            ->assertJsonPath('errors.precision.0', 'Precision cannot exceed 255 decimal places.');
+            ->assertJsonPath('errors.display_precision.0', 'Display precision cannot exceed 25 decimal places.');
     });
 
-    test('precision supports the full unsigned tiny integer range', function () {
+    test('display precision supports all stored fractional places', function () {
         $this->postJson('/api/v1/financial/commodities', [
             'code' => 'ATOM',
             'name' => 'Atomic Unit',
             'kind' => 'traded',
-            'precision' => 255,
+            'display_precision' => 25,
         ])->assertCreated()
-            ->assertJsonPath('data.precision', 255);
+            ->assertJsonPath('data.display_precision', 25);
     });
 
     test('a symbol requires a placement and vice versa', function (array $payload, string $errorField) {
@@ -80,7 +80,7 @@ describe('with finance permissions', function () {
             'code' => 'EUR',
             'name' => 'Euro',
             'kind' => 'currency',
-            'precision' => 2,
+            'display_precision' => 2,
             ...$payload,
         ])->assertUnprocessable()
             ->assertJsonPath("errors.{$errorField}.0", $errorField === 'symbol'
@@ -98,19 +98,19 @@ describe('with finance permissions', function () {
             'code' => 'FBTC',
             'name' => 'Fidelity Wise Origin Bitcoin Fund',
             'kind' => 'traded',
-            'precision' => 8,
+            'display_precision' => 8,
         ])->assertUnprocessable()
             ->assertJsonPath('errors.code.0', 'This commodity code is already in use.');
     });
 
     test('updating a commodity keeps its own code available', function () {
-        $commodity = Commodity::factory()->create(['code' => 'FBTC', 'precision' => 8]);
+        $commodity = Commodity::factory()->create(['code' => 'FBTC', 'display_precision' => 8]);
 
         $this->putJson("/api/v1/financial/commodities/{$commodity->id}", [
             'code' => 'FBTC',
             'name' => 'Fidelity Wise Origin Bitcoin Fund',
             'kind' => 'traded',
-            'precision' => 8,
+            'display_precision' => 8,
         ])->assertOk();
     });
 
@@ -129,46 +129,45 @@ describe('with finance permissions', function () {
         $this->deleteJson("/api/v1/financial/commodities/{$commodity->id}")->assertConflict();
     });
 
-    test('precision cannot decrease while postings reference the commodity', function () {
-        $commodity = Commodity::factory()->create(['code' => 'FBTC', 'precision' => 8]);
+    test('display precision can decrease while postings reference the commodity', function () {
+        $commodity = Commodity::factory()->create(['code' => 'FBTC', 'display_precision' => 8]);
         Posting::factory()->ofCommodity($commodity)->create();
 
         $this->putJson("/api/v1/financial/commodities/{$commodity->id}", [
             'code' => 'FBTC',
             'name' => $commodity->name,
             'kind' => 'traded',
-            'precision' => 6,
-        ])->assertUnprocessable()->assertJsonValidationErrors('precision');
+            'display_precision' => 6,
+        ])->assertOk()->assertJsonPath('data.display_precision', 6);
     });
 
-    test('increasing precision rescales existing posting amounts', function () {
-        $commodity = Commodity::factory()->create(['code' => 'FBTC', 'precision' => 4]);
+    test('increasing display precision preserves existing posting amounts', function () {
+        $commodity = Commodity::factory()->create(['code' => 'FBTC', 'display_precision' => 4]);
         $posting = Posting::factory()->ofCommodity($commodity)->create(['amount' => 12_345]);
 
         $this->putJson("/api/v1/financial/commodities/{$commodity->id}", [
             'code' => 'FBTC',
             'name' => $commodity->name,
             'kind' => 'traded',
-            'precision' => 6,
+            'display_precision' => 6,
         ])->assertOk();
 
-        expect((string) $posting->refresh()->amount)->toBe('1234500');
+        expect((string) $posting->refresh()->amount)->toBe('12345');
     });
 
-    test('precision cannot increase when rescaling would exceed atomic storage', function () {
-        $commodity = Commodity::factory()->create(['code' => 'MAX', 'precision' => 0]);
-        Posting::factory()->ofCommodity($commodity)->create(['amount' => str_repeat('9', 78)]);
+    test('display precision can increase for maximum stored amounts', function () {
+        $commodity = Commodity::factory()->create(['code' => 'MAX', 'display_precision' => 0]);
+        Posting::factory()->ofCommodity($commodity)->create(['amount' => str_repeat('9', 53)]);
 
         $this->putJson("/api/v1/financial/commodities/{$commodity->id}", [
             'code' => 'MAX',
             'name' => $commodity->name,
             'kind' => 'traded',
-            'precision' => 1,
-        ])->assertUnprocessable()
-            ->assertJsonPath('errors.precision.0', 'Precision cannot increase because a stored value would exceed 78 digits.');
+            'display_precision' => 1,
+        ])->assertOk()->assertJsonPath('data.display_precision', 1);
     });
 
-    test('increasing the base currency precision also rescales lot costs', function () {
+    test('changing base currency display precision preserves postings and lot costs', function () {
         $usd = Commodity::query()->where('code', 'USD')->firstOrFail();
         $posting = Posting::factory()->ofCommodity($usd)->create(['amount' => 500]);
         $lot = Lot::factory()->create(['cost' => 425_000]);
@@ -177,12 +176,12 @@ describe('with finance permissions', function () {
             'code' => 'USD',
             'name' => $usd->name,
             'kind' => 'currency',
-            'precision' => 3,
+            'display_precision' => 3,
             'symbol' => $usd->symbol,
             'symbol_placement' => $usd->symbol_placement?->value,
         ])->assertOk();
 
-        expect((string) $posting->refresh()->amount)->toBe('5000')
-            ->and((string) $lot->refresh()->cost)->toBe('4250000');
+        expect((string) $posting->refresh()->amount)->toBe('500')
+            ->and((string) $lot->refresh()->cost)->toBe('425000');
     });
 });

@@ -8,9 +8,9 @@ use App\Models\Financial\Account;
 use App\Models\Financial\Commodity;
 use App\Models\Financial\Lot;
 use App\Models\Financial\Payee;
-use App\Rules\ExactInteger;
+use App\Rules\ExactDecimal;
 use App\Support\Financial\CostBasisBalancer;
-use Brick\Math\BigInteger;
+use Brick\Math\BigDecimal;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Collection;
@@ -35,18 +35,33 @@ class StoreTransactionRequest extends FormRequest
             'postings.*.status' => ['nullable', Rule::enum(PostingStatus::class)],
             'postings.*.financial_account_id' => ['required', 'integer', Rule::exists(Account::class, 'id')],
             'postings.*.financial_commodity_id' => ['required', 'integer', Rule::exists(Commodity::class, 'id')],
+            /**
+             * Nonzero decimal string, e.g. "426.674". Maximum 53 integer and 25 fractional digits.
+             *
+             * @var string
+             *
+             * @example 426.674
+             */
             'postings.*.amount' => [
                 'required',
-                new ExactInteger(allowNegative: true, allowZero: false, message: 'Enter a valid nonzero amount.'),
+                new ExactDecimal(allowNegative: true, allowZero: false, message: 'Enter a valid nonzero amount.'),
             ],
             'postings.*.memo' => ['nullable', 'string', 'max:255'],
             'postings.*.metadata' => ['sometimes', 'array'],
             'postings.*.financial_lot_id' => ['nullable', 'integer', Rule::exists(Lot::class, 'id')],
             'postings.*.lot' => ['nullable', 'array'],
             'postings.*.lot.acquired_at' => ['nullable', 'date'],
+            /**
+             * Total USD acquisition cost as a nonnegative decimal string, e.g. "4040.60278".
+             * Maximum 53 integer and 25 fractional digits.
+             *
+             * @var string
+             *
+             * @example 4040.60278
+             */
             'postings.*.lot.cost' => [
                 'required_with:postings.*.lot',
-                new ExactInteger(allowNegative: false, allowZero: true, message: 'Enter a valid nonnegative lot cost.'),
+                new ExactDecimal(allowNegative: false, allowZero: true, message: 'Enter a valid nonnegative lot cost.'),
             ],
         ];
     }
@@ -170,7 +185,7 @@ class StoreTransactionRequest extends FormRequest
                 );
             }
 
-            if ($createsLot && BigInteger::of($posting['amount'])->isNegativeOrZero()) {
+            if ($createsLot && BigDecimal::of($posting['amount'])->isNegativeOrZero()) {
                 $validator->errors()->add(
                     "postings.{$index}.amount",
                     'A new lot requires a positive amount.',
@@ -226,13 +241,13 @@ class StoreTransactionRequest extends FormRequest
 
         foreach ($this->postingInputs() as $index => $posting) {
             if ((int) $posting['financial_commodity_id'] === $baseCurrencyId) {
-                $legs[] = ['is_base' => true, 'amount' => BigInteger::of($posting['amount']), 'lot_key' => null, 'lot_cost' => null, 'lot_total_quantity' => null];
+                $legs[] = ['is_base' => true, 'amount' => BigDecimal::of($posting['amount']), 'lot_key' => null, 'lot_cost' => null, 'lot_total_quantity' => null];
             } elseif (isset($posting['lot'])) {
-                $amount = BigInteger::of($posting['amount']);
-                $legs[] = ['is_base' => false, 'amount' => $amount, 'lot_key' => "new-{$index}", 'lot_cost' => BigInteger::of($posting['lot']['cost']), 'lot_total_quantity' => $amount];
+                $amount = BigDecimal::of($posting['amount']);
+                $legs[] = ['is_base' => false, 'amount' => $amount, 'lot_key' => "new-{$index}", 'lot_cost' => BigDecimal::of($posting['lot']['cost']), 'lot_total_quantity' => $amount];
             } else {
                 $lot = $lots->get((int) $posting['financial_lot_id']);
-                $legs[] = ['is_base' => false, 'amount' => BigInteger::of($posting['amount']), 'lot_key' => $lot->id, 'lot_cost' => $lot->cost, 'lot_total_quantity' => $acquiredQuantities[$lot->id]];
+                $legs[] = ['is_base' => false, 'amount' => BigDecimal::of($posting['amount']), 'lot_key' => $lot->id, 'lot_cost' => $lot->cost, 'lot_total_quantity' => $acquiredQuantities[$lot->id]];
             }
         }
 
@@ -269,7 +284,7 @@ class StoreTransactionRequest extends FormRequest
      * outside this transaction plus positive payload amounts drawing on it.
      *
      * @param  Collection<int, Lot>  $lots
-     * @return array<int, BigInteger>
+     * @return array<int, BigDecimal>
      */
     protected function acquiredQuantities(Collection $lots): array
     {
@@ -280,7 +295,7 @@ class StoreTransactionRequest extends FormRequest
         }
 
         foreach ($this->postingInputs() as $posting) {
-            $amount = BigInteger::of($posting['amount'] ?? 0);
+            $amount = BigDecimal::of($posting['amount'] ?? 0);
 
             if (isset($posting['financial_lot_id']) && $amount->isPositive()) {
                 $lotId = (int) $posting['financial_lot_id'];

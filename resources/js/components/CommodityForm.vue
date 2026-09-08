@@ -23,7 +23,7 @@ const form = reactive({
     code: props.commodity?.code ?? '',
     name: props.commodity?.name ?? '',
     kind: (props.commodity?.kind ?? 'traded') as CommodityKind,
-    precision: props.commodity?.precision ?? 4,
+    display_precision: props.commodity?.display_precision ?? 4,
     symbol: props.commodity?.symbol ?? '',
     symbol_placement: props.commodity?.symbol_placement ?? null,
 });
@@ -42,7 +42,7 @@ async function save(): Promise<void> {
         code: form.code,
         name: form.name,
         kind: form.kind,
-        precision: form.precision,
+        display_precision: form.display_precision,
         symbol: form.symbol || null,
         symbol_placement: form.symbol_placement,
     };
@@ -99,9 +99,9 @@ async function save(): Promise<void> {
             </div>
 
             <label class="flex flex-col gap-1.5">
-                <span class="field-label">Precision</span>
-                <input v-model.number="form.precision" type="number" min="0" max="255" required class="input" />
-                <p v-if="errors.precision" class="text-sm text-danger">{{ errors.precision[0] }}</p>
+                <span class="field-label">Display decimals</span>
+                <input v-model.number="form.display_precision" type="number" min="0" max="25" required class="input" />
+                <p v-if="errors.display_precision" class="text-sm text-danger">{{ errors.display_precision[0] }}</p>
             </label>
 
             <label class="flex flex-col gap-1.5">

@@ -13,7 +13,7 @@ return new class extends Migration
             $table->string('code')->unique();
             $table->string('name');
             $table->string('kind');
-            $table->unsignedTinyInteger('precision');
+            $table->unsignedTinyInteger('display_precision');
             $table->string('symbol')->nullable();
             $table->string('symbol_placement')->nullable();
             $table->timestampsTz();

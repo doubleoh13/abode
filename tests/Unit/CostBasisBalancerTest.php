@@ -1,6 +1,7 @@
 <?php
 
 use App\Support\Financial\CostBasisBalancer;
+use Brick\Math\BigDecimal;
 
 describe('allocate', function () {
     test('a sole full acquisition values at exactly the lot cost', function () {
@@ -18,20 +19,20 @@ describe('allocate', function () {
     test('the shortfall is distributed by descending remainder', function () {
         $allocations = array_map(strval(...), new CostBasisBalancer()->allocate(100, 7, [3, 2, 2]));
 
-        expect($allocations)->toBe(['43', '29', '28'])
-            ->and(array_sum($allocations))->toBe(100);
+        expect($allocations)->toBe(['42.8571428571428571428571428', '28.5714285714285714285714286', '28.5714285714285714285714286'])
+            ->and((string) array_reduce($allocations, fn ($sum, $share) => $sum->plus($share), BigDecimal::zero())->strippedOfTrailingZeros())->toBe('100');
     });
 
     test('remainder ties break by input order', function () {
         $allocations = array_map(strval(...), new CostBasisBalancer()->allocate(100, 3, [1, 1, 1]));
 
-        expect($allocations)->toBe(['34', '33', '33']);
+        expect($allocations)->toBe(['33.3333333333333333333333334', '33.3333333333333333333333333', '33.3333333333333333333333333']);
     });
 
     test('full consumption across several legs sums to exactly the lot cost', function () {
         $allocations = array_map(strval(...), new CostBasisBalancer()->allocate(999, 10, [3, 3, 4]));
 
-        expect(array_sum($allocations))->toBe(999);
+        expect((string) array_reduce($allocations, fn ($sum, $share) => $sum->plus($share), BigDecimal::zero())->strippedOfTrailingZeros())->toBe('999');
     });
 
     test('allocation remains exact beyond native integer range', function () {

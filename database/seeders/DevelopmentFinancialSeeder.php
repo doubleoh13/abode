@@ -13,6 +13,7 @@ use App\Models\Financial\Lot;
 use App\Models\Financial\Payee;
 use App\Models\Financial\Posting;
 use App\Models\Financial\Transaction;
+use Brick\Math\BigDecimal;
 use Illuminate\Database\Seeder;
 
 class DevelopmentFinancialSeeder extends Seeder
@@ -114,7 +115,7 @@ class DevelopmentFinancialSeeder extends Seeder
             'code' => 'FBTC',
             'name' => 'Fidelity Wise Origin Bitcoin Fund',
             'kind' => CommodityKind::Traded,
-            'precision' => 8,
+            'display_precision' => 8,
         ]);
         $this->seedDailyPrices($fbtc, 85.0);
 
@@ -122,7 +123,7 @@ class DevelopmentFinancialSeeder extends Seeder
             'code' => 'ETH',
             'name' => 'Ether',
             'kind' => CommodityKind::Traded,
-            'precision' => 8,
+            'display_precision' => 8,
         ]);
         $this->seedDailyPrices($eth, 3200.0);
 
@@ -130,7 +131,7 @@ class DevelopmentFinancialSeeder extends Seeder
             'code' => 'SPAXX',
             'name' => 'Fidelity Government Money Market Fund',
             'kind' => CommodityKind::Traded,
-            'precision' => 3,
+            'display_precision' => 3,
         ]);
         $this->seedDailyPrices($spaxx, 1.0, 0.01);
 
@@ -138,7 +139,7 @@ class DevelopmentFinancialSeeder extends Seeder
             'code' => 'HOUSE',
             'name' => 'Primary Residence',
             'kind' => CommodityKind::Custom,
-            'precision' => 0,
+            'display_precision' => 0,
         ]);
 
         foreach ([['-2 years', 380000], ['-1 year', 405000], ['-1 month', 430000]] as [$when, $appraisal]) {
@@ -173,38 +174,38 @@ class DevelopmentFinancialSeeder extends Seeder
 
             if (in_array($date->day, [1, 15], true)) {
                 $this->createJournalTransaction($daysAgo, null, 'Paycheck', [
-                    [$checking, $usd, 260_000, null],
-                    [$salary, $usd, -260_000, null],
+                    [$checking, $usd, '2600', null],
+                    [$salary, $usd, '-2600', null],
                 ]);
             }
 
             if ($date->isSaturday()) {
-                $amount = fake()->numberBetween(80_00, 160_00);
+                $amount = (string) BigDecimal::of(fake()->numberBetween(80_00, 160_00))->dividedBy(100, 2);
                 $this->createJournalTransaction($daysAgo, $kroger, null, [
-                    [$checking, $usd, -$amount, null],
+                    [$checking, $usd, '-'.$amount, null],
                     [$groceries, $usd, $amount, null],
                 ]);
             }
 
             if ($date->day === 5) {
                 $this->createJournalTransaction($daysAgo, $cityUtilities, null, [
-                    [$checking, $usd, -145_50, null],
-                    [$utilities, $usd, 145_50, null],
+                    [$checking, $usd, '-145.50', null],
+                    [$utilities, $usd, '145.50', null],
                 ]);
             }
 
             if ($date->day % 9 === 0) {
-                $amount = fake()->numberBetween(12_00, 48_00);
+                $amount = (string) BigDecimal::of(fake()->numberBetween(12_00, 48_00))->dividedBy(100, 2);
                 $this->createJournalTransaction($daysAgo, $chipotle, null, [
-                    [$creditCard, $usd, -$amount, null],
+                    [$creditCard, $usd, '-'.$amount, null],
                     [$diningOut, $usd, $amount, null],
                 ]);
             }
 
             if ($date->day === 20) {
                 $this->createJournalTransaction($daysAgo, null, 'Card payment', [
-                    [$checking, $usd, -500_00, null],
-                    [$creditCard, $usd, 500_00, null],
+                    [$checking, $usd, '-500', null],
+                    [$creditCard, $usd, '500', null],
                 ]);
             }
         }
@@ -212,19 +213,19 @@ class DevelopmentFinancialSeeder extends Seeder
         $lot = Lot::query()->create([
             'financial_commodity_id' => $fbtc->id,
             'acquired_at' => now()->subDays(45)->toDateString(),
-            'cost' => 425_000,
+            'cost' => '4250',
             'metadata' => [],
         ]);
 
         $this->createJournalTransaction(45, null, 'Buy FBTC', [
-            [$brokerage, $fbtc, 50_000_000, $lot->id],
-            [$checking, $usd, -425_000, null],
+            [$brokerage, $fbtc, '0.5', $lot->id],
+            [$checking, $usd, '-4250', null],
         ]);
 
         $this->createJournalTransaction(10, null, 'Sell FBTC', [
-            [$brokerage, $fbtc, -20_000_000, $lot->id],
-            [$checking, $usd, 190_000, null],
-            [$capitalGains, $usd, -20_000, null],
+            [$brokerage, $fbtc, '-0.2', $lot->id],
+            [$checking, $usd, '1900', null],
+            [$capitalGains, $usd, '-200', null],
         ]);
     }
 
@@ -234,7 +235,7 @@ class DevelopmentFinancialSeeder extends Seeder
     }
 
     /**
-     * @param  list<array{Account, Commodity, int, int|null}>  $legs
+     * @param  list<array{Account, Commodity, string, int|null}>  $legs
      */
     private function createJournalTransaction(int $daysAgo, ?Payee $payee, ?string $memo, array $legs): void
     {

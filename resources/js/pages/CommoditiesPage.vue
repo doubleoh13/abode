@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import axios from 'axios';
+import { formatAmount } from '../money';
 import { onMounted, ref } from 'vue';
 import CommodityForm from '../components/CommodityForm.vue';
 import ModalDialog from '../components/ModalDialog.vue';
@@ -47,17 +48,7 @@ async function deleteCommodity(commodity: Commodity): Promise<void> {
 }
 
 function exampleAmount(commodity: Commodity): string {
-    const amount = (1234.5678).toFixed(commodity.precision);
-
-    if (commodity.symbol && commodity.symbol_placement === 'prefix') {
-        return `${commodity.symbol}${amount}`;
-    }
-
-    if (commodity.symbol && commodity.symbol_placement === 'suffix') {
-        return `${amount}${commodity.symbol}`;
-    }
-
-    return `${amount} ${commodity.code}`;
+    return formatAmount('1234.5678', commodity);
 }
 </script>
 

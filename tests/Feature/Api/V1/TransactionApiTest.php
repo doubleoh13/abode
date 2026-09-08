@@ -8,7 +8,7 @@ use App\Models\Financial\Lot;
 use App\Models\Financial\Payee;
 use App\Models\Financial\Posting;
 use App\Models\Financial\Transaction;
-use Brick\Math\BigInteger;
+use Brick\Math\BigDecimal;
 
 function journalLeg(Account $account, Commodity $commodity, int|string $amount, array $overrides = []): array
 {
@@ -57,7 +57,7 @@ describe('with finance permissions', function () {
         $this->groceries = Account::factory()->ofType(AccountType::Expense)->create();
         $this->brokerage = Account::factory()->ofType(AccountType::Asset)->create();
         $this->gains = Account::factory()->ofType(AccountType::Income)->create();
-        $this->fbtc = Commodity::factory()->create(['precision' => 8]);
+        $this->fbtc = Commodity::factory()->create(['display_precision' => 8]);
     });
 
     test('required transaction fields use form language', function () {
@@ -106,8 +106,8 @@ describe('with finance permissions', function () {
     });
 
     test('an eighteen-decimal on-chain quantity round trips exactly', function () {
-        $ether = Commodity::factory()->create(['code' => 'ETH', 'precision' => 18]);
-        $quantity = '123456789012345678901';
+        $ether = Commodity::factory()->create(['code' => 'ETH', 'display_precision' => 18]);
+        $quantity = '123.456789012345678901';
 
         $response = $this->postJson('/api/v1/financial/transactions', [
             'date' => '2026-08-01',
@@ -121,9 +121,42 @@ describe('with finance permissions', function () {
 
         $posting = Posting::query()->findOrFail($response->json('data.postings.0.id'));
 
-        expect($posting->amount)->toBeInstanceOf(BigInteger::class)
+        expect($posting->amount)->toBeInstanceOf(BigDecimal::class)
             ->and((string) $posting->amount)->toBe($quantity);
     });
+
+    test('fractional amounts and USD lot costs round trip independently of display precision', function () {
+        $response = $this->postJson('/api/v1/financial/transactions', [
+            'date' => '2024-01-01',
+            'postings' => [
+                journalLeg($this->brokerage, $this->fbtc, '426.674', ['lot' => ['cost' => '4040.60278']]),
+                journalLeg($this->checking, $this->usd, '-4040.60278'),
+            ],
+        ])->assertCreated()
+            ->assertJsonPath('data.postings.0.amount', '426.674')
+            ->assertJsonPath('data.postings.0.lot.cost', '4040.60278')
+            ->assertJsonPath('data.postings.1.amount', '-4040.60278');
+
+        $this->getJson('/api/v1/financial/transactions/'.$response->json('data.id'))
+            ->assertOk()
+            ->assertJsonPath('data.postings.0.amount', '426.674')
+            ->assertJsonPath('data.postings.0.lot.cost', '4040.60278');
+
+        expect($this->usd->refresh()->display_precision)->toBe(2);
+    });
+
+    test('decimal storage boundaries round trip exactly', function (string $amount) {
+        $this->postJson('/api/v1/financial/transactions', [
+            'date' => '2024-01-01',
+            'postings' => [
+                journalLeg($this->checking, $this->usd, $amount),
+                journalLeg($this->groceries, $this->usd, '-'.$amount),
+            ],
+        ])->assertCreated()->assertJsonPath('data.postings.0.amount', $amount);
+    })->with([
+        'smallest fraction' => '0.'.str_repeat('0', 24).'1',
+        'maximum magnitude' => str_repeat('9', 53).'.'.str_repeat('9', 25),
+    ]);
 
     test('the index is date-descending and paginated', function () {
         Transaction::factory()->on('2026-03-01')->create();
@@ -170,7 +203,7 @@ describe('with finance permissions', function () {
             ]);
     });
 
-    test('posting amounts require canonical integer strings', function (mixed $amount) {
+    test('posting amounts require bounded decimal strings', function (mixed $amount) {
         $this->postJson('/api/v1/financial/transactions', [
             'date' => '2026-08-01',
             'postings' => [
@@ -190,22 +223,29 @@ describe('with finance permissions', function () {
         'JSON number' => 100,
         'leading zero' => '01',
         'plus sign' => '+1',
-        'decimal' => '1.0',
-        'more than 78 digits' => str_repeat('1', 79),
+        'too many fractional digits' => '0.'.str_repeat('1', 26),
+        'zero decimal' => '0.00',
+        'exponent notation' => '1e3',
+        'more than 53 integer digits' => str_repeat('1', 54),
     ]);
 
-    test('lot costs require canonical nonnegative integer strings', function () {
+    test('lot costs require bounded nonnegative decimal strings', function (mixed $cost) {
         $this->postJson('/api/v1/financial/transactions', [
             'date' => '2026-08-01',
             'postings' => [
-                journalLeg($this->brokerage, $this->fbtc, '100', ['lot' => ['cost' => '-1']]),
+                [...journalLeg($this->brokerage, $this->fbtc, '100'), 'lot' => ['cost' => $cost]],
                 journalLeg($this->checking, $this->usd, '-100'),
             ],
         ])->assertUnprocessable()
             ->assertJsonValidationErrors([
                 'postings.0.lot.cost' => 'Enter a valid nonnegative lot cost.',
             ]);
-    });
+    })->with([
+        'negative' => '-1',
+        'JSON number' => 1,
+        'too many integer digits' => str_repeat('9', 54),
+        'too many fractional digits' => '0.'.str_repeat('1', 26),
+    ]);
 
     test('status is required only for asset and liability postings', function () {
         $this->postJson('/api/v1/financial/transactions', [
@@ -256,7 +296,7 @@ describe('with finance permissions', function () {
     });
 
     test('a referenced lot must hold the posting commodity', function () {
-        $otherCommodity = Commodity::factory()->create(['precision' => 8]);
+        $otherCommodity = Commodity::factory()->create(['display_precision' => 8]);
         $lot = journalSeedAcquisition($this->brokerage, $otherCommodity, 100, 100);
 
         $this->postJson('/api/v1/financial/transactions', [

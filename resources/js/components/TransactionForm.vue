@@ -7,7 +7,8 @@ import ModalDialog from './ModalDialog.vue';
 import PostingRow from './PostingRow.vue';
 import {
     allocateBasis,
-    amountToInput,
+    decimalToScaledInteger,
+    scaledIntegerToDecimal,
     formatAmount,
     parseAmount,
     totalCostFromUnitCost,
@@ -79,8 +80,6 @@ function emptyDraft(): PostingDraft {
 }
 
 function draftFromPosting(posting: Posting): PostingDraft {
-    const precision = posting.commodity?.precision ?? 0;
-
     if (posting.lot) {
         registerLots([posting.lot]);
     }
@@ -90,11 +89,11 @@ function draftFromPosting(posting: Posting): PostingDraft {
         status: posting.status,
         financial_account_id: posting.financial_account_id,
         financial_commodity_id: posting.financial_commodity_id,
-        amount: amountToInput(posting.amount, precision),
+        amount: posting.amount,
         memo: posting.memo ?? '',
         financial_lot_id: posting.financial_lot_id,
-        lotMode: posting.lot && BigInt(posting.amount) > 0n ? 'new' : 'existing',
-        lotCost: posting.lot ? amountToInput(posting.lot.cost, baseCurrency.value.precision) : '',
+        lotMode: posting.lot && decimalToScaledInteger(posting.amount) > 0n ? 'new' : 'existing',
+        lotCost: posting.lot ? posting.lot.cost : '',
         lotCostMode: 'total',
         lotAcquiredAt: posting.lot?.acquired_at ?? '',
     };
@@ -179,21 +178,21 @@ function commodityById(id: number | null): Commodity | null {
     return props.commodities.find((commodity) => commodity.id === id) ?? null;
 }
 
-function lotCostMinor(draft: PostingDraft): string | null {
+function lotCostDecimal(draft: PostingDraft): string | null {
     const commodity = commodityById(draft.financial_commodity_id);
 
     if (draft.lotCostMode === 'total') {
-        return parseAmount(draft.lotCost, baseCurrency.value.precision);
+        return parseAmount(draft.lotCost);
     }
 
-    const unitCost = parseAmount(draft.lotCost, baseCurrency.value.precision);
-    const quantity = commodity === null ? null : parseAmount(draft.amount, commodity.precision);
+    const unitCost = parseAmount(draft.lotCost);
+    const quantity = commodity === null ? null : parseAmount(draft.amount);
 
-    if (unitCost === null || quantity === null || commodity === null || BigInt(unitCost) < 0n) {
+    if (unitCost === null || quantity === null || commodity === null || decimalToScaledInteger(unitCost) < 0n) {
         return null;
     }
 
-    return totalCostFromUnitCost(unitCost, quantity, commodity.precision);
+    return totalCostFromUnitCost(unitCost, quantity);
 }
 
 interface Balance {
@@ -210,7 +209,7 @@ function calculateBalance(postingDrafts: PostingDraft[]): Balance {
 
     for (const draft of postingDrafts) {
         const commodity = commodityById(draft.financial_commodity_id);
-        const amount = commodity === null ? null : parseAmount(draft.amount, commodity.precision);
+        const amount = commodity === null ? null : parseAmount(draft.amount);
 
         if (commodity === null || amount === null) {
             return { faceSums: [], residual: null, approximate: false };
@@ -218,19 +217,19 @@ function calculateBalance(postingDrafts: PostingDraft[]): Balance {
 
         faceSumsByCommodity.set(
             commodity.id,
-            (faceSumsByCommodity.get(commodity.id) ?? 0n) + BigInt(amount),
+            (faceSumsByCommodity.get(commodity.id) ?? 0n) + decimalToScaledInteger(amount),
         );
 
         if (commodity.id === baseCurrency.value.id) {
-            residual += BigInt(amount);
+            residual += decimalToScaledInteger(amount);
         } else if (draft.lotMode === 'new') {
-            const cost = lotCostMinor(draft);
+            const cost = lotCostDecimal(draft);
 
             if (cost === null) {
                 return { faceSums: [], residual: null, approximate: false };
             }
 
-            residual += BigInt(cost);
+            residual += decimalToScaledInteger(cost);
         } else {
             const lot =
                 draft.financial_lot_id !== null ? knownLots.value[draft.financial_lot_id] : undefined;
@@ -251,28 +250,33 @@ function calculateBalance(postingDrafts: PostingDraft[]): Balance {
     }
 
     for (const group of lotGroups.values()) {
+        if (decimalToScaledInteger(group.total) <= 0n) {
+            approximate = true;
+            continue;
+        }
+
         const shares = allocateBasis(
             group.cost,
             group.total,
             group.amounts.map((amount) => {
-                const value = BigInt(amount);
+                const value = decimalToScaledInteger(amount);
 
-                return (value < 0n ? -value : value).toString();
+                return scaledIntegerToDecimal(value < 0n ? -value : value);
             }),
         );
 
         group.amounts.forEach((amount, index) => {
-            residual += (BigInt(amount) < 0n ? -1n : 1n) * BigInt(shares[index]);
+            residual += (decimalToScaledInteger(amount) < 0n ? -1n : 1n) * decimalToScaledInteger(shares[index]);
         });
     }
 
     const faceSums = [...faceSumsByCommodity.entries()].map(([commodityId, sum]) => {
         const commodity = commodityById(commodityId);
 
-        return commodity === null ? '' : formatAmount(sum.toString(), commodity);
+        return commodity === null ? '' : formatAmount(scaledIntegerToDecimal(sum), commodity);
     });
 
-    return { faceSums, residual: residual.toString(), approximate };
+    return { faceSums, residual: scaledIntegerToDecimal(residual), approximate };
 }
 
 const balance = computed<Balance>(() => calculateBalance(postings.value));
@@ -298,7 +302,7 @@ const balancingAmount = computed<string | null>(() => {
         return null;
     }
 
-    return amountToInput((-BigInt(precedingBalance.residual)).toString(), baseCurrency.value.precision);
+    return scaledIntegerToDecimal(-decimalToScaledInteger(precedingBalance.residual));
 });
 
 function addPosting(): void {
@@ -315,7 +319,7 @@ function postingPayload(draft: PostingDraft): Record<string, unknown> {
         status: draft.status,
         financial_account_id: draft.financial_account_id,
         financial_commodity_id: draft.financial_commodity_id,
-        amount: commodity === null ? null : parseAmount(draft.amount, commodity.precision),
+        amount: commodity === null ? null : parseAmount(draft.amount),
         memo: draft.memo || null,
     };
 
@@ -328,7 +332,7 @@ function postingPayload(draft: PostingDraft): Record<string, unknown> {
             payload.financial_lot_id = draft.financial_lot_id;
         } else {
             payload.lot = {
-                cost: lotCostMinor(draft),
+                cost: lotCostDecimal(draft),
                 ...(draft.lotAcquiredAt ? { acquired_at: draft.lotAcquiredAt } : {}),
             };
         }
@@ -469,7 +473,7 @@ async function save(): Promise<void> {
                         {{
                             balance.residual === '0'
                                 ? `Balanced${balance.approximate ? ' (approx.)' : ''}`
-                                : `Off by ${formatAmount(balance.residual, baseCurrency)}`
+                                : `Off by ${balance.residual} ${baseCurrency.code}`
                         }}
                     </span>
                     <span v-else class="tracking-wider text-muted uppercase">Incomplete</span>

@@ -7,7 +7,7 @@ use App\Http\Resources\Financial\LotResource;
 use App\Models\Financial\Account;
 use App\Models\Financial\Commodity;
 use App\Models\Financial\Lot;
-use Brick\Math\BigInteger;
+use Brick\Math\BigDecimal;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -50,7 +50,7 @@ class LotController extends Controller
             ->orderBy('acquired_at')
             ->orderBy('id')
             ->get()
-            ->filter(fn (Lot $lot): bool => BigInteger::of($lot->open_quantity)->isPositive())
+            ->filter(fn (Lot $lot): bool => BigDecimal::of($lot->open_quantity ?? 0)->isPositive())
             ->values();
 
         return LotResource::collection($lots);

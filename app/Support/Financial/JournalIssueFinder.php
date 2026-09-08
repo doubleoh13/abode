@@ -6,7 +6,7 @@ use App\Models\Financial\Commodity;
 use App\Models\Financial\Lot;
 use App\Models\Financial\Posting;
 use App\Models\Financial\Transaction;
-use Brick\Math\BigInteger;
+use Brick\Math\BigDecimal;
 
 /**
  * Derives the journal's soft integrity issues on the fly: nothing here is
@@ -42,7 +42,7 @@ class JournalIssueFinder
                 fn (Posting $a, Posting $b): int => $a->position <=> $b->position,
             ]);
 
-            $runningQuantity = BigInteger::zero();
+            $runningQuantity = BigDecimal::zero();
 
             foreach ($orderedPostings as $posting) {
                 $runningQuantity = $runningQuantity->plus($posting->amount);
@@ -81,7 +81,7 @@ class JournalIssueFinder
             ->groupBy('financial_lot_id')
             ->selectRaw('financial_lot_id, sum(amount) as acquired_quantity')
             ->pluck('acquired_quantity', 'financial_lot_id')
-            ->map(fn (string|int $quantity): BigInteger => BigInteger::of($quantity));
+            ->map(fn (string|int $quantity): BigDecimal => BigDecimal::of($quantity));
 
         foreach (Transaction::query()->with('postings.lot')->get() as $transaction) {
             $legs = $transaction->postings->map(fn (Posting $posting): array => [

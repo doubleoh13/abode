@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('financial_account_id')->constrained('financial_accounts');
             $table->foreignId('financial_commodity_id')->constrained('financial_commodities');
             $table->foreignId('financial_lot_id')->nullable()->constrained('financial_lots');
-            $table->decimal('amount', 78, 0);
+            $table->decimal('amount', 78, 25);
             $table->string('memo')->nullable();
             $table->jsonb('metadata')->default('{}');
             $table->timestampsTz();

@@ -28,7 +28,7 @@ describe('with finance permissions', function () {
         actingWithPermissions(Permission::ViewFinances);
 
         $this->brokerage = Account::factory()->ofType(AccountType::Asset)->create();
-        $this->fbtc = Commodity::factory()->create(['precision' => 8]);
+        $this->fbtc = Commodity::factory()->create(['display_precision' => 8]);
     });
 
     test('the account and commodity filters are required', function () {
@@ -67,6 +67,15 @@ describe('with finance permissions', function () {
         $this->getJson("/api/v1/financial/lots?financial_account_id={$this->brokerage->id}&financial_commodity_id={$this->fbtc->id}")
             ->assertOk()
             ->assertJsonPath('data.0.open_quantity', '60');
+    });
+
+    test('an as_of predating every posting excludes the lot instead of erroring', function () {
+        $lot = Lot::factory()->ofCommodity($this->fbtc)->create();
+        lotPickerPosting($lot, $this->brokerage, 100, '2026-01-05');
+
+        $this->getJson("/api/v1/financial/lots?financial_account_id={$this->brokerage->id}&financial_commodity_id={$this->fbtc->id}&as_of=2025-12-31")
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
     });
 
     test('fully consumed lots are excluded', function () {

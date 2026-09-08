@@ -1,47 +1,48 @@
 import type { Commodity } from './types';
 
-export function parseAmount(input: string, precision: number): string | null {
-    const match = input.trim().match(/^(-?)(\d+)(?:\.(\d+))?$/);
+const decimalPlaces = 25;
+const decimalScale = 10n ** BigInt(decimalPlaces);
+
+export function decimalToScaledInteger(value: string): bigint {
+    const match = value.match(/^(-?)(\d+)(?:\.(\d{1,25}))?$/);
 
     if (!match) {
-        return null;
+        throw new Error('Invalid decimal value.');
     }
 
     const [, sign, whole, fraction = ''] = match;
+    const magnitude = BigInt(whole) * decimalScale + BigInt(fraction.padEnd(decimalPlaces, '0'));
 
-    if (fraction.length > precision) {
+    return sign === '-' ? -magnitude : magnitude;
+}
+
+export function scaledIntegerToDecimal(value: bigint): string {
+    const digits = (value < 0n ? -value : value).toString().padStart(decimalPlaces + 1, '0');
+    const fraction = digits.slice(-decimalPlaces).replace(/0+$/, '');
+
+    return `${value < 0n ? '-' : ''}${digits.slice(0, -decimalPlaces)}${fraction ? `.${fraction}` : ''}`;
+}
+
+export function parseAmount(input: string): string | null {
+    const value = input.trim();
+
+    if (!/^-?(?:0|[1-9][0-9]{0,52})(?:\.[0-9]{1,25})?$/.test(value)) {
         return null;
     }
 
-    const minor =
-        BigInt(whole) * 10n ** BigInt(precision) + BigInt(fraction.padEnd(precision, '0') || '0');
-    const value = (sign === '-' ? -1n : 1n) * minor;
-    const digits = value.toString().replace('-', '');
-
-    if (digits.length > 78) {
-        return null;
-    }
-
-    return value.toString();
+    return scaledIntegerToDecimal(decimalToScaledInteger(value));
 }
 
-export function amountToInput(minor: string, precision: number): string {
-    const value = BigInt(minor);
-    const digits = (value < 0n ? -value : value).toString().padStart(precision + 1, '0');
-    const whole = precision > 0 ? digits.slice(0, -precision) : digits;
-    const fraction = precision > 0 ? `.${digits.slice(-precision)}` : '';
-
-    return `${value < 0n ? '-' : ''}${whole}${fraction}`;
-}
-
-export function formatAmount(minor: string, commodity: Commodity): string {
-    const value = BigInt(minor);
-    const digits = (value < 0n ? -value : value).toString().padStart(commodity.precision + 1, '0');
-    const whole = (
-        commodity.precision > 0 ? digits.slice(0, -commodity.precision) : digits
-    ).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    const fraction = commodity.precision > 0 ? `.${digits.slice(-commodity.precision)}` : '';
-    const sign = value < 0n ? '-' : '';
+export function formatAmount(amount: string, commodity: Commodity): string {
+    const value = decimalToScaledInteger(amount);
+    const magnitude = value < 0n ? -value : value;
+    const divisor = 10n ** BigInt(decimalPlaces - commodity.display_precision);
+    const rounded = magnitude / divisor + (magnitude % divisor * 2n >= divisor ? 1n : 0n);
+    const digits = rounded.toString().padStart(commodity.display_precision + 1, '0');
+    const whole = (commodity.display_precision > 0 ? digits.slice(0, -commodity.display_precision) : digits)
+        .replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    const fraction = commodity.display_precision > 0 ? `.${digits.slice(-commodity.display_precision)}` : '';
+    const sign = value < 0n && rounded !== 0n ? '-' : '';
     const number = `${whole}${fraction}`;
 
     if (commodity.symbol && commodity.symbol_placement === 'prefix') {
@@ -55,15 +56,11 @@ export function formatAmount(minor: string, commodity: Commodity): string {
     return `${sign}${number} ${commodity.code}`;
 }
 
-/**
- * Mirrors the server's pro-rata basis allocation for live balance display:
- * floor each share of the lot's total cost, then distribute the shortfall
- * against the combined target by descending remainder, ties by input order.
- */
+/** Allocate at 25 fractional places, distributing remainders in the same order as the server. */
 export function allocateBasis(cost: string, totalQuantity: string, quantities: string[]): string[] {
-    const costValue = BigInt(cost);
-    const totalQuantityValue = BigInt(totalQuantity);
-    const quantityValues = quantities.map(BigInt);
+    const costValue = decimalToScaledInteger(cost);
+    const totalQuantityValue = decimalToScaledInteger(totalQuantity);
+    const quantityValues = quantities.map(decimalToScaledInteger);
     const shares = quantityValues.map((quantity) => (costValue * quantity) / totalQuantityValue);
     const total = quantityValues.reduce((sum, quantity) => sum + quantity, 0n);
     let shortfall = (costValue * total) / totalQuantityValue - shares.reduce((sum, share) => sum + share, 0n);
@@ -87,18 +84,15 @@ export function allocateBasis(cost: string, totalQuantity: string, quantities: s
         shortfall -= 1n;
     }
 
-    return shares.map(String);
+    return shares.map(scaledIntegerToDecimal);
 }
 
-export function totalCostFromUnitCost(
-    unitCost: string,
-    quantity: string,
-    quantityPrecision: number,
-): string {
-    const numerator = BigInt(unitCost) * BigInt(quantity);
-    const divisor = 10n ** BigInt(quantityPrecision);
-    const quotient = numerator / divisor;
-    const remainder = numerator % divisor;
+export function totalCostFromUnitCost(unitCost: string, quantity: string): string | null {
+    const numerator = decimalToScaledInteger(unitCost) * decimalToScaledInteger(quantity);
 
-    return (remainder * 2n >= divisor ? quotient + 1n : quotient).toString();
+    if (numerator % decimalScale !== 0n) {
+        return null;
+    }
+
+    return parseAmount(scaledIntegerToDecimal(numerator / decimalScale));
 }

@@ -23,7 +23,7 @@ class CommodityResource extends JsonResource
             'code' => $this->code,
             'name' => $this->name,
             'kind' => $this->kind,
-            'precision' => $this->precision,
+            'display_precision' => $this->display_precision,
             'symbol' => $this->symbol,
             'symbol_placement' => $this->symbol_placement,
         ];

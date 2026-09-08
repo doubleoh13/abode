@@ -12,7 +12,6 @@ use App\Models\Financial\Posting;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\DB;
 
 #[Group('Financial / Commodities')]
 class CommodityController extends Controller
@@ -36,26 +35,7 @@ class CommodityController extends Controller
 
     public function update(UpdateCommodityRequest $request, Commodity $commodity): CommodityResource
     {
-        DB::transaction(function () use ($request, $commodity): void {
-            $previousPrecision = $commodity->precision;
-            $isBaseCurrency = $commodity->id === Commodity::baseCurrency()->id;
-
-            $commodity->update($request->validated());
-
-            $additionalDigits = $commodity->precision - $previousPrecision;
-
-            if ($additionalDigits > 0) {
-                $scale = '1'.str_repeat('0', $additionalDigits);
-
-                Posting::query()
-                    ->where('financial_commodity_id', $commodity->id)
-                    ->update(['amount' => DB::raw("amount * {$scale}")]);
-
-                if ($isBaseCurrency) {
-                    Lot::query()->update(['cost' => DB::raw("cost * {$scale}")]);
-                }
-            }
-        });
+        $commodity->update($request->validated());
 
         return new CommodityResource($commodity);
     }

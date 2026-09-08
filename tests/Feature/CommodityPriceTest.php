@@ -2,6 +2,7 @@
 
 use App\Models\Financial\CommodityPrice;
 use Brick\Math\BigDecimal;
+use Brick\Math\Exception\RoundingNecessaryException;
 use Illuminate\Database\QueryException;
 
 test('a price point records created_at and never an updated_at', function () {
@@ -22,9 +23,14 @@ test('duplicate points for the same commodity and instant are rejected', functio
 
 test('a price is represented as an exact decimal', function () {
     $price = CommodityPrice::factory()->create([
-        'price' => '0.000000000000000001234567890123456789',
+        'price' => '0.0000000000000000012345678',
     ]);
 
     expect($price->price)->toBeInstanceOf(BigDecimal::class)
-        ->and($price->price->isEqualTo('0.000000000000000001234567890123456789'))->toBeTrue();
+        ->and($price->price->isEqualTo('0.0000000000000000012345678'))->toBeTrue();
+});
+
+test('a price exceeding storage scale is rejected before the database can round it', function () {
+    expect(fn () => CommodityPrice::factory()->create(['price' => '0.'.str_repeat('0', 25).'1']))
+        ->toThrow(RoundingNecessaryException::class);
 });

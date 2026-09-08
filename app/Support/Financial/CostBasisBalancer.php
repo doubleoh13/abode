@@ -2,12 +2,13 @@
 
 namespace App\Support\Financial;
 
+use Brick\Math\BigDecimal;
 use Brick\Math\BigInteger;
 
 /**
  * The single home of balance-at-cost math: base-currency legs count at face,
  * lot-bearing legs at their pro-rata share of the lot's total cost. All math
- * uses arbitrary-precision integers so atomic on-chain quantities stay exact.
+ * uses exact decimals with allocation rounded down at 25 fractional places.
  */
 class CostBasisBalancer
 {
@@ -17,11 +18,11 @@ class CostBasisBalancer
      * usable lot (missing, or no acquired quantity) contribute nothing,
      * which lets the issue checker value broken history without dividing.
      *
-     * @param  list<array{is_base: bool, amount: BigInteger|int|string, lot_key: int|string|null, lot_cost: BigInteger|int|string|null, lot_total_quantity: BigInteger|int|string|null}>  $legs
+     * @param  list<array{is_base: bool, amount: BigDecimal|int|string, lot_key: int|string|null, lot_cost: BigDecimal|int|string|null, lot_total_quantity: BigDecimal|int|string|null}>  $legs
      */
-    public function residual(array $legs): BigInteger
+    public function residual(array $legs): BigDecimal
     {
-        $residual = BigInteger::zero();
+        $residual = BigDecimal::zero();
 
         /** @var array<int|string, list<int>> $lotGroups */
         $lotGroups = [];
@@ -33,7 +34,7 @@ class CostBasisBalancer
                 continue;
             }
 
-            if ($leg['lot_key'] === null || BigInteger::of($leg['lot_total_quantity'] ?? 0)->isNegativeOrZero()) {
+            if ($leg['lot_key'] === null || BigDecimal::of($leg['lot_total_quantity'] ?? 0)->isNegativeOrZero()) {
                 continue;
             }
 
@@ -44,34 +45,34 @@ class CostBasisBalancer
             $first = $legs[$indices[0]];
 
             $allocations = $this->allocate(
-                BigInteger::of($first['lot_cost']),
-                BigInteger::of($first['lot_total_quantity']),
-                array_map(fn (int $index): BigInteger => BigInteger::of($legs[$index]['amount'])->abs(), $indices),
+                BigDecimal::of($first['lot_cost']),
+                BigDecimal::of($first['lot_total_quantity']),
+                array_map(fn (int $index): BigDecimal => BigDecimal::of($legs[$index]['amount'])->abs(), $indices),
             );
 
             foreach ($indices as $offset => $index) {
-                $sign = BigInteger::of($legs[$index]['amount'])->getSign();
+                $sign = BigDecimal::of($legs[$index]['amount'])->getSign();
                 $residual = $residual->plus($allocations[$offset]->multipliedBy($sign));
             }
         }
 
-        return $residual;
+        return $residual->strippedOfTrailingZeros();
     }
 
     /**
      * Pro-rata allocation of one lot's total cost across quantities drawn
      * from it within one transaction: floor each share, then distribute the
-     * shortfall against the combined target one unit at a time by descending
+     * shortfall against the combined target in units of 10^-25 by descending
      * remainder, ties broken by input order.
      *
-     * @param  list<BigInteger|int|string>  $quantities
-     * @return list<BigInteger>
+     * @param  list<BigDecimal|int|string>  $quantities
+     * @return list<BigDecimal>
      */
-    public function allocate(BigInteger|int|string $cost, BigInteger|int|string $totalQuantity, array $quantities): array
+    public function allocate(BigDecimal|int|string $cost, BigDecimal|int|string $totalQuantity, array $quantities): array
     {
-        $cost = BigInteger::of($cost);
-        $totalQuantity = BigInteger::of($totalQuantity);
-        $quantities = array_map(BigInteger::of(...), $quantities);
+        $cost = BigDecimal::of($cost)->toScale(25)->getUnscaledValue();
+        $totalQuantity = BigDecimal::of($totalQuantity)->toScale(25)->getUnscaledValue();
+        $quantities = array_map(fn (BigDecimal|int|string $quantity): BigInteger => BigDecimal::of($quantity)->toScale(25)->getUnscaledValue(), $quantities);
         $shares = [];
         $remainderOrder = [];
 
@@ -109,6 +110,6 @@ class CostBasisBalancer
             $shortfall = $shortfall->minus(1);
         }
 
-        return $shares;
+        return array_map(fn (BigInteger $share): BigDecimal => BigDecimal::ofUnscaledValue($share, 25)->strippedOfTrailingZeros(), $shares);
     }
 }

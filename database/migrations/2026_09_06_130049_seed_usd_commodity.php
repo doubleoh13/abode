@@ -11,7 +11,7 @@ return new class extends Migration
             'code' => 'USD',
             'name' => 'US Dollar',
             'kind' => 'currency',
-            'precision' => 2,
+            'display_precision' => 2,
             'symbol' => '$',
             'symbol_placement' => 'prefix',
             'created_at' => now(),

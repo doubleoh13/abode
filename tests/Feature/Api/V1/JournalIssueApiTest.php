@@ -31,7 +31,7 @@ describe('with finance permissions', function () {
         $this->brokerage = Account::factory()->ofType(AccountType::Asset)->create();
         $this->checking = Account::factory()->ofType(AccountType::Asset)->create();
         $this->gains = Account::factory()->ofType(AccountType::Income)->create();
-        $this->fbtc = Commodity::factory()->create(['precision' => 8]);
+        $this->fbtc = Commodity::factory()->create(['display_precision' => 8]);
     });
 
     test('a clean journal reports no issues', function () {
