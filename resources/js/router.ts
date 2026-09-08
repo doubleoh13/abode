@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHistory, type LocationQuery } from 'vue-router';
 import { auth, resolveAuthenticatedUser } from './auth';
 import AccountsPage from './pages/AccountsPage.vue';
 import AppShell from './layouts/AppShell.vue';
@@ -58,16 +58,24 @@ export const router = createRouter({
     ],
 });
 
+export function intendedDestination(query: LocationQuery): string {
+    const redirect = query.redirect;
+
+    return typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')
+        ? redirect
+        : '/';
+}
+
 router.beforeEach(async (to) => {
     if (!auth.resolved) {
         await resolveAuthenticatedUser();
     }
 
     if (to.meta.requiresAuth && !auth.user) {
-        return { name: 'login' };
+        return { name: 'login', query: to.fullPath === '/' ? {} : { redirect: to.fullPath } };
     }
 
     if (to.name === 'login' && auth.user) {
-        return { name: 'home' };
+        return intendedDestination(to.query);
     }
 });

@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { isAxiosError } from 'axios';
 import { reactive, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { login, loginAsDevelopmentUser, type LoginCredentials } from '../auth';
+import { intendedDestination } from '../router';
 
+const route = useRoute();
 const router = useRouter();
 
 const developmentLoginEnabled = window.developmentLoginEnabled === true;
 
 async function developmentLogin(): Promise<void> {
     await loginAsDevelopmentUser();
-    router.push({ name: 'home' });
+    router.push(intendedDestination(route.query));
 }
 
 const form = reactive<LoginCredentials>({
@@ -28,7 +30,7 @@ async function attemptLogin(): Promise<void> {
 
     try {
         await login(form);
-        router.push({ name: 'home' });
+        router.push(intendedDestination(route.query));
     } catch (error) {
         errorMessage.value =
             (isAxiosError(error) && error.response?.data?.message) ||
