@@ -19,6 +19,36 @@ use Illuminate\Validation\Validator;
 
 class StoreTransactionRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $postings = $this->input('postings');
+
+        if (! is_array($postings)) {
+            return;
+        }
+
+        $accountIds = collect($postings)
+            ->filter(fn (mixed $posting): bool => is_array($posting))
+            ->pluck('financial_account_id')
+            ->filter(fn (mixed $id): bool => filter_var($id, FILTER_VALIDATE_INT) !== false)
+            ->unique();
+        $accounts = Account::query()->findMany($accountIds)->keyBy('id');
+
+        foreach ($postings as $index => $posting) {
+            if (! is_array($posting) || filter_var($posting['financial_account_id'] ?? null, FILTER_VALIDATE_INT) === false) {
+                continue;
+            }
+
+            $account = $accounts->get((int) $posting['financial_account_id']);
+
+            if ($account !== null && ! in_array($account->account_type, [AccountType::Asset, AccountType::Liability], true)) {
+                $postings[$index]['status'] = null;
+            }
+        }
+
+        $this->merge(['postings' => $postings]);
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -32,6 +62,9 @@ class StoreTransactionRequest extends FormRequest
             'memo' => ['nullable', 'string', 'max:255'],
             'metadata' => ['sometimes', 'array'],
             'postings' => ['required', 'array', 'min:2'],
+            /**
+             * Required for asset and liability accounts. Ignored and stored as null for all other account types.
+             */
             'postings.*.status' => ['nullable', Rule::enum(PostingStatus::class)],
             'postings.*.financial_account_id' => ['required', 'integer', Rule::exists(Account::class, 'id')],
             'postings.*.financial_commodity_id' => ['required', 'integer', Rule::exists(Commodity::class, 'id')],
@@ -142,9 +175,6 @@ class StoreTransactionRequest extends FormRequest
                 $validator->errors()->add("postings.{$index}.status", 'A status is required for asset and liability postings.');
             }
 
-            if (! $carriesStatus && $status !== null) {
-                $validator->errors()->add("postings.{$index}.status", 'Only asset and liability postings may have a status.');
-            }
         }
     }
 

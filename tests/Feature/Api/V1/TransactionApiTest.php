@@ -256,9 +256,37 @@ describe('with finance permissions', function () {
             ],
         ])->assertUnprocessable()->assertJsonValidationErrors([
             'postings.0.status',
-            'postings.1.status',
         ]);
     });
+
+    test('non-reconcilable account statuses are ignored on create and update', function (AccountType $accountType, mixed $status) {
+        $account = Account::factory()->ofType($accountType)->create();
+        $payload = [
+            'date' => '2024-01-01',
+            'postings' => [
+                journalLeg($this->checking, $this->usd, '-100'),
+                journalLeg($account, $this->usd, '100', ['status' => $status]),
+            ],
+        ];
+
+        $response = $this->postJson('/api/v1/financial/transactions', $payload)
+            ->assertCreated()->assertJsonPath('data.postings.1.status', null);
+        $transactionId = $response->json('data.id');
+        $this->assertDatabaseHas('financial_postings', [
+            'financial_transaction_id' => $transactionId,
+            'financial_account_id' => $account->id,
+            'status' => null,
+        ]);
+
+        $this->putJson('/api/v1/financial/transactions/'.$transactionId, $payload)
+            ->assertOk()->assertJsonPath('data.postings.1.status', null);
+        $this->assertDatabaseHas('financial_postings', [
+            'financial_transaction_id' => $transactionId,
+            'financial_account_id' => $account->id,
+            'status' => null,
+        ]);
+    })->with([AccountType::Income, AccountType::Expense, AccountType::Equity])
+        ->with(['valid' => ['cleared'], 'invalid' => ['invalid'], 'object' => [['unexpected' => 'object']], 'number' => [123], 'null' => [null]]);
 
     test('a base-currency posting cannot reference a lot', function () {
         $lot = Lot::factory()->ofCommodity($this->fbtc)->create();
