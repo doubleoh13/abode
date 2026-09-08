@@ -38,6 +38,20 @@ describe('with finance permissions', function () {
             ->assertJsonValidationErrors(['financial_account_id']);
     });
 
+    test('a commodity alone lists global open lots across accounts', function () {
+        $otherAccount = Account::factory()->ofType(AccountType::Asset)->create();
+        $lot = Lot::factory()->ofCommodity($this->fbtc)->create();
+        lotPickerPosting($lot, $this->brokerage, 100, '2026-01-05');
+        lotPickerPosting($lot, $otherAccount, 30, '2026-02-01');
+        lotPickerPosting($lot, $this->brokerage, -100, '2026-02-05');
+
+        $this->getJson("/api/v1/financial/lots?financial_commodity_id={$this->fbtc->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.open_quantity', '30')
+            ->assertJsonPath('data.0.acquired_quantity', '130');
+    });
+
     test('omitting the commodity lists holdings across commodities', function () {
         $solana = Commodity::factory()->create(['display_precision' => 9]);
         $fbtcLot = Lot::factory()->ofCommodity($this->fbtc)->create();

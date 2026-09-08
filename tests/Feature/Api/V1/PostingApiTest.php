@@ -30,10 +30,34 @@ describe('with view permissions', function () {
         actingWithPermissions(Permission::ViewFinances);
     });
 
-    test('the register requires an account', function () {
+    test('the register requires an account or a commodity', function () {
         $this->getJson('/api/v1/financial/postings')
             ->assertUnprocessable()
-            ->assertJsonValidationErrors('financial_account_id');
+            ->assertJsonValidationErrors(['financial_account_id', 'financial_commodity_id']);
+    });
+
+    test('a commodity register spans accounts with a global running quantity', function () {
+        $brokerage = Account::factory()->ofType(AccountType::Asset)->create();
+        $trezor = Account::factory()->ofType(AccountType::Asset)->create();
+        $checking = Account::factory()->ofType(AccountType::Asset)->create();
+        $fbtc = Commodity::factory()->create(['display_precision' => 8]);
+        $usd = Commodity::query()->where('code', 'USD')->firstOrFail();
+
+        foreach ([[$brokerage, '2026-01-05', '2'], [$trezor, '2026-01-10', '1'], [$brokerage, '2026-01-20', '-0.5']] as [$account, $date, $amount]) {
+            $transaction = Transaction::factory()->on($date)->create();
+            Posting::factory()->forTransaction($transaction, 0)->inAccount($account)->ofCommodity($fbtc)
+                ->create(['amount' => $amount, 'status' => 'cleared']);
+            Posting::factory()->forTransaction($transaction, 1)->inAccount($checking)->ofCommodity($usd)
+                ->create(['amount' => '1', 'status' => 'cleared']);
+        }
+
+        $this->getJson("/api/v1/financial/postings?financial_commodity_id={$fbtc->id}")
+            ->assertOk()
+            ->assertJsonCount(3, 'data')
+            ->assertJsonPath('data.0.running_balance', '2.5')
+            ->assertJsonPath('data.1.running_balance', '3')
+            ->assertJsonPath('data.2.running_balance', '2')
+            ->assertJsonPath('data.0.account.id', $brokerage->id);
     });
 
     test('the register lists an account\'s postings newest first with running balances', function () {

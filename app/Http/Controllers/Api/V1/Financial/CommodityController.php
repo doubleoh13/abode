@@ -9,7 +9,9 @@ use App\Http\Resources\Financial\CommodityResource;
 use App\Models\Financial\Commodity;
 use App\Models\Financial\Lot;
 use App\Models\Financial\Posting;
+use Brick\Math\BigDecimal;
 use Dedoc\Scramble\Attributes\Group;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 
@@ -31,6 +33,25 @@ class CommodityController extends Controller
     public function show(Commodity $commodity): CommodityResource
     {
         return new CommodityResource($commodity);
+    }
+
+    /**
+     * The commodity's per-account posting sums.
+     */
+    public function balances(Commodity $commodity): JsonResponse
+    {
+        $balances = Posting::query()
+            ->where('financial_commodity_id', $commodity->id)
+            ->groupBy('financial_account_id')
+            ->selectRaw('financial_account_id, sum(amount) as balance')
+            ->orderBy('financial_account_id')
+            ->get()
+            ->map(fn (Posting $row): array => [
+                'financial_account_id' => $row->financial_account_id,
+                'balance' => (string) BigDecimal::of($row->balance)->strippedOfTrailingZeros(),
+            ]);
+
+        return response()->json(['data' => $balances]);
     }
 
     public function update(UpdateCommodityRequest $request, Commodity $commodity): CommodityResource

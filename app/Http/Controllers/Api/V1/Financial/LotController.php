@@ -18,26 +18,31 @@ use Illuminate\Validation\Rule;
 class LotController extends Controller
 {
     /**
-     * Lots with open quantity in an account, for picking which lot a
-     * reduction draws from or listing an account's holdings. Open quantity
-     * is guidance as of the given date; acquired quantity is the global
+     * Lots with open quantity, scoped to an account, a commodity, or both —
+     * for picking which lot a reduction draws from or listing holdings.
+     * Open quantity is guidance as of the given date (per account when one
+     * is given, global otherwise); acquired quantity is the global
      * allocation denominator.
      */
     public function index(Request $request): AnonymousResourceCollection
     {
         $validated = $request->validate([
-            'financial_account_id' => ['required', 'integer', Rule::exists(Account::class, 'id')],
-            'financial_commodity_id' => ['nullable', 'integer', Rule::exists(Commodity::class, 'id')],
+            'financial_account_id' => ['nullable', 'required_without:financial_commodity_id', 'integer', Rule::exists(Account::class, 'id')],
+            'financial_commodity_id' => ['nullable', 'required_without:financial_account_id', 'integer', Rule::exists(Commodity::class, 'id')],
             'as_of' => ['nullable', 'date'],
         ]);
+
+        $accountId = $validated['financial_account_id'] ?? null;
 
         $lots = Lot::query()
             ->when($validated['financial_commodity_id'] ?? null, fn (Builder $query, int $commodityId) => $query
                 ->where('financial_commodity_id', $commodityId))
-            ->whereHas('postings', fn (Builder $query) => $query->where('financial_account_id', $validated['financial_account_id']))
+            ->when($accountId, fn (Builder $query, int $account) => $query
+                ->whereHas('postings', fn (Builder $postings) => $postings->where('financial_account_id', $account)))
             ->withSum([
                 'postings as open_quantity' => fn (Builder $query) => $query
-                    ->where('financial_account_id', $validated['financial_account_id'])
+                    ->when($accountId, fn (Builder $inAccount, int $account) => $inAccount
+                        ->where('financial_account_id', $account))
                     ->when(
                         $validated['as_of'] ?? null,
                         fn (Builder $withinDate, string $asOf) => $withinDate->whereHas(

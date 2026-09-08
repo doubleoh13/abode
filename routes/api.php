@@ -33,6 +33,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('payees', PayeeController::class)->only(['index', 'show']);
             Route::apiResource('transactions', TransactionController::class)->only(['index', 'show']);
             Route::get('accounts/{account}/balances', [AccountController::class, 'balances'])->name('accounts.balances');
+            Route::get('commodities/{commodity}/balances', [CommodityController::class, 'balances'])->name('commodities.balances');
             Route::apiResource('balance-assertions', BalanceAssertionController::class)->only('index');
             Route::get('postings', [PostingController::class, 'index'])->name('postings.index');
             Route::get('lots', [LotController::class, 'index'])->name('lots.index');

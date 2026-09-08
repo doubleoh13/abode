@@ -1,9 +1,12 @@
 <?php
 
+use App\Enums\Financial\AccountType;
 use App\Enums\Permission;
+use App\Models\Financial\Account;
 use App\Models\Financial\Commodity;
 use App\Models\Financial\Lot;
 use App\Models\Financial\Posting;
+use App\Models\Financial\Transaction;
 
 test('guests receive a 401', function () {
     $this->getJson('/api/v1/financial/commodities')->assertUnauthorized();
@@ -23,6 +26,22 @@ test('a viewer cannot write', function () {
 describe('with finance permissions', function () {
     beforeEach(function () {
         actingWithPermissions(Permission::ViewFinances, Permission::ManageFinances);
+    });
+
+    test('balances sum the commodity postings per account', function () {
+        $fbtc = Commodity::factory()->create(['display_precision' => 8]);
+        $brokerage = Account::factory()->ofType(AccountType::Asset)->create();
+        $trezor = Account::factory()->ofType(AccountType::Asset)->create();
+        $transaction = Transaction::factory()->on('2026-01-05')->create();
+        Posting::factory()->forTransaction($transaction, 0)->inAccount($brokerage)->ofCommodity($fbtc)->create(['amount' => '2']);
+        Posting::factory()->forTransaction($transaction, 1)->inAccount($trezor)->ofCommodity($fbtc)->create(['amount' => '0.5']);
+
+        $this->getJson("/api/v1/financial/commodities/{$fbtc->id}/balances")
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.financial_account_id', $brokerage->id)
+            ->assertJsonPath('data.0.balance', '2')
+            ->assertJsonPath('data.1.balance', '0.5');
     });
 
     test('required commodity fields use form language', function () {
