@@ -7,11 +7,19 @@ use App\Enums\Financial\SymbolPlacement;
 use App\Models\Financial\Commodity;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 
 class StoreCommodityRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if (is_string($this->input('code'))) {
+            $this->merge(['code' => Str::upper($this->input('code'))]);
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *

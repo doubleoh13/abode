@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -15,7 +16,11 @@ return new class extends Migration
             $table->decimal('cost', 78, 25);
             $table->jsonb('metadata')->default('{}');
             $table->timestampsTz();
+
+            $table->index('financial_commodity_id');
         });
+
+        DB::statement('ALTER TABLE financial_lots ADD CONSTRAINT financial_lots_cost_nonnegative CHECK (cost >= 0)');
     }
 
     public function down(): void

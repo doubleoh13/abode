@@ -9,6 +9,7 @@ use App\Models\Financial\Payee;
 use App\Models\Financial\Posting;
 use App\Models\Financial\Transaction;
 use Brick\Math\BigDecimal;
+use Illuminate\Database\QueryException;
 
 function journalLeg(Account $account, Commodity $commodity, int|string $amount, array $overrides = []): array
 {
@@ -439,6 +440,37 @@ describe('with finance permissions', function () {
             ->assertJsonPath('data.postings.2.financial_account_id', $dining->id);
 
         $this->assertModelMissing($droppedPosting);
+    });
+
+    test('a zero posting amount is rejected by the database', function () {
+        expect(fn () => Posting::factory()->create(['amount' => 0]))
+            ->toThrow(QueryException::class, 'financial_postings_amount_nonzero');
+    });
+
+    test('an update can reorder kept postings', function () {
+        $created = $this->postJson('/api/v1/financial/transactions', [
+            'date' => '2026-08-01',
+            'postings' => [
+                journalLeg($this->checking, $this->usd, -100),
+                journalLeg($this->groceries, $this->usd, 100),
+            ],
+        ])->assertCreated();
+
+        $transactionId = $created->json('data.id');
+        [$first, $second] = $created->json('data.postings');
+
+        $this->putJson("/api/v1/financial/transactions/{$transactionId}", [
+            'date' => '2026-08-01',
+            'postings' => [
+                journalLeg($this->groceries, $this->usd, 100, ['id' => $second['id']]),
+                journalLeg($this->checking, $this->usd, -100, ['id' => $first['id']]),
+            ],
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.postings.0.id', $second['id'])
+            ->assertJsonPath('data.postings.0.position', 0)
+            ->assertJsonPath('data.postings.1.id', $first['id'])
+            ->assertJsonPath('data.postings.1.position', 1);
     });
 
     test('an update rejects duplicate posting ids', function () {

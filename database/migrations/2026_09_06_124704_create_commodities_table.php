@@ -10,12 +10,12 @@ return new class extends Migration
     {
         Schema::create('financial_commodities', function (Blueprint $table) {
             $table->id();
-            $table->string('code')->unique();
+            $table->string('code', 16)->unique();
             $table->string('name');
-            $table->string('kind');
+            $table->string('kind', 16);
             $table->unsignedTinyInteger('display_precision');
-            $table->string('symbol')->nullable();
-            $table->string('symbol_placement')->nullable();
+            $table->string('symbol', 8)->nullable();
+            $table->string('symbol_placement', 8)->nullable();
             $table->timestampsTz();
         });
     }

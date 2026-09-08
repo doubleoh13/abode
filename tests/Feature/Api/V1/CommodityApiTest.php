@@ -103,6 +103,26 @@ describe('with finance permissions', function () {
             ->assertJsonPath('errors.code.0', 'This commodity code is already in use.');
     });
 
+    test('codes are normalized to uppercase, making uniqueness case-insensitive', function () {
+        Commodity::factory()->create(['code' => 'FBTC']);
+
+        $this->postJson('/api/v1/financial/commodities', [
+            'code' => 'fbtc',
+            'name' => 'Fidelity Wise Origin Bitcoin Fund',
+            'kind' => 'traded',
+            'display_precision' => 8,
+        ])->assertUnprocessable()
+            ->assertJsonPath('errors.code.0', 'This commodity code is already in use.');
+
+        $this->postJson('/api/v1/financial/commodities', [
+            'code' => 'spaxx',
+            'name' => 'Fidelity Government Money Market Fund',
+            'kind' => 'traded',
+            'display_precision' => 3,
+        ])->assertCreated()
+            ->assertJsonPath('data.code', 'SPAXX');
+    });
+
     test('updating a commodity keeps its own code available', function () {
         $commodity = Commodity::factory()->create(['code' => 'FBTC', 'display_precision' => 8]);
 

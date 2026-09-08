@@ -7,6 +7,7 @@ use App\Models\Financial\Commodity;
 use App\Models\Financial\Lot;
 use App\Models\Financial\Posting;
 use App\Models\Financial\Transaction;
+use Illuminate\Database\QueryException;
 
 function lotPickerPosting(Lot $lot, Account $account, int $amount, string $date): Posting
 {
@@ -76,6 +77,11 @@ describe('with finance permissions', function () {
         $this->getJson("/api/v1/financial/lots?financial_account_id={$this->brokerage->id}&financial_commodity_id={$this->fbtc->id}&as_of=2025-12-31")
             ->assertOk()
             ->assertJsonCount(0, 'data');
+    });
+
+    test('a negative lot cost is rejected by the database', function () {
+        expect(fn () => Lot::factory()->create(['cost' => '-1']))
+            ->toThrow(QueryException::class, 'financial_lots_cost_nonnegative');
     });
 
     test('fully consumed lots are excluded', function () {

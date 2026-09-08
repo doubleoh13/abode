@@ -24,6 +24,10 @@ class Commodity extends Model
 
     private static ?self $baseCurrency = null;
 
+    /**
+     * Memoized for the process lifetime, so its attributes can outlive
+     * updates — read only the immutable id and code from it.
+     */
     public static function baseCurrency(): self
     {
         return self::$baseCurrency ??= self::query()->where('code', self::BASE_CURRENCY_CODE)->firstOrFail();

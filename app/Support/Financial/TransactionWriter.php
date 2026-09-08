@@ -37,6 +37,9 @@ class TransactionWriter
         return DB::transaction(function () use ($transaction, $data): Transaction {
             $transaction->update($this->transactionAttributes($data));
 
+            // Park existing rows above the 0..n range: the (transaction, position)
+            // unique index is checked per statement, so resequencing one row at a
+            // time would collide with a not-yet-moved sibling.
             Posting::query()
                 ->where('financial_transaction_id', $transaction->id)
                 ->update(['position' => DB::raw('position + 10000')]);
