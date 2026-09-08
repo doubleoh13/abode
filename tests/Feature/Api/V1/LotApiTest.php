@@ -32,10 +32,22 @@ describe('with finance permissions', function () {
         $this->fbtc = Commodity::factory()->create(['display_precision' => 8]);
     });
 
-    test('the account and commodity filters are required', function () {
+    test('the account filter is required', function () {
         $this->getJson('/api/v1/financial/lots')
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['financial_account_id', 'financial_commodity_id']);
+            ->assertJsonValidationErrors(['financial_account_id']);
+    });
+
+    test('omitting the commodity lists holdings across commodities', function () {
+        $solana = Commodity::factory()->create(['display_precision' => 9]);
+        $fbtcLot = Lot::factory()->ofCommodity($this->fbtc)->create();
+        $solanaLot = Lot::factory()->ofCommodity($solana)->create();
+        lotPickerPosting($fbtcLot, $this->brokerage, 100, '2026-01-05');
+        lotPickerPosting($solanaLot, $this->brokerage, 40, '2026-01-06');
+
+        $this->getJson("/api/v1/financial/lots?financial_account_id={$this->brokerage->id}")
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
     });
 
     test('open quantity is derived per account', function () {

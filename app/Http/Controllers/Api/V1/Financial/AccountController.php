@@ -8,7 +8,9 @@ use App\Http\Requests\Financial\UpdateAccountRequest;
 use App\Http\Resources\Financial\AccountResource;
 use App\Models\Financial\Account;
 use App\Models\Financial\Posting;
+use Brick\Math\BigDecimal;
 use Dedoc\Scramble\Attributes\Group;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 
@@ -40,6 +42,25 @@ class AccountController extends Controller
     public function show(Account $account): AccountResource
     {
         return new AccountResource($account->load('institution'));
+    }
+
+    /**
+     * The account's own per-commodity posting sums.
+     */
+    public function balances(Account $account): JsonResponse
+    {
+        $balances = Posting::query()
+            ->where('financial_account_id', $account->id)
+            ->groupBy('financial_commodity_id')
+            ->selectRaw('financial_commodity_id, sum(amount) as balance')
+            ->orderBy('financial_commodity_id')
+            ->get()
+            ->map(fn (Posting $row): array => [
+                'financial_commodity_id' => $row->financial_commodity_id,
+                'balance' => (string) BigDecimal::of($row->balance)->strippedOfTrailingZeros(),
+            ]);
+
+        return response()->json(['data' => $balances]);
     }
 
     public function update(UpdateAccountRequest $request, Account $account): AccountResource

@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Financial;
 
 use App\Models\Financial\Posting;
+use Brick\Math\BigDecimal;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -31,6 +32,11 @@ class PostingResource extends JsonResource
             'amount' => (string) $this->amount,
             'memo' => $this->memo,
             'metadata' => $this->metadata,
+            'transaction' => new TransactionResource($this->whenLoaded('transaction')),
+            'running_balance' => $this->when(
+                isset($this->running_balance),
+                fn (): string => (string) BigDecimal::of($this->running_balance)->strippedOfTrailingZeros(),
+            ),
         ];
     }
 }

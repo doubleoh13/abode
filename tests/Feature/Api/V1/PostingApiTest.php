@@ -22,6 +22,42 @@ test('guests receive a 401', function () {
 
     $this->patchJson("/api/v1/financial/postings/{$posting->id}", ['status' => 'cleared'])
         ->assertUnauthorized();
+    $this->getJson('/api/v1/financial/postings?financial_account_id=1')->assertUnauthorized();
+});
+
+describe('with view permissions', function () {
+    beforeEach(function () {
+        actingWithPermissions(Permission::ViewFinances);
+    });
+
+    test('the register requires an account', function () {
+        $this->getJson('/api/v1/financial/postings')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('financial_account_id');
+    });
+
+    test('the register lists an account\'s postings newest first with running balances', function () {
+        $checking = Account::factory()->ofType(AccountType::Asset)->create();
+        $groceries = Account::factory()->ofType(AccountType::Expense)->create();
+        $usd = Commodity::query()->where('code', 'USD')->firstOrFail();
+
+        foreach ([['2026-01-05', '100'], ['2026-01-10', '-30'], ['2026-01-20', '-20.50']] as [$date, $amount]) {
+            $transaction = Transaction::factory()->on($date)->create();
+            Posting::factory()->forTransaction($transaction, 0)->inAccount($checking)->ofCommodity($usd)
+                ->create(['amount' => $amount, 'status' => 'cleared']);
+            Posting::factory()->forTransaction($transaction, 1)->inAccount($groceries)->ofCommodity($usd)
+                ->create(['amount' => bcmul($amount, '-1', 2), 'status' => null]);
+        }
+
+        $this->getJson("/api/v1/financial/postings?financial_account_id={$checking->id}")
+            ->assertOk()
+            ->assertJsonCount(3, 'data')
+            ->assertJsonPath('data.0.amount', '-20.5')
+            ->assertJsonPath('data.0.running_balance', '49.5')
+            ->assertJsonPath('data.1.running_balance', '70')
+            ->assertJsonPath('data.2.running_balance', '100')
+            ->assertJsonPath('data.0.transaction.date', '2026-01-20');
+    });
 });
 
 test('viewing permissions cannot update a posting', function () {

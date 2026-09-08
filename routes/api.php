@@ -31,6 +31,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('commodities', CommodityController::class)->only(['index', 'show']);
             Route::apiResource('payees', PayeeController::class)->only(['index', 'show']);
             Route::apiResource('transactions', TransactionController::class)->only(['index', 'show']);
+            Route::get('accounts/{account}/balances', [AccountController::class, 'balances'])->name('accounts.balances');
+            Route::get('postings', [PostingController::class, 'index'])->name('postings.index');
             Route::get('lots', [LotController::class, 'index'])->name('lots.index');
             Route::get('journal-issues', [JournalIssueController::class, 'index'])->name('journal-issues.index');
         });

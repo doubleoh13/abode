@@ -1,9 +1,12 @@
 <?php
 
+use App\Enums\Financial\AccountType;
 use App\Enums\Permission;
 use App\Models\Financial\Account;
+use App\Models\Financial\Commodity;
 use App\Models\Financial\Institution;
 use App\Models\Financial\Posting;
+use App\Models\Financial\Transaction;
 
 test('guests receive a 401', function () {
     $this->getJson('/api/v1/financial/accounts')->assertUnauthorized();
@@ -27,6 +30,24 @@ test('a viewer cannot write', function () {
 describe('with finance permissions', function () {
     beforeEach(function () {
         actingWithPermissions(Permission::ViewFinances, Permission::ManageFinances);
+    });
+
+    test('balances sum the account posting amounts per commodity', function () {
+        $checking = Account::factory()->ofType(AccountType::Asset)->create();
+        $usd = Commodity::query()->where('code', 'USD')->firstOrFail();
+        $fbtc = Commodity::factory()->create(['display_precision' => 8]);
+        $transaction = Transaction::factory()->on('2026-01-05')->create();
+        Posting::factory()->forTransaction($transaction, 0)->inAccount($checking)->ofCommodity($usd)->create(['amount' => '250.75']);
+        Posting::factory()->forTransaction($transaction, 1)->inAccount($checking)->ofCommodity($usd)->create(['amount' => '-100.25']);
+        Posting::factory()->forTransaction($transaction, 2)->inAccount($checking)->ofCommodity($fbtc)->create(['amount' => '0.5']);
+
+        $this->getJson("/api/v1/financial/accounts/{$checking->id}/balances")
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.financial_commodity_id', $usd->id)
+            ->assertJsonPath('data.0.balance', '150.5')
+            ->assertJsonPath('data.1.financial_commodity_id', $fbtc->id)
+            ->assertJsonPath('data.1.balance', '0.5');
     });
 
     test('required account fields use form language', function () {
