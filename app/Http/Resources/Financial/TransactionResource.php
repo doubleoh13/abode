@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Financial;
 
+use App\Enums\Financial\PostingStatus;
 use App\Models\Financial\Transaction;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -25,7 +26,12 @@ class TransactionResource extends JsonResource
             'payee' => new PayeeResource($this->whenLoaded('payee')),
             'memo' => $this->memo,
             'metadata' => $this->metadata,
-            'status' => $this->status,
+            /**
+             * Derived from the loaded postings; omitted when they are not
+             * part of the response, since deriving it would lazy-load every
+             * sibling posting and its account.
+             */
+            'status' => $this->when($this->relationLoaded('postings'), fn (): ?PostingStatus => $this->status),
             'postings' => PostingResource::collection($this->whenLoaded('postings')),
         ];
     }
