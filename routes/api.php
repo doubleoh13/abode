@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\Financial\InstitutionController;
 use App\Http\Controllers\Api\V1\Financial\JournalIssueController;
 use App\Http\Controllers\Api\V1\Financial\LotController;
 use App\Http\Controllers\Api\V1\Financial\PayeeController;
+use App\Http\Controllers\Api\V1\Financial\PostingController;
 use App\Http\Controllers\Api\V1\Financial\TransactionController;
 use App\Http\Controllers\Api\V1\NoteController;
 use App\Http\Resources\UserResource;
@@ -40,6 +41,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('commodities', CommodityController::class)->only(['store', 'update', 'destroy']);
             Route::apiResource('payees', PayeeController::class)->only(['store', 'update', 'destroy']);
             Route::apiResource('transactions', TransactionController::class)->only(['store', 'update', 'destroy']);
+            Route::apiResource('postings', PostingController::class)->only('update');
         });
     });
 });
