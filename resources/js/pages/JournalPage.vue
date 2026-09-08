@@ -23,6 +23,7 @@ const commodities = ref<Commodity[]>([]);
 const institutions = ref<Institution[]>([]);
 const payees = ref<Payee[]>([]);
 const issues = ref<JournalIssue[]>([]);
+const issuesChecked = ref(false);
 const loaded = ref(false);
 const formOpen = ref(false);
 const editingTransaction = ref<Transaction | null>(null);
@@ -71,19 +72,22 @@ async function loadTransactions(): Promise<void> {
 }
 
 async function loadIssues(): Promise<void> {
+    issuesChecked.value = false;
     issues.value = (
         await axios.get<{ data: JournalIssue[] }>('/api/v1/financial/journal-issues')
     ).data.data;
+    issuesChecked.value = true;
 }
 
 onMounted(async () => {
+    void loadIssues();
+
     const [accountsResponse, commoditiesResponse, institutionsResponse, payeesResponse] = await Promise.all([
         axios.get<{ data: Account[] }>('/api/v1/financial/accounts'),
         axios.get<{ data: Commodity[] }>('/api/v1/financial/commodities'),
         axios.get<{ data: Institution[] }>('/api/v1/financial/institutions'),
         axios.get<{ data: Payee[] }>('/api/v1/financial/payees'),
         loadTransactions(),
-        loadIssues(),
     ]);
 
     accounts.value = accountsResponse.data.data;
@@ -207,7 +211,11 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                 />
             </ModalDialog>
 
-            <p v-if="issues.length > 0" class="mt-4 rounded-md border border-danger/40 bg-danger/10 px-4 py-2 text-sm text-danger">
+            <p v-if="!issuesChecked" class="mt-4 font-mono text-xs tracking-wider text-muted uppercase">
+                Checking journal integrity…
+            </p>
+
+            <p v-else-if="issues.length > 0" class="mt-4 rounded-md border border-danger/40 bg-danger/10 px-4 py-2 text-sm text-danger">
                 {{ issues.length }} journal {{ issues.length === 1 ? 'issue needs' : 'issues need' }} attention.
             </p>
 
@@ -325,5 +333,25 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                 </button>
             </div>
         </template>
+
+        <div
+            v-else
+            aria-hidden="true"
+            class="mt-6 animate-pulse divide-y divide-edge overflow-hidden rounded-md border border-edge bg-surface"
+        >
+            <div v-for="row in 6" :key="row" class="px-4 py-2">
+                <div class="flex items-center gap-4">
+                    <span class="h-3 w-20 rounded-sm bg-edge/60"></span>
+                    <span class="h-3 w-4 rounded-sm bg-edge/60"></span>
+                    <span class="h-3 w-64 rounded-sm bg-edge/60"></span>
+                </div>
+                <div class="mt-2.5 flex flex-col gap-2 pb-1 pl-24">
+                    <div v-for="line in 2" :key="line" class="flex items-center justify-between">
+                        <span class="h-3 w-72 rounded-sm bg-edge/60"></span>
+                        <span class="h-3 w-24 rounded-sm bg-edge/60"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
