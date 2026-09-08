@@ -14,6 +14,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property-read PostingStatus|null $status
+ */
 #[Fillable(['date', 'financial_payee_id', 'memo', 'metadata'])]
 class Transaction extends Model
 {
