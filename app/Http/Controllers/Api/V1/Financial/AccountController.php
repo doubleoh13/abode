@@ -10,7 +10,9 @@ use App\Models\Financial\Account;
 use App\Models\Financial\Posting;
 use Brick\Math\BigDecimal;
 use Dedoc\Scramble\Attributes\Group;
+use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 
@@ -45,12 +47,19 @@ class AccountController extends Controller
     }
 
     /**
-     * The account's own per-commodity posting sums.
+     * The account's own per-commodity posting sums, optionally as of the end
+     * of a date.
      */
-    public function balances(Account $account): JsonResponse
+    public function balances(Request $request, Account $account): JsonResponse
     {
+        $validated = $request->validate([
+            'as_of' => ['nullable', 'date'],
+        ]);
+
         $balances = Posting::query()
             ->where('financial_account_id', $account->id)
+            ->when($validated['as_of'] ?? null, fn (Builder $query, string $asOf) => $query
+                ->whereHas('transaction', fn (Builder $transaction) => $transaction->where('date', '<=', $asOf)))
             ->groupBy('financial_commodity_id')
             ->selectRaw('financial_commodity_id, sum(amount) as balance')
             ->orderBy('financial_commodity_id')

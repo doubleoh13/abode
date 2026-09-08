@@ -3,6 +3,7 @@
 use App\Enums\Financial\AccountType;
 use App\Enums\Permission;
 use App\Models\Financial\Account;
+use App\Models\Financial\BalanceAssertion;
 use App\Models\Financial\Commodity;
 use App\Models\Financial\Lot;
 use App\Models\Financial\Posting;
@@ -67,6 +68,30 @@ describe('with finance permissions', function () {
             ->and($negativeLotIssues[0]['financial_lot_id'])->toBe($lot->id)
             ->and($negativeLotIssues[0]['financial_transaction_id'])->toBe($secondSale->id)
             ->and($negativeLotIssues[0]['financial_posting_id'])->toBe($offender->id);
+    });
+
+    test('a balance assertion is checked end-of-day inclusive', function () {
+        $deposit = Transaction::factory()->on('2026-01-31')->create();
+        journalIssuePosting($deposit, 0, $this->checking, $this->usd, 100);
+        journalIssuePosting($deposit, 1, $this->gains, $this->usd, -100);
+
+        BalanceAssertion::factory()
+            ->forAccount($this->checking)->ofCommodity($this->usd)
+            ->create(['asserted_at' => '2026-01-31', 'balance' => 100]);
+
+        $this->getJson('/api/v1/financial/journal-issues')->assertOk()->assertJsonCount(0, 'data');
+
+        $backdated = Transaction::factory()->on('2026-01-15')->create();
+        journalIssuePosting($backdated, 0, $this->checking, $this->usd, 25);
+        journalIssuePosting($backdated, 1, $this->gains, $this->usd, -25);
+
+        $response = $this->getJson('/api/v1/financial/journal-issues')->assertOk();
+        $failed = collect($response->json('data'))->where('type', 'failed_assertion')->values();
+
+        expect($failed)->toHaveCount(1)
+            ->and($failed[0]['expected'])->toBe('100')
+            ->and($failed[0]['actual'])->toBe('125')
+            ->and($failed[0]['financial_account_id'])->toBe($this->checking->id);
     });
 
     test('a lot edit retroactively unbalances dependent transactions', function () {

@@ -21,7 +21,59 @@ class JournalIssueFinder
      */
     public function find(): array
     {
-        return [...$this->negativeLotIssues(), ...$this->unbalancedTransactionIssues()];
+        return [
+            ...$this->negativeLotIssues(),
+            ...$this->unbalancedTransactionIssues(),
+            ...$this->failedAssertionIssues(),
+        ];
+    }
+
+    /**
+     * Recompute each balance assertion against the postings dated on or
+     * before its day; edits anywhere in history can break an old
+     * reconciliation point.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function failedAssertionIssues(): array
+    {
+        $issues = [];
+
+        $assertions = DB::table('financial_balance_assertions as assertion')
+            ->select('assertion.*')
+            ->selectRaw(<<<'SQL'
+                (
+                    select coalesce(sum(posting.amount), 0)
+                    from financial_postings posting
+                    join financial_transactions transaction on transaction.id = posting.financial_transaction_id
+                    where posting.financial_account_id = assertion.financial_account_id
+                        and posting.financial_commodity_id = assertion.financial_commodity_id
+                        and transaction.date <= assertion.asserted_at
+                ) as actual
+                SQL)
+            ->orderBy('assertion.asserted_at')
+            ->orderBy('assertion.id')
+            ->get();
+
+        foreach ($assertions as $assertion) {
+            $expected = BigDecimal::of($assertion->balance);
+            $actual = BigDecimal::of($assertion->actual);
+
+            if ($expected->compareTo($actual) !== 0) {
+                $issues[] = [
+                    'type' => 'failed_assertion',
+                    'financial_balance_assertion_id' => $assertion->id,
+                    'financial_account_id' => $assertion->financial_account_id,
+                    'financial_commodity_id' => $assertion->financial_commodity_id,
+                    'asserted_at' => $assertion->asserted_at,
+                    'expected' => (string) $expected->strippedOfTrailingZeros(),
+                    'actual' => (string) $actual->strippedOfTrailingZeros(),
+                    'message' => 'The journal no longer matches this balance assertion.',
+                ];
+            }
+        }
+
+        return $issues;
     }
 
     /**

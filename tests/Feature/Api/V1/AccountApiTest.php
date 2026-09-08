@@ -48,6 +48,13 @@ describe('with finance permissions', function () {
             ->assertJsonPath('data.0.balance', '150.5')
             ->assertJsonPath('data.1.financial_commodity_id', $fbtc->id)
             ->assertJsonPath('data.1.balance', '0.5');
+
+        $later = Transaction::factory()->on('2026-02-10')->create();
+        Posting::factory()->forTransaction($later, 0)->inAccount($checking)->ofCommodity($usd)->create(['amount' => '49.5']);
+
+        $this->getJson("/api/v1/financial/accounts/{$checking->id}/balances?as_of=2026-01-05")
+            ->assertOk()
+            ->assertJsonPath('data.0.balance', '150.5');
     });
 
     test('required account fields use form language', function () {

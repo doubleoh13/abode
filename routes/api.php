@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AttachmentController;
 use App\Http\Controllers\Api\V1\Financial\AccountController;
+use App\Http\Controllers\Api\V1\Financial\BalanceAssertionController;
 use App\Http\Controllers\Api\V1\Financial\CommodityController;
 use App\Http\Controllers\Api\V1\Financial\InstitutionController;
 use App\Http\Controllers\Api\V1\Financial\JournalIssueController;
@@ -32,6 +33,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('payees', PayeeController::class)->only(['index', 'show']);
             Route::apiResource('transactions', TransactionController::class)->only(['index', 'show']);
             Route::get('accounts/{account}/balances', [AccountController::class, 'balances'])->name('accounts.balances');
+            Route::apiResource('balance-assertions', BalanceAssertionController::class)->only('index');
             Route::get('postings', [PostingController::class, 'index'])->name('postings.index');
             Route::get('lots', [LotController::class, 'index'])->name('lots.index');
             Route::get('journal-issues', [JournalIssueController::class, 'index'])->name('journal-issues.index');
@@ -44,6 +46,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('payees', PayeeController::class)->only(['store', 'update', 'destroy']);
             Route::apiResource('transactions', TransactionController::class)->only(['store', 'update', 'destroy']);
             Route::apiResource('postings', PostingController::class)->only('update');
+            Route::apiResource('balance-assertions', BalanceAssertionController::class)->only(['store', 'destroy']);
         });
     });
 });
