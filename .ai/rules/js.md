@@ -19,5 +19,8 @@ CRUD pages follow one pattern (see PayeesPage as the minimal example): full-widt
 Selects are always the ComboBox component (type-to-filter, arrow/Enter/Tab select, explicit "(none)" row when nullable) — never a native select. Shared form styling comes from the .input/.field-label/.button-primary/.button-subtle classes in app.css; never restyle inline.
 Shared API types live in resources/js/types.ts; auth state stays in the plain reactive auth.ts module (no Pinia).
 
-## Exact financial values are JSON strings
-Posting amounts, lot costs and quantities, and journal residuals cross the API as canonical integer strings. Use JavaScript BigInt for exact arithmetic and convert back to strings before JSON serialization; never use Number for scaled financial values.
+## Unscaled decimal API values and display-only precision
+Financial API values (posting amounts, lot costs and quantities, journal residuals) are unscaled decimal strings, never numbers or commodity-scaled integers — never use Number for financial values. money.ts uses an internal fixed 25-place BigInt representation for exact calculations and converts back to decimal strings at boundaries. Commodity display_precision controls formatting only; editing preserves all stored fractional digits. Display uses half-up rounding; unit-cost products that exceed storage capacity are rejected.
+
+## money.test.mjs guards PHP/JS allocation parity — run npm test
+tests/Unit/money.test.mjs (Node's test runner, run via `npm test`) is the only automated check that money.ts allocation matches CostBasisBalancer bit-for-bit; both suites assert the same vectors. Run it whenever money.ts or CostBasisBalancer changes, and keep the shared vectors in sync in both test files.

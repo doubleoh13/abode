@@ -15,20 +15,16 @@ Deliberately absent: currency (single-currency), any balance column (derive from
 ## Commodity modeling decisions
 commodities is one uniform table, hledger-style — a future posting is always (account, quantity, commodity) whether USD, SPAXX, FBTC, ETH, or HOUSE. Never split per asset class.
 kind is BEHAVIORAL, not descriptive: Currency (unit of account), Traded (market-priced), Custom (manually valued, e.g. HOUSE). Resist adding descriptive cases that behave identically.
-precision is display decimals per commodity and will inform amount storage when postings are designed (not designed yet).
+display_precision is display decimals per commodity (0–25), formatting only — storage scale is fixed at NUMERIC(78,25) and never rescales (see .ai/rules/financial.md).
 symbol + symbol_placement (prefix/suffix) render "$1,234.56" vs "10.500 SPAXX"; both null = code-as-suffix. They are a pair: validation requires placement with symbol.
 USD-as-base-currency is config-in-code: Commodity::BASE_CURRENCY_CODE plus the memoized Commodity::baseCurrency() helper — never a flag column. Lots/cost basis are designed in .ai/rules/financial.md.
 
-## Amount storage: bigint minor units scaled by commodity precision
-All journal/posting amounts are signed BIGINT in the commodity's minor units; commodity precision is the STORAGE SCALE, not just display ($12.34 = 1234 at precision 2). Balances are per-commodity integer SUMs — exact on Postgres and SQLite alike (never use decimal columns for amounts; SQLite makes them floats).
-precision immutability is ONE-DIRECTIONAL once postings/lots reference the commodity: decreases are refused in validation (lossy); increases are allowed and CommodityController::update rescales referencing posting amounts x10^delta in the same DB transaction (plus all lot costs when the base currency's own precision changes).
-Cap precision at 8 in validation: 64-bit range leaves ~9.2 billion whole units at scale 8. Never store ETH at native 18 (caps at 9.2 ETH). If display ever needs to differ from storage, add display_precision then.
-PHP int is 64-bit signed and matches bigint exactly — plain integer math, no bcmath.
+## Amount storage: fixed 25-place decimals
+Posting amounts, lot costs, and commodity prices are NUMERIC(78,25) cast to Brick Math BigDecimal — the full rule (bounds, rejection over rounding, display_precision, basis allocation) lives in .ai/rules/financial.md. Never coerce exact financial values through PHP int or float.
 
 ## Commodity price modeling decisions
-commodity_prices rows are immutable data points: price decimal(24,12) ALWAYS denominated in the base currency (USD) — there is deliberately no price_commodity_id; priced_at timestamptz (not date — intraday crypto points wanted); created_at only, no updated_at, hard deletes allowed. Unique (commodity_id, priced_at).
-This is the documented carve-out from the bigint-amounts rule: prices are never summed, need more precision than any commodity's display precision, and Postgres numeric is exact (tests run on Postgres). Ledger AMOUNTS remain bigint minor units — never copy this pattern for them.
-Valuation math: exact bigint amount x numeric price via bcmath when exactness matters; floats acceptable for charting only.
+commodity_prices rows are immutable data points: price NUMERIC(78,25) ALWAYS denominated in the base currency (USD) — there is deliberately no price_commodity_id; priced_at timestamptz (not date — intraday crypto points wanted); created_at only, no updated_at, hard deletes allowed. Unique (commodity_id, priced_at).
+Valuation math: exact BigDecimal amount x price when exactness matters; floats acceptable for charting only.
 
 ## Domain prefixes: financial_ tables, App\Models\Financial namespace
 Finance-domain tables are prefixed financial_ (financial_accounts, financial_commodities, financial_commodity_prices, financial_institutions) and their models live in App\Models\Financial (factories in Database\Factories\Financial) with explicit protected $table. The Financial sub-namespace carries through the whole domain: App\Enums\Financial, App\Http\Controllers\Api\V1\Financial, App\Http\Requests\Financial, App\Http\Resources\Financial. Future domains get their own prefix + namespaces the same way. API URLs carry the domain too: /api/v1/financial/accounts, route names financial.accounts.index (Route::prefix('financial')->name('financial.')).
@@ -39,6 +35,3 @@ Use Rule::unique(Model::class)/Rule::exists(Model::class) in validation, never s
 The morph map is ENFORCED (AppServiceProvider): every morphable model needs an alias ('user', 'financial.account', ...) — FQCNs never hit the database (namespace moves proved why). Adding a morphable model without registering it throws, including Sanctum's tokenable.
 Notes and Attachments are global cross-domain polymorphics (App\Models, unprefixed tables): nullable user_id author, soft deletes (timestampsTz + softDeletesTz). Models opt in via App\Models\Concerns\HasNotes / HasAttachments.
 Attachments store disk/path/name/mime_type/size plus sha256 hash (indexed, for dedup); files stay on disk through soft delete — removal belongs with a future force-delete. Generic APIs at /api/v1/notes and /api/v1/attachments address parents by (morph alias, id); index endpoints require the filter pair.
-
-## Exact numeric values supersede bigint amounts
-Financial posting amounts and lot costs are atomic integers stored as NUMERIC(78,0), cast to Brick Math BigInteger in PHP, and serialized as canonical integer strings. Commodity precision is the storage/display scale and may be 0–255; each atomic value remains limited to 78 digits. Never coerce exact financial values to PHP int or float.
