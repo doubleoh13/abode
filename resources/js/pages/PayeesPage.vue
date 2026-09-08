@@ -3,6 +3,7 @@ import axios from 'axios';
 import { onMounted, ref } from 'vue';
 import ModalDialog from '../components/ModalDialog.vue';
 import PayeeForm from '../components/PayeeForm.vue';
+import SkeletonList from '../components/SkeletonList.vue';
 import type { Payee } from '../types';
 
 const payees = ref<Payee[]>([]);
@@ -97,5 +98,7 @@ async function deletePayee(payee: Payee): Promise<void> {
                 </li>
             </ul>
         </template>
+
+        <SkeletonList v-else />
     </div>
 </template>

@@ -3,6 +3,7 @@ import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, ref } from 'vue';
 import AccountForm from '../components/AccountForm.vue';
 import ModalDialog from '../components/ModalDialog.vue';
+import SkeletonList from '../components/SkeletonList.vue';
 import type { Account, AccountType, Institution } from '../types';
 
 const accounts = ref<Account[]>([]);
@@ -215,5 +216,7 @@ async function deleteAccount(account: Account): Promise<void> {
                 </section>
             </div>
         </template>
+
+        <SkeletonList v-else />
     </div>
 </template>

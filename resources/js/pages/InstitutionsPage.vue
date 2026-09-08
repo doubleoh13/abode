@@ -3,6 +3,7 @@ import axios, { isAxiosError } from 'axios';
 import { onMounted, ref } from 'vue';
 import InstitutionForm from '../components/InstitutionForm.vue';
 import ModalDialog from '../components/ModalDialog.vue';
+import SkeletonList from '../components/SkeletonList.vue';
 import type { Institution } from '../types';
 
 const institutions = ref<Institution[]>([]);
@@ -111,5 +112,7 @@ async function deleteInstitution(institution: Institution): Promise<void> {
                 </li>
             </ul>
         </template>
+
+        <SkeletonList v-else />
     </div>
 </template>

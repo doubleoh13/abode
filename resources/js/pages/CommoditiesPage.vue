@@ -4,6 +4,7 @@ import { formatAmount } from '../money';
 import { onMounted, ref } from 'vue';
 import CommodityForm from '../components/CommodityForm.vue';
 import ModalDialog from '../components/ModalDialog.vue';
+import SkeletonList from '../components/SkeletonList.vue';
 import type { Commodity } from '../types';
 
 const commodities = ref<Commodity[]>([]);
@@ -119,5 +120,7 @@ function exampleAmount(commodity: Commodity): string {
                 </table>
             </div>
         </template>
+
+        <SkeletonList v-else />
     </div>
 </template>
