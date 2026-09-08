@@ -67,6 +67,13 @@ export interface Posting {
     amount: string;
     memo: string | null;
     metadata: Record<string, unknown>;
+    transaction?: Transaction;
+    running_balance?: string;
+}
+
+export interface AccountBalance {
+    financial_commodity_id: number;
+    balance: string;
 }
 
 export interface Transaction {

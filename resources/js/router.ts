@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type LocationQuery } from 'vue-router';
 import { auth, resolveAuthenticatedUser } from './auth';
+import AccountPage from './pages/AccountPage.vue';
 import AccountsPage from './pages/AccountsPage.vue';
 import AppShell from './layouts/AppShell.vue';
 import CommoditiesPage from './pages/CommoditiesPage.vue';
@@ -33,6 +34,11 @@ export const router = createRouter({
                             path: 'accounts',
                             name: 'finances.accounts',
                             component: AccountsPage,
+                        },
+                        {
+                            path: 'accounts/:id',
+                            name: 'finances.account',
+                            component: AccountPage,
                         },
                         {
                             path: 'commodities',

@@ -3,7 +3,16 @@ import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, ref, watch } from 'vue';
 import ComboBox from '../components/ComboBox.vue';
 import ModalDialog from '../components/ModalDialog.vue';
+import PaginationBar from '../components/PaginationBar.vue';
 import TransactionForm from '../components/TransactionForm.vue';
+import {
+    accountPathAncestor,
+    accountPathLeaf,
+    nextStatus,
+    statusClass,
+    statusLabel,
+    statusSymbol,
+} from '../journal';
 import { formatAmount } from '../money';
 import type {
     Account,
@@ -157,27 +166,6 @@ async function changePage(target: number): Promise<void> {
     await loadTransactions();
 }
 
-// Windowed page links: first, last, and current±1, with null marking a gap.
-const pageLinks = computed<Array<number | null>>(() => {
-    const candidates = new Set([1, page.value - 1, page.value, page.value + 1, lastPage.value]);
-    const pages = [...candidates]
-        .filter((candidate) => candidate >= 1 && candidate <= lastPage.value)
-        .sort((first, second) => first - second);
-    const links: Array<number | null> = [];
-    let previous = 0;
-
-    for (const candidate of pages) {
-        if (candidate - previous > 1) {
-            links.push(null);
-        }
-
-        links.push(candidate);
-        previous = candidate;
-    }
-
-    return links;
-});
-
 function openCreateForm(): void {
     editingTransaction.value = null;
     formOpen.value = true;
@@ -210,48 +198,6 @@ async function transactionSaved(): Promise<void> {
     await Promise.all([loadTransactions(), loadIssues()]);
 }
 
-function accountPathAncestor(path: string | undefined): string {
-    const segments = path?.split(':') ?? [];
-
-    return segments.length > 1 ? `${segments.slice(0, -1).join(':')}:` : '';
-}
-
-function accountPathLeaf(path: string | undefined): string {
-    return path?.split(':').at(-1) ?? '';
-}
-
-function statusSymbol(status: PostingStatus | null): string {
-    if (status === 'pending') {
-        return 'P';
-    }
-
-    if (status === 'cleared') {
-        return 'C';
-    }
-
-    if (status === 'reconciled') {
-        return 'R';
-    }
-
-    return ' ';
-}
-
-function statusClass(status: PostingStatus | null): string {
-    return status === 'reconciled' ? 'text-accent' : 'text-muted';
-}
-
-function nextStatus(status: PostingStatus): PostingStatus {
-    if (status === 'pending') {
-        return 'cleared';
-    }
-
-    if (status === 'cleared') {
-        return 'reconciled';
-    }
-
-    return 'pending';
-}
-
 async function flipStatus(transaction: Transaction, posting: Posting): Promise<void> {
     if (posting.status === null) {
         return;
@@ -269,10 +215,6 @@ async function flipStatus(transaction: Transaction, posting: Posting): Promise<v
     if (index !== -1) {
         transactions.value[index] = refreshed;
     }
-}
-
-function statusLabel(status: PostingStatus | null): string {
-    return status === null ? 'No status' : status[0].toUpperCase() + status.slice(1);
 }
 
 async function deleteTransaction(transaction: Transaction): Promise<void> {
@@ -463,45 +405,7 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                 </li>
             </ul>
 
-            <div v-if="lastPage > 1" class="mt-4 flex items-center justify-between">
-                <button
-                    type="button"
-                    class="button-subtle"
-                    :disabled="page <= 1"
-                    @click="changePage(page - 1)"
-                >
-                    Prev
-                </button>
-
-                <div class="flex items-center gap-1">
-                    <template v-for="(link, index) in pageLinks" :key="index">
-                        <span v-if="link === null" class="px-1 font-mono text-xs text-muted">…</span>
-                        <button
-                            v-else
-                            type="button"
-                            class="min-w-8 rounded-sm border px-2 py-1.5 font-mono text-xs transition-colors"
-                            :class="
-                                link === page
-                                    ? 'border-edge bg-surface text-foreground'
-                                    : 'border-transparent text-muted hover:text-foreground'
-                            "
-                            :disabled="link === page"
-                            @click="changePage(link)"
-                        >
-                            {{ link }}
-                        </button>
-                    </template>
-                </div>
-
-                <button
-                    type="button"
-                    class="button-subtle"
-                    :disabled="page >= lastPage"
-                    @click="changePage(page + 1)"
-                >
-                    Next
-                </button>
-            </div>
+            <PaginationBar :page="page" :last-page="lastPage" @change="changePage" />
         </template>
 
         <div

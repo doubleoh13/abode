@@ -184,13 +184,14 @@ async function deleteAccount(account: Account): Promise<void> {
                             :key="account.id"
                             class="group flex items-center justify-between gap-4 px-4 py-2"
                         >
-                            <span
-                                class="text-sm"
+                            <RouterLink
+                                :to="{ name: 'finances.account', params: { id: account.id } }"
+                                class="text-sm transition-colors hover:text-accent"
                                 :class="account.closed_at ? 'text-muted line-through' : ''"
                                 :style="{ paddingLeft: `${depth * 1.25}rem` }"
                             >
                                 {{ account.name }}
-                            </span>
+                            </RouterLink>
 
                             <span class="flex items-center gap-3 font-mono text-xs text-muted">
                                 <span v-if="account.institution">{{ account.institution.name }}</span>
