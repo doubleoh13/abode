@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import ComboBox from '../components/ComboBox.vue';
 import ModalDialog from '../components/ModalDialog.vue';
 import TransactionForm from '../components/TransactionForm.vue';
 import { formatAmount } from '../money';
@@ -26,6 +27,36 @@ const payees = ref<Payee[]>([]);
 const issues = ref<JournalIssue[]>([]);
 const issuesChecked = ref(false);
 const loaded = ref(false);
+const filterAccountId = ref<number | null>(null);
+const filterStatus = ref<PostingStatus[]>([]);
+const filterFrom = ref('');
+const filterTo = ref('');
+const searchQuery = ref('');
+
+const accountOptions = computed(() =>
+    accounts.value.map((account) => ({ value: account.id, label: account.path })),
+);
+
+const statusOptions: Array<{ value: PostingStatus; label: string }> = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'cleared', label: 'Cleared' },
+    { value: 'reconciled', label: 'Reconciled' },
+];
+
+const hasActiveFilters = computed(
+    () =>
+        filterAccountId.value !== null ||
+        filterStatus.value.length > 0 ||
+        filterFrom.value !== '' ||
+        filterTo.value !== '' ||
+        searchQuery.value !== '',
+);
+
+function toggleStatusFilter(status: PostingStatus): void {
+    filterStatus.value = filterStatus.value.includes(status)
+        ? filterStatus.value.filter((candidate) => candidate !== status)
+        : [...filterStatus.value, status];
+}
 const formOpen = ref(false);
 const editingTransaction = ref<Transaction | null>(null);
 
@@ -64,13 +95,36 @@ const issuesByPosting = computed(() => {
 async function loadTransactions(): Promise<void> {
     const response = (
         await axios.get<Paginated<Transaction>>('/api/v1/financial/transactions', {
-            params: { page: page.value },
+            params: {
+                page: page.value,
+                financial_account_id: filterAccountId.value ?? undefined,
+                status: filterStatus.value.length > 0 ? filterStatus.value : undefined,
+                from: filterFrom.value || undefined,
+                to: filterTo.value || undefined,
+                search: searchQuery.value || undefined,
+            },
         })
     ).data;
 
     transactions.value = response.data;
     lastPage.value = response.meta.last_page;
 }
+
+async function applyFilters(): Promise<void> {
+    page.value = 1;
+    await loadTransactions();
+}
+
+watch([filterAccountId, filterStatus, filterFrom, filterTo], () => {
+    void applyFilters();
+}, { deep: true });
+
+let searchDebounce: number | undefined;
+
+watch(searchQuery, () => {
+    window.clearTimeout(searchDebounce);
+    searchDebounce = window.setTimeout(() => void applyFilters(), 300);
+});
 
 async function loadIssues(): Promise<void> {
     issuesChecked.value = false;
@@ -102,6 +156,27 @@ async function changePage(target: number): Promise<void> {
     page.value = target;
     await loadTransactions();
 }
+
+// Windowed page links: first, last, and current±1, with null marking a gap.
+const pageLinks = computed<Array<number | null>>(() => {
+    const candidates = new Set([1, page.value - 1, page.value, page.value + 1, lastPage.value]);
+    const pages = [...candidates]
+        .filter((candidate) => candidate >= 1 && candidate <= lastPage.value)
+        .sort((first, second) => first - second);
+    const links: Array<number | null> = [];
+    let previous = 0;
+
+    for (const candidate of pages) {
+        if (candidate - previous > 1) {
+            links.push(null);
+        }
+
+        links.push(candidate);
+        previous = candidate;
+    }
+
+    return links;
+});
 
 function openCreateForm(): void {
     editingTransaction.value = null;
@@ -255,8 +330,47 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                 {{ issues.length }} journal {{ issues.length === 1 ? 'issue needs' : 'issues need' }} attention.
             </p>
 
+            <div class="mt-6 flex flex-wrap items-end gap-3">
+                <label class="flex min-w-64 flex-1 flex-col gap-1.5">
+                    <span class="field-label">Account</span>
+                    <ComboBox v-model="filterAccountId" :options="accountOptions" nullable null-label="(all)" fuzzy />
+                </label>
+
+                <div class="flex flex-col gap-1.5">
+                    <span class="field-label">Status</span>
+                    <div class="flex gap-2">
+                        <button
+                            v-for="option in statusOptions"
+                            :key="option.value"
+                            type="button"
+                            class="button-subtle"
+                            :class="{ 'border-accent text-accent hover:text-accent': filterStatus.includes(option.value) }"
+                            :aria-pressed="filterStatus.includes(option.value)"
+                            @click="toggleStatusFilter(option.value)"
+                        >
+                            {{ option.label }}
+                        </button>
+                    </div>
+                </div>
+
+                <label class="flex flex-col gap-1.5">
+                    <span class="field-label">From</span>
+                    <input v-model="filterFrom" type="date" class="input" />
+                </label>
+
+                <label class="flex flex-col gap-1.5">
+                    <span class="field-label">To</span>
+                    <input v-model="filterTo" type="date" class="input" />
+                </label>
+
+                <label class="flex min-w-48 flex-1 flex-col gap-1.5">
+                    <span class="field-label">Search</span>
+                    <input v-model="searchQuery" type="search" class="input" placeholder="Payee or memo" />
+                </label>
+            </div>
+
             <p v-if="transactions.length === 0" class="mt-6 text-sm text-muted">
-                No transactions yet.
+                {{ hasActiveFilters ? 'No matching transactions.' : 'No transactions yet.' }}
             </p>
 
             <ul
@@ -359,9 +473,25 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                     Prev
                 </button>
 
-                <span class="font-mono text-xs tracking-wider text-muted uppercase">
-                    Page {{ page }} / {{ lastPage }}
-                </span>
+                <div class="flex items-center gap-1">
+                    <template v-for="(link, index) in pageLinks" :key="index">
+                        <span v-if="link === null" class="px-1 font-mono text-xs text-muted">…</span>
+                        <button
+                            v-else
+                            type="button"
+                            class="min-w-8 rounded-sm border px-2 py-1.5 font-mono text-xs transition-colors"
+                            :class="
+                                link === page
+                                    ? 'border-edge bg-surface text-foreground'
+                                    : 'border-transparent text-muted hover:text-foreground'
+                            "
+                            :disabled="link === page"
+                            @click="changePage(link)"
+                        >
+                            {{ link }}
+                        </button>
+                    </template>
+                </div>
 
                 <button
                     type="button"

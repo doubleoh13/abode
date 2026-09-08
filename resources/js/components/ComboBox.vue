@@ -5,6 +5,7 @@ const props = defineProps<{
     modelValue: TValue | null;
     options: Array<{ value: TValue; label: string }>;
     nullable?: boolean;
+    nullLabel?: string;
     creatable?: boolean;
     createOptionLabel?: string;
     fuzzy?: boolean;
@@ -77,7 +78,7 @@ const choices = computed<Choice[]>(() => {
         }
 
         return props.nullable
-            ? [{ type: 'option', value: null, label: '(none)' }, ...options]
+            ? [{ type: 'option', value: null, label: props.nullLabel ?? '(none)' }, ...options]
             : options;
     }
 
