@@ -88,12 +88,28 @@ export interface Transaction {
 }
 
 export interface JournalIssue {
-    type: 'negative_lot' | 'unbalanced_transaction';
-    financial_transaction_id: number;
+    type: 'negative_lot' | 'unbalanced_transaction' | 'failed_assertion';
+    financial_transaction_id?: number;
     financial_lot_id?: number;
     financial_posting_id?: number;
     residual?: string;
+    financial_balance_assertion_id?: number;
+    financial_account_id?: number;
+    financial_commodity_id?: number;
+    asserted_at?: string;
+    expected?: string;
+    actual?: string;
     message: string;
+}
+
+export interface BalanceAssertion {
+    id: number;
+    financial_account_id: number;
+    financial_commodity_id: number;
+    commodity?: Commodity;
+    asserted_at: string;
+    balance: string;
+    memo: string | null;
 }
 
 export interface PostingDraft {

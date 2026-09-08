@@ -73,7 +73,7 @@ const issuesByTransaction = computed(() => {
     const map = new Map<number, JournalIssue[]>();
 
     for (const issue of issues.value) {
-        if (issue.financial_posting_id !== undefined) {
+        if (issue.financial_posting_id !== undefined || issue.financial_transaction_id === undefined) {
             continue;
         }
 
