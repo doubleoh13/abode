@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import axios from 'axios';
 import { formatAmount } from '../money';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import CommodityForm from '../components/CommodityForm.vue';
 import ModalDialog from '../components/ModalDialog.vue';
 import SkeletonList from '../components/SkeletonList.vue';
@@ -48,6 +48,8 @@ async function deleteCommodity(commodity: Commodity): Promise<void> {
     await loadCommodities();
 }
 
+const usd = computed(() => commodities.value.find((candidate) => candidate.code === 'USD'));
+
 function exampleAmount(commodity: Commodity): string {
     return formatAmount('1234.5678', commodity);
 }
@@ -84,6 +86,7 @@ function exampleAmount(commodity: Commodity): string {
                             <th class="px-4 py-2 text-left font-medium">Name</th>
                             <th class="px-4 py-2 text-left font-medium">Kind</th>
                             <th class="px-4 py-2 text-right font-medium">Display</th>
+                            <th class="px-4 py-2 text-right font-medium">Latest price</th>
                             <th class="px-4 py-2"></th>
                         </tr>
                     </thead>
@@ -101,6 +104,16 @@ function exampleAmount(commodity: Commodity): string {
                             <td class="px-4 py-2 text-muted">{{ commodity.kind }}</td>
                             <td class="px-4 py-2 text-right font-mono text-muted">
                                 {{ exampleAmount(commodity) }}
+                            </td>
+                            <td
+                                class="px-4 py-2 text-right font-mono"
+                                :title="commodity.latest_priced_at ? `priced ${commodity.latest_priced_at}` : undefined"
+                            >
+                                <template v-if="commodity.latest_price && usd">
+                                    {{ formatAmount(commodity.latest_price, usd) }}
+                                    <span class="text-muted"> {{ commodity.latest_priced_at }}</span>
+                                </template>
+                                <span v-else class="text-muted">—</span>
                             </td>
                             <td class="px-4 py-2">
                                 <span

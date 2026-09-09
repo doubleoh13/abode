@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import axios from 'axios';
-import { computed, onMounted, ref, watch } from 'vue';
+import axios, { isAxiosError } from 'axios';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import ModalDialog from '../components/ModalDialog.vue';
 import PaginationBar from '../components/PaginationBar.vue';
+import PriceChart from '../components/PriceChart.vue';
 import SkeletonList from '../components/SkeletonList.vue';
 import {
     accountPathAncestor,
@@ -20,7 +22,7 @@ import {
     scaledIntegerToDecimal,
     subtractAmounts,
 } from '../money';
-import type { Account, Commodity, CommodityBalance, Lot, Paginated, Posting } from '../types';
+import type { Account, Commodity, CommodityBalance, CommodityPrice, Lot, Paginated, Posting } from '../types';
 
 const route = useRoute();
 
@@ -119,6 +121,87 @@ function lotUnrealized(lot: Lot): string | null {
     return market !== null ? subtractAmounts(market, lotBasisShare(lot)) : null;
 }
 
+const priceSeries = ref<Array<[string, string]>>([]);
+const pricePoints = ref<CommodityPrice[]>([]);
+const pricePage = ref(1);
+const priceLastPage = ref(1);
+
+async function loadPriceSeries(): Promise<void> {
+    priceSeries.value = (
+        await axios.get<{ data: Array<[string, string]> }>(
+            `/api/v1/financial/commodities/${commodityId.value}/price-series`,
+        )
+    ).data.data;
+}
+
+async function loadPricePoints(): Promise<void> {
+    const response = (
+        await axios.get<Paginated<CommodityPrice>>('/api/v1/financial/commodity-prices', {
+            params: { financial_commodity_id: commodityId.value, page: pricePage.value },
+        })
+    ).data;
+
+    pricePoints.value = response.data;
+    priceLastPage.value = response.meta.last_page;
+}
+
+async function changePricePage(target: number): Promise<void> {
+    pricePage.value = target;
+    await loadPricePoints();
+}
+
+const priceFormOpen = ref(false);
+const priceForm = reactive({ priced_at: '', price: '' });
+const priceErrors = ref<Record<string, string[]>>({});
+
+function openPriceForm(): void {
+    priceForm.priced_at = new Date().toISOString().slice(0, 10);
+    priceForm.price = '';
+    priceErrors.value = {};
+    priceFormOpen.value = true;
+}
+
+async function reloadPrices(): Promise<void> {
+    const [commodityResponse] = await Promise.all([
+        axios.get<{ data: Commodity }>(`/api/v1/financial/commodities/${commodityId.value}`),
+        loadPriceSeries(),
+        loadPricePoints(),
+    ]);
+
+    commodity.value = commodityResponse.data.data;
+}
+
+async function savePrice(): Promise<void> {
+    priceErrors.value = {};
+
+    try {
+        await axios.post('/api/v1/financial/commodity-prices', {
+            financial_commodity_id: commodityId.value,
+            priced_at: `${priceForm.priced_at}T00:00:00Z`,
+            price: priceForm.price,
+        });
+    } catch (error) {
+        if (isAxiosError(error) && error.response?.status === 422) {
+            priceErrors.value = error.response.data.errors ?? {};
+            return;
+        }
+
+        throw error;
+    }
+
+    priceFormOpen.value = false;
+    await reloadPrices();
+}
+
+async function deletePrice(point: CommodityPrice): Promise<void> {
+    if (!confirm(`Delete the ${point.priced_at.slice(0, 10)} price?`)) {
+        return;
+    }
+
+    await axios.delete(`/api/v1/financial/commodity-prices/${point.id}`);
+    await reloadPrices();
+}
+
 async function loadPostings(): Promise<void> {
     const response = (
         await axios.get<Paginated<Posting>>('/api/v1/financial/postings', {
@@ -160,6 +243,8 @@ async function loadCommodity(): Promise<void> {
             axios.get<{ data: Account[] }>('/api/v1/financial/accounts'),
             axios.get<{ data: Commodity[] }>('/api/v1/financial/commodities'),
             loadPostings(),
+            loadPriceSeries(),
+            loadPricePoints(),
         ]);
 
     commodity.value = commodityResponse.data.data;
@@ -307,6 +392,82 @@ watch(commodityId, () => {
                         </tbody>
                     </table>
                 </div>
+            </section>
+
+            <section v-if="commodity && commodity.kind !== 'currency'" class="mt-8">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-mono text-xs tracking-wider text-muted uppercase">Prices</h2>
+
+                    <button
+                        v-if="commodity.price_source === 'manual'"
+                        type="button"
+                        class="button-subtle"
+                        @click="openPriceForm"
+                    >
+                        New price
+                    </button>
+                </div>
+
+                <ModalDialog :open="priceFormOpen" @close="priceFormOpen = false">
+                    <form class="flex w-80 flex-col gap-5" @submit.prevent="savePrice">
+                        <h3 class="font-mono text-sm tracking-wider uppercase">Price point</h3>
+
+                        <label class="flex flex-col gap-1.5">
+                            <span class="field-label">Date</span>
+                            <input v-model="priceForm.priced_at" type="date" required class="input" />
+                            <p v-if="priceErrors.priced_at" class="text-sm text-danger">
+                                {{ priceErrors.priced_at[0] }}
+                            </p>
+                        </label>
+
+                        <label class="flex flex-col gap-1.5">
+                            <span class="field-label">Price (USD)</span>
+                            <input v-model="priceForm.price" type="text" required class="input font-mono" />
+                            <p v-if="priceErrors.price" class="text-sm text-danger">
+                                {{ priceErrors.price[0] }}
+                            </p>
+                        </label>
+
+                        <div class="flex justify-end gap-3">
+                            <button type="button" class="button-subtle" @click="priceFormOpen = false">
+                                Cancel
+                            </button>
+                            <button type="submit" class="button-primary">Save</button>
+                        </div>
+                    </form>
+                </ModalDialog>
+
+                <div v-if="priceSeries.length > 1 && usd" class="mt-2 rounded-md border border-edge bg-surface p-4">
+                    <PriceChart :series="priceSeries" :usd="usd" />
+                </div>
+
+                <p v-if="pricePoints.length === 0" class="mt-2 text-sm text-muted">No price points yet.</p>
+
+                <ul
+                    v-else
+                    class="mt-4 divide-y divide-edge overflow-hidden rounded-md border border-edge bg-surface"
+                >
+                    <li
+                        v-for="point in pricePoints"
+                        :key="point.id"
+                        class="group flex items-center justify-between gap-4 px-4 py-1.5"
+                    >
+                        <span class="font-mono text-xs text-muted">{{ point.priced_at.slice(0, 10) }}</span>
+
+                        <span class="flex items-center gap-3">
+                            <span class="font-mono text-sm">{{ formatUsd(point.price) }}</span>
+                            <button
+                                type="button"
+                                class="font-mono text-xs tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
+                                @click="deletePrice(point)"
+                            >
+                                Delete
+                            </button>
+                        </span>
+                    </li>
+                </ul>
+
+                <PaginationBar :page="pricePage" :last-page="priceLastPage" @change="changePricePage" />
             </section>
 
             <section class="mt-8">

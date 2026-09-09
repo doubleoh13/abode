@@ -18,9 +18,13 @@ export interface Commodity {
     display_precision: number;
     symbol: string | null;
     symbol_placement: SymbolPlacement | null;
+    price_source: PriceSource | null;
+    price_symbol: string | null;
     latest_price?: string;
     latest_priced_at?: string;
 }
+
+export type PriceSource = 'yahoo' | 'in529' | 'manual';
 
 export interface Institution {
     id: number;
@@ -81,6 +85,13 @@ export interface AccountBalance {
 export interface CommodityBalance {
     financial_account_id: number;
     balance: string;
+}
+
+export interface CommodityPrice {
+    id: number;
+    financial_commodity_id: number;
+    priced_at: string;
+    price: string;
 }
 
 export interface Transaction {

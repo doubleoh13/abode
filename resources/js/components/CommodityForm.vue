@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import ComboBox from './ComboBox.vue';
-import type { Commodity, CommodityKind, SymbolPlacement } from '../types';
+import type { Commodity, CommodityKind, PriceSource, SymbolPlacement } from '../types';
 
 const props = defineProps<{ commodity: Commodity | null }>();
 
@@ -26,7 +26,17 @@ const form = reactive({
     display_precision: props.commodity?.display_precision ?? 4,
     symbol: props.commodity?.symbol ?? '',
     symbol_placement: props.commodity?.symbol_placement ?? null,
+    price_source: props.commodity?.price_source ?? null,
+    price_symbol: props.commodity?.price_symbol ?? '',
 });
+
+const priceSources: Array<{ value: PriceSource; label: string }> = [
+    { value: 'yahoo', label: 'Yahoo' },
+    { value: 'in529', label: 'Indiana 529' },
+    { value: 'manual', label: 'Manual' },
+];
+
+const fetchableSource = computed(() => form.price_source === 'yahoo' || form.price_source === 'in529');
 
 const errors = ref<Record<string, string[]>>({});
 const submitting = ref(false);
@@ -45,6 +55,8 @@ async function save(): Promise<void> {
         display_precision: form.display_precision,
         symbol: form.symbol || null,
         symbol_placement: form.symbol_placement,
+        price_source: form.price_source,
+        price_symbol: fetchableSource.value ? form.price_symbol || null : null,
     };
 
     try {
@@ -117,6 +129,22 @@ async function save(): Promise<void> {
                     {{ errors.symbol_placement[0] }}
                 </p>
             </div>
+
+            <div class="flex flex-col gap-1.5">
+                <span class="field-label">Price source</span>
+                <ComboBox v-model="form.price_source" :options="priceSources" nullable />
+                <p v-if="errors.price_source" class="text-sm text-danger">
+                    {{ errors.price_source[0] }}
+                </p>
+            </div>
+
+            <label v-if="fetchableSource" class="flex flex-col gap-1.5">
+                <span class="field-label">Quote symbol</span>
+                <input v-model="form.price_symbol" type="text" class="input font-mono" />
+                <p v-if="errors.price_symbol" class="text-sm text-danger">
+                    {{ errors.price_symbol[0] }}
+                </p>
+            </label>
         </div>
 
         <div class="mt-6 flex gap-3">
