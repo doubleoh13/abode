@@ -52,7 +52,12 @@ onBeforeUnmount(() => {
                 :class="nested ? 'z-[60] bg-black/40' : 'z-50 bg-black/60'"
                 @click.self="emit('close')"
             >
-                <div class="modal-panel w-full max-w-5xl" role="dialog" aria-modal="true">
+                <div
+                    class="modal-panel w-full max-w-5xl"
+                    role="dialog"
+                    aria-modal="true"
+                    @click.self="emit('close')"
+                >
                     <slot />
                 </div>
             </div>
