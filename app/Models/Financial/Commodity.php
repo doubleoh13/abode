@@ -3,6 +3,7 @@
 namespace App\Models\Financial;
 
 use App\Enums\Financial\CommodityKind;
+use App\Enums\Financial\PriceSource;
 use App\Enums\Financial\SymbolPlacement;
 use App\Models\Concerns\HasAttachments;
 use App\Models\Concerns\HasNotes;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['code', 'name', 'kind', 'display_precision', 'symbol', 'symbol_placement'])]
+#[Fillable(['code', 'name', 'kind', 'display_precision', 'symbol', 'symbol_placement', 'price_source', 'price_symbol'])]
 class Commodity extends Model
 {
     /** @use HasFactory<CommodityFactory> */
@@ -76,6 +77,7 @@ class Commodity extends Model
             'kind' => CommodityKind::class,
             'display_precision' => 'integer',
             'symbol_placement' => SymbolPlacement::class,
+            'price_source' => PriceSource::class,
         ];
     }
 }

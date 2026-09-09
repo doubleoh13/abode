@@ -28,6 +28,28 @@ describe('with finance permissions', function () {
         actingWithPermissions(Permission::ViewFinances, Permission::ManageFinances);
     });
 
+    test('a fetchable price source requires its quote symbol', function () {
+        $payload = [
+            'code' => 'VTI',
+            'name' => 'Vanguard Total Stock Market ETF',
+            'kind' => 'traded',
+            'display_precision' => 4,
+        ];
+
+        $this->postJson('/api/v1/financial/commodities', [...$payload, 'price_source' => 'yahoo'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['price_symbol' => 'Enter the quote symbol for this price source.']);
+
+        $this->postJson('/api/v1/financial/commodities', [...$payload, 'price_source' => 'manual', 'price_symbol' => 'VTI'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['price_symbol' => 'A quote symbol only applies to fetchable price sources.']);
+
+        $this->postJson('/api/v1/financial/commodities', [...$payload, 'price_source' => 'yahoo', 'price_symbol' => 'VTI'])
+            ->assertCreated()
+            ->assertJsonPath('data.price_source', 'yahoo')
+            ->assertJsonPath('data.price_symbol', 'VTI');
+    });
+
     test('balances sum the commodity postings per account', function () {
         $fbtc = Commodity::factory()->create(['display_precision' => 8]);
         $brokerage = Account::factory()->ofType(AccountType::Asset)->create();

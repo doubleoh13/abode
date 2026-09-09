@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Financial;
 
 use App\Enums\Financial\CommodityKind;
+use App\Enums\Financial\PriceSource;
 use App\Enums\Financial\SymbolPlacement;
 use App\Models\Financial\Commodity;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -41,6 +42,17 @@ class StoreCommodityRequest extends FormRequest
                 Rule::enum(SymbolPlacement::class),
                 'required_with:symbol',
             ],
+            'price_source' => ['nullable', Rule::enum(PriceSource::class)],
+            /**
+             * The source's quote symbol (e.g. a Yahoo ticker). Required for fetchable sources, absent otherwise.
+             */
+            'price_symbol' => [
+                'nullable',
+                'string',
+                'max:32',
+                Rule::requiredIf(fn (): bool => $this->fetchableSource()),
+                Rule::prohibitedIf(fn (): bool => ! $this->fetchableSource()),
+            ],
         ];
     }
 
@@ -68,7 +80,18 @@ class StoreCommodityRequest extends FormRequest
             'symbol.required_with' => 'Enter a symbol when choosing its placement.',
             'symbol_placement.enum' => 'Choose a valid symbol placement.',
             'symbol_placement.required_with' => 'Choose where the symbol appears.',
+            'price_source.enum' => 'Choose a valid price source.',
+            'price_symbol.required' => 'Enter the quote symbol for this price source.',
+            'price_symbol.prohibited' => 'A quote symbol only applies to fetchable price sources.',
+            'price_symbol.max' => 'Quote symbols may not exceed 32 characters.',
         ];
+    }
+
+    protected function fetchableSource(): bool
+    {
+        $source = PriceSource::tryFrom((string) $this->input('price_source'));
+
+        return $source !== null && $source->fetchable();
     }
 
     protected function uniqueCodeRule(): Unique
