@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\Financial\JournalIssueController;
 use App\Http\Controllers\Api\V1\Financial\LotController;
 use App\Http\Controllers\Api\V1\Financial\PayeeController;
 use App\Http\Controllers\Api\V1\Financial\PostingController;
+use App\Http\Controllers\Api\V1\Financial\ReportController;
 use App\Http\Controllers\Api\V1\Financial\TransactionController;
 use App\Http\Controllers\Api\V1\NoteController;
 use App\Http\Resources\UserResource;
@@ -40,6 +41,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::get('postings', [PostingController::class, 'index'])->name('postings.index');
             Route::get('lots', [LotController::class, 'index'])->name('lots.index');
             Route::get('journal-issues', [JournalIssueController::class, 'index'])->name('journal-issues.index');
+            Route::get('reports/balance-sheet', [ReportController::class, 'balanceSheet'])->name('reports.balance-sheet');
             Route::apiResource('commodity-prices', CommodityPriceController::class)->only('index');
         });
 

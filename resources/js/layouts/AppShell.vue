@@ -85,6 +85,7 @@ async function endSession(): Promise<void> {
                                 { name: 'finances.journal', label: 'Journal' },
                                 { name: 'finances.accounts', label: 'Accounts' },
                                 { name: 'finances.commodities', label: 'Commodities' },
+                                { name: 'finances.reports', label: 'Reports' },
                                 { name: 'finances.institutions', label: 'Institutions' },
                                 { name: 'finances.payees', label: 'Payees' },
                             ]"
@@ -92,7 +93,7 @@ async function endSession(): Promise<void> {
                             :to="{ name: subItem.name }"
                             class="rounded-sm px-3 py-1.5 text-sm transition-colors"
                             :class="
-                                route.name === subItem.name
+                                String(route.name).startsWith(subItem.name)
                                     ? 'bg-background text-foreground'
                                     : 'text-muted hover:bg-background/60 hover:text-foreground'
                             "

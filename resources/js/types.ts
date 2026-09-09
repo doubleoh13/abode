@@ -130,6 +130,26 @@ export interface BalanceAssertion {
     memo: string | null;
 }
 
+export interface BalanceSheetRow {
+    financial_account_id: number;
+    financial_commodity_id: number;
+    account_type: AccountType;
+    quantity: string;
+    price: string | null;
+    market_value: string | null;
+    cost_basis: string | null;
+}
+
+export interface BalanceSheet {
+    as_of: string;
+    rows: BalanceSheetRow[];
+    totals: {
+        assets: string;
+        liabilities: string;
+        net_worth: string;
+    };
+}
+
 export interface PostingDraft {
     id: number | null;
     status: PostingStatus | null;

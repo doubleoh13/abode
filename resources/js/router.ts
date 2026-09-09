@@ -3,6 +3,7 @@ import { auth, resolveAuthenticatedUser } from './auth';
 import AccountPage from './pages/AccountPage.vue';
 import AccountsPage from './pages/AccountsPage.vue';
 import AppShell from './layouts/AppShell.vue';
+import BalanceSheetPage from './pages/BalanceSheetPage.vue';
 import CommoditiesPage from './pages/CommoditiesPage.vue';
 import CommodityPage from './pages/CommodityPage.vue';
 import FinancesPage from './pages/FinancesPage.vue';
@@ -12,6 +13,7 @@ import JournalPage from './pages/JournalPage.vue';
 import LoginPage from './pages/LoginPage.vue';
 import NotFoundPage from './pages/NotFoundPage.vue';
 import PayeesPage from './pages/PayeesPage.vue';
+import ReportsPage from './pages/ReportsPage.vue';
 
 export const router = createRouter({
     history: createWebHistory(),
@@ -50,6 +52,16 @@ export const router = createRouter({
                             path: 'commodities/:id',
                             name: 'finances.commodity',
                             component: CommodityPage,
+                        },
+                        {
+                            path: 'reports',
+                            name: 'finances.reports',
+                            component: ReportsPage,
+                        },
+                        {
+                            path: 'reports/balance-sheet',
+                            name: 'finances.reports.balance-sheet',
+                            component: BalanceSheetPage,
                         },
                         {
                             path: 'institutions',
