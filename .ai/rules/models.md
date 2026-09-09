@@ -13,7 +13,7 @@ Lifecycle: opened_at/closed_at nullable DATEs. Both null = always open. closed_a
 Deliberately absent: currency (single-currency), any balance column (derive from future transactions).
 
 ## Commodity modeling decisions
-commodities is one uniform table, hledger-style — a future posting is always (account, quantity, commodity) whether USD, SPAXX, FBTC, ETH, or HOUSE. Never split per asset class.
+commodities is one uniform table — a future posting is always (account, quantity, commodity) whether USD, SPAXX, FBTC, ETH, or HOUSE. Never split per asset class.
 kind is BEHAVIORAL, not descriptive: Currency (unit of account), Traded (market-priced), Custom (manually valued, e.g. HOUSE). Resist adding descriptive cases that behave identically.
 display_precision is display decimals per commodity (0–25), formatting only — storage scale is fixed at NUMERIC(78,25) and never rescales (see .ai/rules/financial.md).
 symbol + symbol_placement (prefix/suffix) render "$1,234.56" vs "10.500 SPAXX"; both null = code-as-suffix. They are a pair: validation requires placement with symbol.
