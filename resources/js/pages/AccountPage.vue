@@ -478,7 +478,10 @@ watch(accountId, () => {
                 </div>
 
                 <ModalDialog :open="assertionFormOpen" @close="assertionFormOpen = false">
-                    <form class="flex w-80 flex-col gap-5" @submit.prevent="saveAssertion">
+                    <form
+                        class="mx-auto flex w-80 flex-col gap-5 rounded-md border border-edge bg-surface p-5"
+                        @submit.prevent="saveAssertion"
+                    >
                         <h3 class="font-mono text-sm tracking-wider uppercase">Balance assertion</h3>
 
                         <label class="flex flex-col gap-1.5">

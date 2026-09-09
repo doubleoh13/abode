@@ -150,6 +150,7 @@ async function changePricePage(target: number): Promise<void> {
     await loadPricePoints();
 }
 
+const pricePointsOpen = ref(false);
 const priceFormOpen = ref(false);
 const priceForm = reactive({ priced_at: '', price: '' });
 const priceErrors = ref<Record<string, string[]>>({});
@@ -398,18 +399,57 @@ watch(commodityId, () => {
                 <div class="flex items-center justify-between">
                     <h2 class="font-mono text-xs tracking-wider text-muted uppercase">Prices</h2>
 
-                    <button
-                        v-if="commodity.price_source === 'manual'"
-                        type="button"
-                        class="button-subtle"
-                        @click="openPriceForm"
-                    >
-                        New price
-                    </button>
+                    <div class="flex items-center gap-3">
+                        <button type="button" class="button-subtle" @click="pricePointsOpen = true">
+                            Price points
+                        </button>
+                        <button
+                            v-if="commodity.price_source === 'manual'"
+                            type="button"
+                            class="button-subtle"
+                            @click="openPriceForm"
+                        >
+                            New price
+                        </button>
+                    </div>
                 </div>
 
+                <ModalDialog :open="pricePointsOpen" @close="pricePointsOpen = false">
+                    <div class="mx-auto flex w-96 flex-col gap-3 rounded-md border border-edge bg-surface p-5">
+                        <h3 class="font-mono text-sm tracking-wider uppercase">Price points</h3>
+
+                        <p v-if="pricePoints.length === 0" class="text-sm text-muted">No price points yet.</p>
+
+                        <ul v-else class="max-h-[60vh] divide-y divide-edge overflow-y-auto rounded-md border border-edge">
+                            <li
+                                v-for="point in pricePoints"
+                                :key="point.id"
+                                class="group flex items-center justify-between gap-4 px-4 py-1.5"
+                            >
+                                <span class="font-mono text-xs text-muted">{{ point.priced_at.slice(0, 10) }}</span>
+
+                                <span class="flex items-center gap-3">
+                                    <span class="font-mono text-sm">{{ formatUsd(point.price) }}</span>
+                                    <button
+                                        type="button"
+                                        class="font-mono text-xs tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
+                                        @click="deletePrice(point)"
+                                    >
+                                        Delete
+                                    </button>
+                                </span>
+                            </li>
+                        </ul>
+
+                        <PaginationBar :page="pricePage" :last-page="priceLastPage" @change="changePricePage" />
+                    </div>
+                </ModalDialog>
+
                 <ModalDialog :open="priceFormOpen" @close="priceFormOpen = false">
-                    <form class="flex w-80 flex-col gap-5" @submit.prevent="savePrice">
+                    <form
+                        class="mx-auto flex w-80 flex-col gap-5 rounded-md border border-edge bg-surface p-5"
+                        @submit.prevent="savePrice"
+                    >
                         <h3 class="font-mono text-sm tracking-wider uppercase">Price point</h3>
 
                         <label class="flex flex-col gap-1.5">
@@ -440,34 +480,7 @@ watch(commodityId, () => {
                 <div v-if="priceSeries.length > 1 && usd" class="mt-2 rounded-md border border-edge bg-surface p-4">
                     <PriceChart :series="priceSeries" :usd="usd" />
                 </div>
-
-                <p v-if="pricePoints.length === 0" class="mt-2 text-sm text-muted">No price points yet.</p>
-
-                <ul
-                    v-else
-                    class="mt-4 divide-y divide-edge overflow-hidden rounded-md border border-edge bg-surface"
-                >
-                    <li
-                        v-for="point in pricePoints"
-                        :key="point.id"
-                        class="group flex items-center justify-between gap-4 px-4 py-1.5"
-                    >
-                        <span class="font-mono text-xs text-muted">{{ point.priced_at.slice(0, 10) }}</span>
-
-                        <span class="flex items-center gap-3">
-                            <span class="font-mono text-sm">{{ formatUsd(point.price) }}</span>
-                            <button
-                                type="button"
-                                class="font-mono text-xs tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
-                                @click="deletePrice(point)"
-                            >
-                                Delete
-                            </button>
-                        </span>
-                    </li>
-                </ul>
-
-                <PaginationBar :page="pricePage" :last-page="priceLastPage" @change="changePricePage" />
+                <p v-else class="mt-2 text-sm text-muted">No price points yet.</p>
             </section>
 
             <section class="mt-8">
