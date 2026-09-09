@@ -35,10 +35,12 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('transactions', TransactionController::class)->only(['index', 'show']);
             Route::get('accounts/{account}/balances', [AccountController::class, 'balances'])->name('accounts.balances');
             Route::get('commodities/{commodity}/balances', [CommodityController::class, 'balances'])->name('commodities.balances');
+            Route::get('commodities/{commodity}/price-series', [CommodityController::class, 'priceSeries'])->name('commodities.price-series');
             Route::apiResource('balance-assertions', BalanceAssertionController::class)->only('index');
             Route::get('postings', [PostingController::class, 'index'])->name('postings.index');
             Route::get('lots', [LotController::class, 'index'])->name('lots.index');
             Route::get('journal-issues', [JournalIssueController::class, 'index'])->name('journal-issues.index');
+            Route::apiResource('commodity-prices', CommodityPriceController::class)->only('index');
         });
 
         Route::middleware('can:manage-finances')->group(function () {
@@ -49,7 +51,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('transactions', TransactionController::class)->only(['store', 'update', 'destroy']);
             Route::apiResource('postings', PostingController::class)->only('update');
             Route::apiResource('balance-assertions', BalanceAssertionController::class)->only(['store', 'destroy']);
-            Route::apiResource('commodity-prices', CommodityPriceController::class)->only('store');
+            Route::apiResource('commodity-prices', CommodityPriceController::class)->only(['store', 'destroy']);
         });
     });
 });

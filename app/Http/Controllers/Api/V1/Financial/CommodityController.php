@@ -7,6 +7,7 @@ use App\Http\Requests\Financial\StoreCommodityRequest;
 use App\Http\Requests\Financial\UpdateCommodityRequest;
 use App\Http\Resources\Financial\CommodityResource;
 use App\Models\Financial\Commodity;
+use App\Models\Financial\CommodityPrice;
 use App\Models\Financial\Lot;
 use App\Models\Financial\Posting;
 use Brick\Math\BigDecimal;
@@ -35,6 +36,24 @@ class CommodityController extends Controller
         return new CommodityResource(
             Commodity::query()->withLatestPrice()->findOrFail($commodity->getKey()),
         );
+    }
+
+    /**
+     * The commodity's full price history as [date, price] pairs, oldest
+     * first — sized for charting rather than paging.
+     */
+    public function priceSeries(Commodity $commodity): JsonResponse
+    {
+        $points = CommodityPrice::query()
+            ->where('financial_commodity_id', $commodity->id)
+            ->orderBy('priced_at')
+            ->get(['priced_at', 'price'])
+            ->map(fn (CommodityPrice $point): array => [
+                $point->priced_at->toDateString(),
+                (string) $point->price,
+            ]);
+
+        return response()->json(['data' => $points]);
     }
 
     /**

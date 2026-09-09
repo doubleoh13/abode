@@ -21,6 +21,51 @@ describe('with finance permissions', function () {
         $this->fbtc = Commodity::factory()->create(['display_precision' => 8]);
     });
 
+    test('the index lists a commodity\'s points newest first', function () {
+        CommodityPrice::factory()->create([
+            'financial_commodity_id' => $this->fbtc->id,
+            'priced_at' => '2026-09-01T00:00:00Z',
+            'price' => '70',
+        ]);
+        CommodityPrice::factory()->create([
+            'financial_commodity_id' => $this->fbtc->id,
+            'priced_at' => '2026-09-05T00:00:00Z',
+            'price' => '78.6014',
+        ]);
+        CommodityPrice::factory()->create();
+
+        $this->getJson("/api/v1/financial/commodity-prices?financial_commodity_id={$this->fbtc->id}")
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.price', '78.6014')
+            ->assertJsonPath('data.1.price', '70');
+    });
+
+    test('the price series returns dated pairs oldest first', function () {
+        CommodityPrice::factory()->create([
+            'financial_commodity_id' => $this->fbtc->id,
+            'priced_at' => '2026-09-05T00:00:00Z',
+            'price' => '78.6014',
+        ]);
+        CommodityPrice::factory()->create([
+            'financial_commodity_id' => $this->fbtc->id,
+            'priced_at' => '2026-09-01T00:00:00Z',
+            'price' => '70',
+        ]);
+
+        $this->getJson("/api/v1/financial/commodities/{$this->fbtc->id}/price-series")
+            ->assertOk()
+            ->assertExactJson(['data' => [['2026-09-01', '70'], ['2026-09-05', '78.6014']]]);
+    });
+
+    test('a price point can be deleted', function () {
+        $point = CommodityPrice::factory()->create(['financial_commodity_id' => $this->fbtc->id]);
+
+        $this->deleteJson("/api/v1/financial/commodity-prices/{$point->id}")->assertNoContent();
+
+        expect(CommodityPrice::query()->find($point->id))->toBeNull();
+    });
+
     test('a price point is recorded', function () {
         $this->postJson('/api/v1/financial/commodity-prices', [
             'financial_commodity_id' => $this->fbtc->id,

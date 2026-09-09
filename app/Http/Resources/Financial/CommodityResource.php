@@ -28,6 +28,8 @@ class CommodityResource extends JsonResource
             'display_precision' => $this->display_precision,
             'symbol' => $this->symbol,
             'symbol_placement' => $this->symbol_placement,
+            'price_source' => $this->price_source,
+            'price_symbol' => $this->price_symbol,
             'latest_price' => $this->when(
                 isset($this->latest_price),
                 fn (): string => (string) BigDecimal::of($this->latest_price)->strippedOfTrailingZeros(),
