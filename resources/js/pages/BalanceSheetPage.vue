@@ -63,10 +63,16 @@ function formatBaseAmount(value: string): string {
     return usd.value ? formatAmount(value, usd.value) : value;
 }
 
-function formatQuantity(row: BalanceSheetRow): string {
-    const commodity = commoditiesById.value.get(row.financial_commodity_id);
+interface HoldingLine {
+    financial_commodity_id: number;
+    quantity: string;
+    unpriced: boolean;
+}
 
-    return commodity ? formatAmount(row.quantity, commodity) : row.quantity;
+function formatQuantity(holding: HoldingLine): string {
+    const commodity = commoditiesById.value.get(holding.financial_commodity_id);
+
+    return commodity ? formatAmount(holding.quantity, commodity) : holding.quantity;
 }
 
 interface SectionRow {
@@ -75,13 +81,14 @@ interface SectionRow {
     hasChildren: boolean;
     collapsed: boolean;
     balance: string | null;
-    holdings: BalanceSheetRow[];
+    holdings: HoldingLine[];
     holdingsListable: boolean;
 }
 
 interface SubtreeAggregate {
     marketValue: bigint;
     hasHoldings: boolean;
+    quantities: Map<number, { quantity: bigint; unpriced: boolean }>;
 }
 
 const rowsByAccount = computed<Map<number, BalanceSheetRow[]>>(() => {
@@ -122,12 +129,28 @@ const aggregates = computed<Map<number, SubtreeAggregate>>(() => {
         const subtree: SubtreeAggregate = {
             marketValue: sumMarketValues(ownRows),
             hasHoldings: ownRows.length > 0,
+            quantities: new Map(),
         };
+
+        for (const row of ownRows) {
+            subtree.quantities.set(row.financial_commodity_id, {
+                quantity: decimalToScaledInteger(row.quantity),
+                unpriced: row.market_value === null,
+            });
+        }
 
         for (const child of childrenByParent.value.get(account.id) ?? []) {
             const childSubtree = aggregate(child);
             subtree.hasHoldings ||= childSubtree.hasHoldings;
             subtree.marketValue += childSubtree.marketValue;
+
+            for (const [commodityId, holding] of childSubtree.quantities) {
+                const merged = subtree.quantities.get(commodityId) ?? { quantity: 0n, unpriced: false };
+                subtree.quantities.set(commodityId, {
+                    quantity: merged.quantity + holding.quantity,
+                    unpriced: merged.unpriced || holding.unpriced,
+                });
+            }
         }
 
         subtrees.set(account.id, subtree);
@@ -166,9 +189,26 @@ const rowsByType = computed<Map<AccountType, SectionRow[]>>(() => {
                 );
                 const collapsed = collapsedAccountIds.value.has(account.id);
                 const ownRows = rowsByAccount.value.get(account.id) ?? [];
-                const holdings = ownRows.filter(
-                    (row) => commoditiesById.value.get(row.financial_commodity_id)?.kind !== 'currency',
-                );
+
+                const isNonCurrency = (commodityId: number): boolean =>
+                    commoditiesById.value.get(commodityId)?.kind !== 'currency';
+
+                const holdings: HoldingLine[] = children.length > 0 && collapsed
+                    ? [...subtree.quantities.entries()]
+                        .filter(([commodityId, holding]) => isNonCurrency(commodityId) && holding.quantity !== 0n)
+                        .sort(([first], [second]) => first - second)
+                        .map(([commodityId, holding]) => ({
+                            financial_commodity_id: commodityId,
+                            quantity: scaledIntegerToDecimal(holding.quantity),
+                            unpriced: holding.unpriced,
+                        }))
+                    : ownRows
+                        .filter((row) => isNonCurrency(row.financial_commodity_id))
+                        .map((row) => ({
+                            financial_commodity_id: row.financial_commodity_id,
+                            quantity: row.quantity,
+                            unpriced: row.market_value === null,
+                        }));
 
                 let balance: string | null = scaledIntegerToDecimal(subtree.marketValue);
 
@@ -337,7 +377,7 @@ function toggleHoldings(accountId: number): void {
                                             :key="holding.financial_commodity_id"
                                             class="font-mono text-xs text-muted"
                                         >
-                                            {{ formatQuantity(holding) }}{{ holding.market_value === null ? ' (unpriced)' : '' }}
+                                            {{ formatQuantity(holding) }}{{ holding.unpriced ? ' (unpriced)' : '' }}
                                         </span>
                                     </template>
                                 </span>
