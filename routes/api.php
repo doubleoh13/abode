@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AttachmentController;
 use App\Http\Controllers\Api\V1\Financial\AccountController;
 use App\Http\Controllers\Api\V1\Financial\BalanceAssertionController;
 use App\Http\Controllers\Api\V1\Financial\CommodityController;
+use App\Http\Controllers\Api\V1\Financial\CommodityPriceController;
 use App\Http\Controllers\Api\V1\Financial\InstitutionController;
 use App\Http\Controllers\Api\V1\Financial\JournalIssueController;
 use App\Http\Controllers\Api\V1\Financial\LotController;
@@ -48,6 +49,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('transactions', TransactionController::class)->only(['store', 'update', 'destroy']);
             Route::apiResource('postings', PostingController::class)->only('update');
             Route::apiResource('balance-assertions', BalanceAssertionController::class)->only(['store', 'destroy']);
+            Route::apiResource('commodity-prices', CommodityPriceController::class)->only('store');
         });
     });
 });

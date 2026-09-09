@@ -8,6 +8,8 @@ use App\Models\Concerns\HasAttachments;
 use App\Models\Concerns\HasNotes;
 use Database\Factories\Financial\CommodityFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -39,6 +41,28 @@ class Commodity extends Model
     public function prices(): HasMany
     {
         return $this->hasMany(CommodityPrice::class, 'financial_commodity_id');
+    }
+
+    /**
+     * Select the most recent price point alongside each commodity.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function withLatestPrice(Builder $query): void
+    {
+        $query->addSelect([
+            'latest_price' => CommodityPrice::query()
+                ->select('price')
+                ->whereColumn('financial_commodity_id', 'financial_commodities.id')
+                ->latest('priced_at')
+                ->limit(1),
+            'latest_priced_at' => CommodityPrice::query()
+                ->select('priced_at')
+                ->whereColumn('financial_commodity_id', 'financial_commodities.id')
+                ->latest('priced_at')
+                ->limit(1),
+        ]);
     }
 
     /**

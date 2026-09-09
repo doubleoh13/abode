@@ -21,7 +21,7 @@ class CommodityController extends Controller
     public function index(): AnonymousResourceCollection
     {
         return CommodityResource::collection(
-            Commodity::query()->orderBy('code')->get(),
+            Commodity::query()->withLatestPrice()->orderBy('code')->get(),
         );
     }
 
@@ -32,7 +32,9 @@ class CommodityController extends Controller
 
     public function show(Commodity $commodity): CommodityResource
     {
-        return new CommodityResource($commodity);
+        return new CommodityResource(
+            Commodity::query()->withLatestPrice()->findOrFail($commodity->getKey()),
+        );
     }
 
     /**
