@@ -24,6 +24,7 @@ class AccountResource extends JsonResource
             'name' => $this->name,
             'path' => $this->path,
             'parent_id' => $this->parent_id,
+            'allow_postings' => $this->allow_postings,
             'institution' => new InstitutionResource($this->whenLoaded('institution')),
             'opened_at' => $this->opened_at?->toDateString(),
             'closed_at' => $this->closed_at?->toDateString(),

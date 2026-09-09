@@ -172,6 +172,36 @@ describe('with finance permissions', function () {
         ])->assertOk();
     });
 
+    test('allow_postings is normalized to false for leaf accounts', function () {
+        $this->postJson('/api/v1/financial/accounts', [
+            'account_type' => 'expense',
+            'name' => 'food',
+            'allow_postings' => true,
+        ])->assertCreated()
+            ->assertJsonPath('data.allow_postings', false);
+
+        $food = Account::query()->where('name', 'food')->firstOrFail();
+
+        $this->putJson("/api/v1/financial/accounts/{$food->id}", [
+            'account_type' => 'expense',
+            'name' => 'food',
+            'allow_postings' => true,
+        ])->assertOk()
+            ->assertJsonPath('data.allow_postings', false);
+    });
+
+    test('allow_postings is stored for accounts with children', function () {
+        $food = Account::factory()->create(['name' => 'food']);
+        Account::factory()->childOf($food)->create(['name' => 'groceries']);
+
+        $this->putJson("/api/v1/financial/accounts/{$food->id}", [
+            'account_type' => 'expense',
+            'name' => 'food',
+            'allow_postings' => true,
+        ])->assertOk()
+            ->assertJsonPath('data.allow_postings', true);
+    });
+
     test('deleting an account with children conflicts', function () {
         $food = Account::factory()->create(['name' => 'food']);
         Account::factory()->childOf($food)->create(['name' => 'groceries']);

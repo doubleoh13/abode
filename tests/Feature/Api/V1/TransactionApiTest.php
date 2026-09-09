@@ -289,6 +289,26 @@ describe('with finance permissions', function () {
     })->with([AccountType::Income, AccountType::Expense, AccountType::Equity])
         ->with(['valid' => ['cleared'], 'invalid' => ['invalid'], 'object' => [['unexpected' => 'object']], 'number' => [123], 'null' => [null]]);
 
+    test('an account with children rejects postings unless flagged', function () {
+        Account::factory()->ofType(AccountType::Asset)->childOf($this->checking)->create();
+
+        $payload = [
+            'date' => '2026-08-01',
+            'postings' => [
+                journalLeg($this->checking, $this->usd, -10_00),
+                journalLeg($this->groceries, $this->usd, 10_00),
+            ],
+        ];
+
+        $this->postJson('/api/v1/financial/transactions', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['postings.0.financial_account_id']);
+
+        $this->checking->update(['allow_postings' => true]);
+
+        $this->postJson('/api/v1/financial/transactions', $payload)->assertCreated();
+    });
+
     test('a base-currency posting cannot reference a lot', function () {
         $lot = Lot::factory()->ofCommodity($this->fbtc)->create();
 

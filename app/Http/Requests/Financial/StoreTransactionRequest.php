@@ -144,11 +144,47 @@ class StoreTransactionRequest extends FormRequest
     public function after(): array
     {
         return [
+            fn (Validator $validator) => $this->validatePostableAccounts($validator),
             fn (Validator $validator) => $this->validatePostingStatuses($validator),
             fn (Validator $validator) => $this->validateLotStructure($validator),
             fn (Validator $validator) => $this->validateReferencedLots($validator),
             fn (Validator $validator) => $this->validateBalance($validator),
         ];
+    }
+
+    /**
+     * Accounts with children reject postings unless explicitly flagged;
+     * leaf accounts always accept them.
+     */
+    protected function validatePostableAccounts(Validator $validator): void
+    {
+        if ($validator->errors()->isNotEmpty()) {
+            return;
+        }
+
+        $accountIds = collect($this->postingInputs())->pluck('financial_account_id')->unique();
+
+        $accounts = Account::query()->findMany($accountIds)->keyBy('id');
+        $accountIdsWithChildren = Account::query()
+            ->whereIn('parent_id', $accountIds)
+            ->distinct()
+            ->pluck('parent_id')
+            ->all();
+
+        foreach ($this->postingInputs() as $index => $posting) {
+            $account = $accounts->get((int) $posting['financial_account_id']);
+
+            if (
+                $account !== null
+                && ! $account->allow_postings
+                && in_array($account->id, $accountIdsWithChildren, true)
+            ) {
+                $validator->errors()->add(
+                    "postings.{$index}.financial_account_id",
+                    'This account has child accounts and does not allow postings.',
+                );
+            }
+        }
     }
 
     protected function validatePostingStatuses(Validator $validator): void

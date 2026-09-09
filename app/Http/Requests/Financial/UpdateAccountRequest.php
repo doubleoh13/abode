@@ -40,6 +40,11 @@ class UpdateAccountRequest extends StoreAccountRequest
         ];
     }
 
+    protected function accountKeepsChildren(): bool
+    {
+        return $this->account()->children()->exists();
+    }
+
     protected function siblingUniqueNameRule(): Unique
     {
         return parent::siblingUniqueNameRule()->ignore($this->account()->id);

@@ -36,6 +36,13 @@ class AccountFactory extends Factory
         ]);
     }
 
+    public function allowingPostings(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'allow_postings' => true,
+        ]);
+    }
+
     public function childOf(Account $parent): static
     {
         return $this->state(fn (array $attributes) => [

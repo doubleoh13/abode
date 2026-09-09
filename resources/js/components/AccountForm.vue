@@ -24,10 +24,15 @@ const form = reactive({
     name: props.account?.name ?? '',
     account_type: (props.account?.account_type ?? 'expense') as AccountType,
     parent_id: props.account?.parent_id ?? null,
+    allow_postings: props.account?.allow_postings ?? false,
     financial_institution_id: props.account?.institution?.id ?? null,
     opened_at: props.account?.opened_at ?? '',
     closed_at: props.account?.closed_at ?? '',
 });
+
+const hasChildren = computed(() =>
+    props.accounts.some((candidate) => candidate.parent_id === props.account?.id),
+);
 
 const errors = ref<Record<string, string[]>>({});
 const submitting = ref(false);
@@ -66,6 +71,7 @@ async function save(): Promise<void> {
         name: form.name,
         account_type: form.account_type,
         parent_id: form.parent_id,
+        allow_postings: form.allow_postings,
         financial_institution_id: form.financial_institution_id,
         opened_at: form.opened_at || null,
         closed_at: form.closed_at || null,
@@ -142,6 +148,11 @@ async function save(): Promise<void> {
                 <span class="field-label">Closed</span>
                 <input v-model="form.closed_at" type="date" class="input" />
                 <p v-if="errors.closed_at" class="text-sm text-danger">{{ errors.closed_at[0] }}</p>
+            </label>
+
+            <label v-if="hasChildren" class="flex items-center gap-2 self-end pb-2">
+                <input v-model="form.allow_postings" type="checkbox" class="size-4 accent-accent" />
+                <span class="text-sm text-muted">Allow postings</span>
             </label>
         </div>
 

@@ -18,12 +18,25 @@ class StoreAccountRequest extends FormRequest
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
+    protected function prepareForValidation(): void
+    {
+        if (! $this->accountKeepsChildren()) {
+            $this->merge(['allow_postings' => false]);
+        }
+    }
+
     public function rules(): array
     {
         return [
             'account_type' => ['required', Rule::enum(AccountType::class)],
             'financial_institution_id' => ['nullable', 'integer', Rule::exists(Institution::class, 'id')],
             'parent_id' => ['nullable', 'integer', Rule::exists(Account::class, 'id')],
+            /**
+             * Whether postings may target this account despite it having child
+             * accounts. Ignored and stored as false for leaf accounts, which
+             * always accept postings.
+             */
+            'allow_postings' => ['sometimes', 'boolean'],
             'name' => [
                 'required',
                 'string',
@@ -48,6 +61,7 @@ class StoreAccountRequest extends FormRequest
             'financial_institution_id.exists' => 'Choose a valid institution.',
             'parent_id.integer' => 'Choose a valid parent account.',
             'parent_id.exists' => 'Choose a valid parent account.',
+            'allow_postings.boolean' => 'Allow postings must be true or false.',
             'name.required' => 'Enter an account name.',
             'name.string' => 'Enter a valid account name.',
             'name.max' => 'Account names may not exceed 255 characters.',
@@ -82,6 +96,15 @@ class StoreAccountRequest extends FormRequest
                 }
             },
         ];
+    }
+
+    /**
+     * Whether the saved account will have child accounts, making an explicit
+     * allow_postings flag meaningful. A created account never does.
+     */
+    protected function accountKeepsChildren(): bool
+    {
+        return false;
     }
 
     protected function siblingUniqueNameRule(): Unique

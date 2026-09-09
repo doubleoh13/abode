@@ -26,11 +26,21 @@ const statusOptions: Array<{ value: PostingStatus; label: string }> = [
     { value: 'reconciled', label: 'Reconciled' },
 ];
 
-const accountOptions = computed(() =>
-    props.accounts
+const accountOptions = computed(() => {
+    const parentIds = new Set(
+        props.accounts.map((account) => account.parent_id).filter((id) => id !== null),
+    );
+
+    return props.accounts
+        .filter(
+            (account) =>
+                !parentIds.has(account.id)
+                || account.allow_postings
+                || account.id === props.draft.financial_account_id,
+        )
         .toSorted((a, b) => a.path.localeCompare(b.path))
-        .map((account) => ({ value: account.id, label: account.path })),
-);
+        .map((account) => ({ value: account.id, label: account.path }));
+});
 
 const commodityOptions = computed(() =>
     props.commodities.map((commodity) => ({ value: commodity.id, label: commodity.code })),
