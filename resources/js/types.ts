@@ -18,6 +18,8 @@ export interface Commodity {
     display_precision: number;
     symbol: string | null;
     symbol_placement: SymbolPlacement | null;
+    latest_price?: string;
+    latest_priced_at?: string;
 }
 
 export interface Institution {

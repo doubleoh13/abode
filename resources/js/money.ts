@@ -87,6 +87,22 @@ export function allocateBasis(cost: string, totalQuantity: string, quantities: s
     return shares.map(scaledIntegerToDecimal);
 }
 
+export function subtractAmounts(minuend: string, subtrahend: string): string {
+    return scaledIntegerToDecimal(decimalToScaledInteger(minuend) - decimalToScaledInteger(subtrahend));
+}
+
+export function marketValue(quantity: string, commodity: Commodity): string | null {
+    if (commodity.kind === 'currency') {
+        return quantity;
+    }
+
+    if (!commodity.latest_price) {
+        return null;
+    }
+
+    return totalCostFromUnitCost(commodity.latest_price, quantity);
+}
+
 export function totalCostFromUnitCost(unitCost: string, quantity: string): string | null {
     const numerator = decimalToScaledInteger(unitCost) * decimalToScaledInteger(quantity);
 

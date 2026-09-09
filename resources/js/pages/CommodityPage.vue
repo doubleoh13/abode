@@ -12,7 +12,14 @@ import {
     statusLabel,
     statusSymbol,
 } from '../journal';
-import { allocateBasis, decimalToScaledInteger, formatAmount, scaledIntegerToDecimal } from '../money';
+import {
+    allocateBasis,
+    decimalToScaledInteger,
+    formatAmount,
+    marketValue,
+    scaledIntegerToDecimal,
+    subtractAmounts,
+} from '../money';
 import type { Account, Commodity, CommodityBalance, Lot, Paginated, Posting } from '../types';
 
 const route = useRoute();
@@ -85,6 +92,32 @@ const totalBasis = computed(() => {
         openLots.value.reduce((sum, lot) => sum + decimalToScaledInteger(lotBasisShare(lot)), 0n),
     );
 });
+
+const totalMarket = computed(() =>
+    commodity.value && commodity.value.kind !== 'currency'
+        ? marketValue(totalHeld.value, commodity.value)
+        : null,
+);
+
+const totalUnrealized = computed(() =>
+    totalMarket.value !== null && totalBasis.value !== null
+        ? subtractAmounts(totalMarket.value, totalBasis.value)
+        : null,
+);
+
+function formatUsd(amount: string | null): string {
+    return amount !== null && usd.value ? formatAmount(amount, usd.value) : '—';
+}
+
+function amountClass(amount: string | null): string {
+    return amount !== null && amount.startsWith('-') ? 'text-danger' : '';
+}
+
+function lotUnrealized(lot: Lot): string | null {
+    const market = commodity.value ? marketValue(lot.open_quantity ?? '0', commodity.value) : null;
+
+    return market !== null ? subtractAmounts(market, lotBasisShare(lot)) : null;
+}
 
 async function loadPostings(): Promise<void> {
     const response = (
@@ -171,13 +204,23 @@ watch(commodityId, () => {
                         {{ totalBasis !== null && usd ? formatAmount(totalBasis, usd) : '—' }}
                     </p>
                 </div>
-                <div class="rounded-md border border-edge bg-surface px-4 py-3">
+                <div
+                    class="rounded-md border border-edge bg-surface px-4 py-3"
+                    :title="commodity?.latest_priced_at ? `priced ${commodity.latest_priced_at}` : undefined"
+                >
                     <p class="field-label">Market value</p>
-                    <p class="mt-1 font-mono text-lg text-muted">—</p>
+                    <p class="mt-1 truncate font-mono text-lg" :class="{ 'text-muted': totalMarket === null }">
+                        {{ formatUsd(totalMarket) }}
+                    </p>
                 </div>
                 <div class="rounded-md border border-edge bg-surface px-4 py-3">
                     <p class="field-label">Unrealized</p>
-                    <p class="mt-1 font-mono text-lg text-muted">—</p>
+                    <p
+                        class="mt-1 truncate font-mono text-lg"
+                        :class="totalUnrealized === null ? 'text-muted' : amountClass(totalUnrealized)"
+                    >
+                        {{ formatUsd(totalUnrealized) }}
+                    </p>
                 </div>
             </div>
 
@@ -220,7 +263,9 @@ watch(commodityId, () => {
                                     <td class="px-4 py-2 text-right font-mono">
                                         {{ commodity ? formatAmount(holding.balance, commodity) : holding.balance }}
                                     </td>
-                                    <td class="px-4 py-2 text-right font-mono text-muted">—</td>
+                                    <td class="px-4 py-2 text-right font-mono">
+                                        {{ formatUsd(commodity && commodity.kind !== 'currency' ? marketValue(holding.balance, commodity) : null) }}
+                                    </td>
                                 </tr>
                                 <tr v-if="holding.account && expandedAccounts.includes(holding.account.id)">
                                     <td colspan="3" class="bg-background/40 px-4 py-3">
@@ -230,7 +275,9 @@ watch(commodityId, () => {
                                                     <th class="py-1 pr-4 text-left font-medium">Acquired</th>
                                                     <th class="px-4 py-1 text-right font-medium">Open here</th>
                                                     <th class="px-4 py-1 text-right font-medium">Acquired qty</th>
-                                                    <th class="py-1 pl-4 text-right font-medium">Open basis</th>
+                                                    <th class="px-4 py-1 text-right font-medium">Open basis</th>
+                                                    <th class="px-4 py-1 text-right font-medium">Market value</th>
+                                                    <th class="py-1 pl-4 text-right font-medium">Unrealized</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -242,8 +289,14 @@ watch(commodityId, () => {
                                                     <td class="px-4 py-1 text-right font-mono text-muted">
                                                         {{ lot.acquired_quantity }}
                                                     </td>
-                                                    <td class="py-1 pl-4 text-right font-mono">
-                                                        {{ usd ? formatAmount(lotBasisShare(lot), usd) : lotBasisShare(lot) }}
+                                                    <td class="px-4 py-1 text-right font-mono">
+                                                        {{ formatUsd(lotBasisShare(lot)) }}
+                                                    </td>
+                                                    <td class="px-4 py-1 text-right font-mono">
+                                                        {{ formatUsd(commodity ? marketValue(lot.open_quantity ?? '0', commodity) : null) }}
+                                                    </td>
+                                                    <td class="py-1 pl-4 text-right font-mono" :class="amountClass(lotUnrealized(lot))">
+                                                        {{ formatUsd(lotUnrealized(lot)) }}
                                                     </td>
                                                 </tr>
                                             </tbody>

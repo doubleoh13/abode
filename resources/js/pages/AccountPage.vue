@@ -14,7 +14,14 @@ import {
     statusLabel,
     statusSymbol,
 } from '../journal';
-import { allocateBasis, decimalToScaledInteger, formatAmount, scaledIntegerToDecimal } from '../money';
+import {
+    allocateBasis,
+    decimalToScaledInteger,
+    formatAmount,
+    marketValue,
+    scaledIntegerToDecimal,
+    subtractAmounts,
+} from '../money';
 import type {
     Account,
     AccountBalance,
@@ -286,6 +293,28 @@ function formatAssertionAmount(assertion: BalanceAssertion, amount: string): str
     return commodity ? formatAmount(amount, commodity) : amount;
 }
 
+function formatUsd(amount: string | null): string {
+    return amount !== null && usd.value ? formatAmount(amount, usd.value) : '—';
+}
+
+function unrealized(market: string | null, basis: string | null): string | null {
+    return market !== null && basis !== null ? subtractAmounts(market, basis) : null;
+}
+
+function holdingUnrealized(holding: Holding): string | null {
+    return holding.commodity.kind === 'currency'
+        ? null
+        : unrealized(marketValue(holding.quantity, holding.commodity), holding.basis);
+}
+
+function lotMarketValue(lot: Lot, commodity: Commodity): string | null {
+    return commodity.kind === 'currency' ? null : marketValue(lot.open_quantity ?? '0', commodity);
+}
+
+function amountClass(amount: string | null): string {
+    return amount !== null && amount.startsWith('-') ? 'text-danger' : '';
+}
+
 async function loadAccount(): Promise<void> {
     loaded.value = false;
     page.value = 1;
@@ -376,10 +405,20 @@ watch(accountId, () => {
                                         {{ formatAmount(holding.quantity, holding.commodity) }}
                                     </td>
                                     <td class="px-4 py-2 text-right font-mono">
-                                        {{ holding.basis !== null && usd ? formatAmount(holding.basis, usd) : '—' }}
+                                        {{ holding.basis !== null ? formatUsd(holding.basis) : '—' }}
                                     </td>
-                                    <td class="px-4 py-2 text-right font-mono text-muted">—</td>
-                                    <td class="px-4 py-2 text-right font-mono text-muted">—</td>
+                                    <td
+                                        class="px-4 py-2 text-right font-mono"
+                                        :title="holding.commodity.latest_priced_at ? `priced ${holding.commodity.latest_priced_at}` : undefined"
+                                    >
+                                        {{ formatUsd(marketValue(holding.quantity, holding.commodity)) }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-2 text-right font-mono"
+                                        :class="amountClass(holdingUnrealized(holding))"
+                                    >
+                                        {{ formatUsd(holdingUnrealized(holding)) }}
+                                    </td>
                                 </tr>
                                 <tr v-if="expandedCommodities.includes(holding.commodity.id)">
                                     <td colspan="5" class="bg-background/40 px-4 py-3">
@@ -389,7 +428,9 @@ watch(accountId, () => {
                                                     <th class="py-1 pr-4 text-left font-medium">Acquired</th>
                                                     <th class="px-4 py-1 text-right font-medium">Open</th>
                                                     <th class="px-4 py-1 text-right font-medium">Acquired qty</th>
-                                                    <th class="py-1 pl-4 text-right font-medium">Basis</th>
+                                                    <th class="px-4 py-1 text-right font-medium">Basis</th>
+                                                    <th class="px-4 py-1 text-right font-medium">Market value</th>
+                                                    <th class="py-1 pl-4 text-right font-medium">Unrealized</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -404,8 +445,17 @@ watch(accountId, () => {
                                                     <td class="px-4 py-1 text-right font-mono text-muted">
                                                         {{ lot.acquired_quantity }}
                                                     </td>
-                                                    <td class="py-1 pl-4 text-right font-mono">
-                                                        {{ usd ? formatAmount(lotBasisShare(lot), usd) : lotBasisShare(lot) }}
+                                                    <td class="px-4 py-1 text-right font-mono">
+                                                        {{ formatUsd(lotBasisShare(lot)) }}
+                                                    </td>
+                                                    <td class="px-4 py-1 text-right font-mono">
+                                                        {{ formatUsd(lotMarketValue(lot, holding.commodity)) }}
+                                                    </td>
+                                                    <td
+                                                        class="py-1 pl-4 text-right font-mono"
+                                                        :class="amountClass(unrealized(lotMarketValue(lot, holding.commodity), lotBasisShare(lot)))"
+                                                    >
+                                                        {{ formatUsd(unrealized(lotMarketValue(lot, holding.commodity), lotBasisShare(lot))) }}
                                                     </td>
                                                 </tr>
                                             </tbody>
