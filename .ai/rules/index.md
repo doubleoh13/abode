@@ -4,6 +4,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 
 | Applies to | Rule file |
 | --- | --- |
+| docker/apache/** | .ai/rules/apache.md |
 | docker/** | .ai/rules/docker.md |
 | Dockerfile | .ai/rules/dockerfile.md |
 | app/Enums/** | .ai/rules/enums.md |
