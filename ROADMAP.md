@@ -30,6 +30,8 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Done
 
+- Journal filter bar: search plus preset chips (this month, last month, last 30 days, this year, pending, unreconciled) with the detailed filters collapsed behind a Filters toggle (2026-09-10).
+
 - DateInput replaces every native date picker (ISO text, arrow-key nudges, T for today); modal focus trap and restore; secondary form buttons out of the tab order; Enter on the last amount adds a posting (2026-09-10).
 
 - Recurring transactions with scheduled posting, per-schedule lead window, journal Repeat toggle and Duplicate, Schedules page (74bb5fd, 2026-09-10).

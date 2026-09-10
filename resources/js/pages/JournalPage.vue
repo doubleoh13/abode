@@ -90,6 +90,93 @@ function cycleStatusFilter(status: PostingStatus): void {
     };
 }
 
+const filtersExpanded = ref(false);
+
+const detailedFilterCount = computed(
+    () =>
+        (filterAccountId.value !== null ? 1 : 0) +
+        includedStatuses.value.length +
+        excludedStatuses.value.length +
+        (filterFrom.value !== '' ? 1 : 0) +
+        (filterTo.value !== '' ? 1 : 0),
+);
+
+function isoDate(date: Date): string {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+interface DateRange {
+    from: string;
+    to: string;
+}
+
+function monthRange(offset: number): DateRange {
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const last = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
+
+    return { from: isoDate(first), to: isoDate(last) };
+}
+
+function yearRange(): DateRange {
+    const year = new Date().getFullYear();
+
+    return { from: `${year}-01-01`, to: `${year}-12-31` };
+}
+
+function trailingDays(days: number): DateRange {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (days - 1));
+
+    return { from: isoDate(start), to: isoDate(now) };
+}
+
+const datePresets: Array<{ label: string; range: () => DateRange }> = [
+    { label: 'This month', range: () => monthRange(0) },
+    { label: 'Last month', range: () => monthRange(-1) },
+    { label: 'Last 30 days', range: () => trailingDays(30) },
+    { label: 'This year', range: yearRange },
+];
+
+function datePresetActive(preset: { range: () => DateRange }): boolean {
+    const range = preset.range();
+
+    return filterFrom.value === range.from && filterTo.value === range.to;
+}
+
+function applyDatePreset(preset: { range: () => DateRange }): void {
+    if (datePresetActive(preset)) {
+        filterFrom.value = '';
+        filterTo.value = '';
+        return;
+    }
+
+    const range = preset.range();
+    filterFrom.value = range.from;
+    filterTo.value = range.to;
+}
+
+const statusPresets: Array<{ label: string; modes: Partial<Record<PostingStatus, StatusFilterMode>> }> = [
+    { label: 'Pending', modes: { pending: 'include' } },
+    { label: 'Unreconciled', modes: { reconciled: 'exclude' } },
+];
+
+function statusPresetActive(preset: { modes: Partial<Record<PostingStatus, StatusFilterMode>> }): boolean {
+    return statusOptions.every((option) => statusFilterModes.value[option.value] === preset.modes[option.value]);
+}
+
+function applyStatusPreset(preset: { modes: Partial<Record<PostingStatus, StatusFilterMode>> }): void {
+    statusFilterModes.value = statusPresetActive(preset) ? {} : { ...preset.modes };
+}
+
+function clearFilters(): void {
+    filterAccountId.value = null;
+    statusFilterModes.value = {};
+    filterFrom.value = '';
+    filterTo.value = '';
+    searchQuery.value = '';
+}
+
 function statusFilterHint(status: PostingStatus): string {
     const mode = statusFilterModes.value[status];
 
@@ -367,8 +454,61 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                 {{ issues.length }} journal {{ issues.length === 1 ? 'issue needs' : 'issues need' }} attention.
             </p>
 
-            <div class="mt-6 flex flex-wrap items-end gap-3">
-                <label class="flex min-w-64 flex-1 flex-col gap-1.5">
+            <div class="mt-6 flex flex-wrap items-center gap-2">
+                <input
+                    v-model="searchQuery"
+                    type="search"
+                    class="input min-w-48 flex-1"
+                    placeholder="Search payee or memo"
+                    aria-label="Search"
+                />
+
+                <button
+                    v-for="preset in datePresets"
+                    :key="preset.label"
+                    type="button"
+                    class="rounded-sm border px-2 py-1.5 font-mono text-xs tracking-wider uppercase transition-colors"
+                    :class="datePresetActive(preset) ? 'border-accent text-accent' : 'border-edge text-muted hover:text-foreground'"
+                    :aria-pressed="datePresetActive(preset)"
+                    @click="applyDatePreset(preset)"
+                >
+                    {{ preset.label }}
+                </button>
+
+                <button
+                    v-for="preset in statusPresets"
+                    :key="preset.label"
+                    type="button"
+                    class="rounded-sm border px-2 py-1.5 font-mono text-xs tracking-wider uppercase transition-colors"
+                    :class="statusPresetActive(preset) ? 'border-accent text-accent' : 'border-edge text-muted hover:text-foreground'"
+                    :aria-pressed="statusPresetActive(preset)"
+                    @click="applyStatusPreset(preset)"
+                >
+                    {{ preset.label }}
+                </button>
+
+                <button
+                    type="button"
+                    class="rounded-sm border px-2 py-1.5 font-mono text-xs tracking-wider uppercase transition-colors"
+                    :class="filtersExpanded || detailedFilterCount > 0 ? 'border-accent text-accent' : 'border-edge text-muted hover:text-foreground'"
+                    :aria-expanded="filtersExpanded"
+                    @click="filtersExpanded = !filtersExpanded"
+                >
+                    Filters<template v-if="detailedFilterCount > 0"> · {{ detailedFilterCount }}</template>
+                </button>
+
+                <button
+                    v-if="hasActiveFilters"
+                    type="button"
+                    class="px-2 py-1.5 font-mono text-xs tracking-wider text-muted uppercase transition-colors hover:text-danger"
+                    @click="clearFilters"
+                >
+                    Clear
+                </button>
+            </div>
+
+            <div v-if="filtersExpanded" class="mt-3 flex flex-wrap items-end gap-3 rounded-md border border-edge bg-surface px-4 py-3">
+                <label class="flex min-w-56 flex-1 flex-col gap-1.5">
                     <span class="field-label">Account</span>
                     <ComboBox v-model="filterAccountId" :options="accountOptions" nullable null-label="(all)" fuzzy />
                 </label>
@@ -396,17 +536,12 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
 
                 <label class="flex flex-col gap-1.5">
                     <span class="field-label">From</span>
-                    <DateInput v-model="filterFrom" />
+                    <DateInput v-model="filterFrom" class="w-36" />
                 </label>
 
                 <label class="flex flex-col gap-1.5">
                     <span class="field-label">To</span>
-                    <DateInput v-model="filterTo" />
-                </label>
-
-                <label class="flex min-w-48 flex-1 flex-col gap-1.5">
-                    <span class="field-label">Search</span>
-                    <input v-model="searchQuery" type="search" class="input" placeholder="Payee or memo" />
+                    <DateInput v-model="filterTo" class="w-36" />
                 </label>
             </div>
 
