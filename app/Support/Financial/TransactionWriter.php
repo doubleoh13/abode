@@ -50,6 +50,34 @@ class TransactionWriter
         });
     }
 
+    /**
+     * Replace two transactions with one built from the payload. Notes,
+     * attachments, and any schedule link carry over; the originals are then
+     * deleted, sweeping only lots nothing references any more.
+     *
+     * @param  list<int>  $absorbedIds
+     * @param  array<string, mixed>  $data
+     */
+    public function merge(array $absorbedIds, array $data): Transaction
+    {
+        return DB::transaction(function () use ($absorbedIds, $data): Transaction {
+            $absorbed = Transaction::query()->findMany($absorbedIds);
+
+            $merged = $this->store([
+                ...$data,
+                'financial_recurring_transaction_id' => $absorbed->pluck('financial_recurring_transaction_id')->filter()->first(),
+            ]);
+
+            foreach ($absorbed as $transaction) {
+                $transaction->notes()->update(['noteable_id' => $merged->id]);
+                $transaction->attachments()->update(['attachable_id' => $merged->id]);
+                $this->destroy($transaction);
+            }
+
+            return $merged;
+        });
+    }
+
     public function destroy(Transaction $transaction): void
     {
         DB::transaction(function () use ($transaction): void {

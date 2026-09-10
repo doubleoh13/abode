@@ -357,7 +357,7 @@ class StoreTransactionRequest extends FormRequest
         $quantities = [];
 
         foreach ($lots as $lot) {
-            $quantities[$lot->id] = $lot->acquiredQuantity($this->excludedTransactionId());
+            $quantities[$lot->id] = $lot->acquiredQuantity($this->excludedTransactionIds());
         }
 
         foreach ($this->postingInputs() as $posting) {
@@ -372,8 +372,14 @@ class StoreTransactionRequest extends FormRequest
         return $quantities;
     }
 
-    protected function excludedTransactionId(): ?int
+    /**
+     * Transactions whose persisted postings must not count toward lot
+     * quantities, because the payload replaces them.
+     *
+     * @return list<int>
+     */
+    protected function excludedTransactionIds(): array
     {
-        return null;
+        return [];
     }
 }

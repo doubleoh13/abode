@@ -64,9 +64,9 @@ class UpdateTransactionRequest extends StoreTransactionRequest
         }
     }
 
-    protected function excludedTransactionId(): ?int
+    protected function excludedTransactionIds(): array
     {
-        return $this->transaction()->id;
+        return [$this->transaction()->id];
     }
 
     private function transaction(): Transaction

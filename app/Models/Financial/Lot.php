@@ -35,12 +35,15 @@ class Lot extends Model
         return $this->hasMany(Posting::class, 'financial_lot_id');
     }
 
-    public function acquiredQuantity(?int $excludeTransactionId = null): BigDecimal
+    /**
+     * @param  list<int>  $excludeTransactionIds
+     */
+    public function acquiredQuantity(array $excludeTransactionIds = []): BigDecimal
     {
         return BigDecimal::of(
             $this->postings()
                 ->where('amount', '>', 0)
-                ->when($excludeTransactionId !== null, fn ($query) => $query->where('financial_transaction_id', '!=', $excludeTransactionId))
+                ->when($excludeTransactionIds !== [], fn ($query) => $query->whereNotIn('financial_transaction_id', $excludeTransactionIds))
                 ->sum('amount'),
         );
     }

@@ -2,6 +2,7 @@
 import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, ref, watch } from 'vue';
 import ComboBox from '../components/ComboBox.vue';
+import MergeDialog from '../components/MergeDialog.vue';
 import ModalDialog from '../components/ModalDialog.vue';
 import PaginationBar from '../components/PaginationBar.vue';
 import TransactionForm from '../components/TransactionForm.vue';
@@ -100,6 +101,8 @@ function statusFilterHint(status: PostingStatus): string {
 const formOpen = ref(false);
 const editingTransaction = ref<Transaction | null>(null);
 const duplicatingTransaction = ref<Transaction | null>(null);
+const mergeSource = ref<Transaction | null>(null);
+const mergeTarget = ref<Transaction | null>(null);
 
 const issuesByTransaction = computed(() => {
     const map = new Map<number, JournalIssue[]>();
@@ -259,6 +262,29 @@ async function flipStatus(transaction: Transaction, posting: Posting): Promise<v
     }
 }
 
+function startMerge(transaction: Transaction): void {
+    mergeSource.value = transaction;
+    mergeTarget.value = null;
+}
+
+function cancelMerge(): void {
+    mergeSource.value = null;
+    mergeTarget.value = null;
+}
+
+function pickMergeTarget(transaction: Transaction): void {
+    if (mergeSource.value === null || transaction.id === mergeSource.value.id) {
+        return;
+    }
+
+    mergeTarget.value = transaction;
+}
+
+async function transactionsMerged(): Promise<void> {
+    cancelMerge();
+    await Promise.all([loadTransactions(), loadIssues()]);
+}
+
 async function deleteTransaction(transaction: Transaction): Promise<void> {
     if (!confirm(`Delete the ${transaction.date} transaction?`)) {
         return;
@@ -306,6 +332,31 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                     @account-created="registerAccount"
                 />
             </ModalDialog>
+
+            <ModalDialog :open="mergeSource !== null && mergeTarget !== null" @close="cancelMerge">
+                <MergeDialog
+                    v-if="mergeSource && mergeTarget"
+                    :key="`${mergeSource.id}-${mergeTarget.id}`"
+                    :first="mergeSource"
+                    :second="mergeTarget"
+                    :commodities="commodities"
+                    @merged="transactionsMerged"
+                    @cancelled="cancelMerge"
+                />
+            </ModalDialog>
+
+            <div
+                v-if="mergeSource"
+                class="mt-4 flex items-center justify-between gap-4 rounded-md border border-accent/40 bg-accent/10 px-4 py-2 text-sm"
+            >
+                <span>
+                    Merging <span class="font-mono text-xs">{{ mergeSource.date }}</span>
+                    {{ mergeSource.payee?.name ?? mergeSource.memo ?? '' }}. Click the other transaction.
+                </span>
+                <button type="button" class="font-mono text-xs tracking-wider uppercase hover:text-foreground" @click="cancelMerge">
+                    Cancel
+                </button>
+            </div>
 
             <p v-if="!issuesChecked" class="mt-4 font-mono text-xs tracking-wider text-muted uppercase">
                 Checking journal integrity…
@@ -366,7 +417,16 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                 v-else
                 class="mt-6 divide-y divide-edge overflow-hidden rounded-md border border-edge bg-surface"
             >
-                <li v-for="transaction in transactions" :key="transaction.id" class="group px-4 py-2">
+                <li
+                    v-for="transaction in transactions"
+                    :key="transaction.id"
+                    class="group px-4 py-2"
+                    :class="{
+                        'cursor-pointer transition-colors hover:bg-edge/40': mergeSource && mergeSource.id !== transaction.id,
+                        'bg-accent/10': mergeSource?.id === transaction.id,
+                    }"
+                    @click="pickMergeTarget(transaction)"
+                >
                     <div class="flex items-center gap-4" :class="{ italic: transaction.status === 'pending' }">
                         <span class="font-mono text-xs text-muted">{{ transaction.date }}</span>
 
@@ -397,21 +457,28 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                             <button
                                 type="button"
                                 class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
-                                @click="openEditForm(transaction)"
+                                @click.stop="openEditForm(transaction)"
                             >
                                 Edit
                             </button>
                             <button
                                 type="button"
                                 class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
-                                @click="openDuplicateForm(transaction)"
+                                @click.stop="openDuplicateForm(transaction)"
                             >
                                 Duplicate
                             </button>
                             <button
                                 type="button"
+                                class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+                                @click.stop="startMerge(transaction)"
+                            >
+                                Merge
+                            </button>
+                            <button
+                                type="button"
                                 class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
-                                @click="deleteTransaction(transaction)"
+                                @click.stop="deleteTransaction(transaction)"
                             >
                                 Delete
                             </button>
@@ -455,7 +522,7 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                                 class="w-8 shrink-0 rounded-sm text-right font-mono text-sm transition-colors hover:bg-edge/60 hover:text-foreground"
                                 :class="statusClass(posting.status)"
                                 :title="`${statusLabel(posting.status)} — click to mark ${statusLabel(nextStatus(posting.status)).toLowerCase()}`"
-                                @click="flipStatus(transaction, posting)"
+                                @click.stop="flipStatus(transaction, posting)"
                             >
                                 <span aria-hidden="true">{{ statusSymbol(posting.status) }}</span>
                                 <span class="sr-only">{{ statusLabel(posting.status) }}</span>

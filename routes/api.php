@@ -61,6 +61,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('commodities', CommodityController::class)->only(['store', 'update', 'destroy']);
             Route::apiResource('payees', PayeeController::class)->only(['store', 'update', 'destroy']);
             Route::apiResource('transactions', TransactionController::class)->only(['store', 'update', 'destroy']);
+            Route::post('transactions/merge', [TransactionController::class, 'merge'])->name('transactions.merge');
             Route::post('recurring-transactions/preview/{recurring_transaction?}', [RecurringTransactionController::class, 'preview'])
                 ->name('recurring-transactions.preview');
             Route::apiResource('recurring-transactions', RecurringTransactionController::class)->only(['store', 'update', 'destroy']);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Financial;
 
 use App\Enums\Financial\PostingStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Financial\MergeTransactionsRequest;
 use App\Http\Requests\Financial\StoreTransactionRequest;
 use App\Http\Requests\Financial\UpdateTransactionRequest;
 use App\Http\Resources\Financial\TransactionResource;
@@ -114,6 +115,18 @@ class TransactionController extends Controller
     public function store(StoreTransactionRequest $request): TransactionResource
     {
         $transaction = $this->transactionWriter->store($request->validated());
+
+        return new TransactionResource($transaction->load(self::EAGER_LOADS));
+    }
+
+    /**
+     * Replace two transactions with a single new one. The payload is a full
+     * transaction; the originals are deleted and their notes, attachments,
+     * and schedule link move to the result.
+     */
+    public function merge(MergeTransactionsRequest $request): TransactionResource
+    {
+        $transaction = $this->transactionWriter->merge($request->absorbedTransactionIds(), $request->validated());
 
         return new TransactionResource($transaction->load(self::EAGER_LOADS));
     }
