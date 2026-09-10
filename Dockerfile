@@ -35,7 +35,13 @@ RUN composer install --no-dev --no-scripts --no-interaction --prefer-dist --no-p
 
 FROM base
 ARG GIT_SHA=unknown
-ENV APP_BUILD_SHA=${GIT_SHA}
+ENV APP_BUILD_SHA=${GIT_SHA} \
+    APP_ENV=production \
+    DB_HOST=db \
+    DB_PORT=5432 \
+    LOG_CHANNEL=stderr \
+    LOG_LEVEL=info \
+    SESSION_SECURE_COOKIE=true
 LABEL org.opencontainers.image.revision=${GIT_SHA} \
       org.opencontainers.image.source=https://github.com/doubleoh13/abode
 WORKDIR /var/www/html
@@ -45,6 +51,8 @@ COPY --from=vendor /var/www/html/vendor vendor/
 COPY --from=assets /app/public/build public/build/
 RUN composer dump-autoload --optimize --no-dev --no-scripts \
     && php artisan package:discover --ansi \
+    && rm -rf storage/app \
+    && ln -s /data/app storage/app \
     && chown -R www-data:www-data storage bootstrap/cache
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh

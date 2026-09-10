@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BACKUP_DIR="${BACKUP_DIR:-/backups}"
+DATA_DIR="${DATA_DIR:-/data}"
+BACKUP_DIR="${BACKUP_DIR:-$DATA_DIR/backups}"
 
 require_environment() {
     local name missing=()
-    for name in APP_KEY APP_URL DB_CONNECTION DB_HOST DB_PORT DB_DATABASE DB_USERNAME DB_PASSWORD; do
+    for name in APP_URL DB_HOST DB_PORT DB_DATABASE DB_USERNAME DB_PASSWORD; do
         if [[ -z "${!name:-}" ]]; then
             missing+=("$name")
         fi
@@ -15,12 +16,26 @@ require_environment() {
         echo "See docker/env.production.example for the full set" >&2
         exit 1
     fi
-    if [[ "$DB_CONNECTION" != "pgsql" ]]; then
-        echo "DB_CONNECTION must be pgsql (got '$DB_CONNECTION') - the migration protocol guards Postgres only" >&2
-        exit 1
-    fi
     export PGPASSWORD="$DB_PASSWORD"
     PG=(-h "$DB_HOST" -p "$DB_PORT" -U "$DB_USERNAME")
+}
+
+prepare_data_directory() {
+    mkdir -p "$DATA_DIR/app" "$BACKUP_DIR"
+    chown -R www-data:www-data "$DATA_DIR/app"
+}
+
+load_app_key() {
+    if [[ -n "${APP_KEY:-}" ]]; then
+        return 0
+    fi
+    if [[ ! -f "$DATA_DIR/app_key" ]]; then
+        mkdir -p "$DATA_DIR"
+        (umask 077 && php artisan key:generate --show > "$DATA_DIR/app_key")
+        echo "Generated APP_KEY into $DATA_DIR/app_key"
+    fi
+    APP_KEY="$(< "$DATA_DIR/app_key")"
+    export APP_KEY
 }
 
 wait_for_database() {
@@ -80,6 +95,8 @@ run_migration_protocol() {
 case "${1:-app}" in
     app)
         require_environment
+        prepare_data_directory
+        load_app_key
         wait_for_database
         if migrations_pending; then
             run_migration_protocol
@@ -89,11 +106,14 @@ case "${1:-app}" in
         ;;
     scheduler)
         require_environment
+        prepare_data_directory
+        load_app_key
         wait_for_database
         cache_laravel
         exec php artisan schedule:work
         ;;
     *)
+        load_app_key
         exec "$@"
         ;;
 esac

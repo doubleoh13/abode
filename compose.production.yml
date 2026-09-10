@@ -3,15 +3,12 @@ services:
     image: ghcr.io/doubleoh13/abode:latest
     command: ["app"]
     env_file: .env
-    environment:
-      BACKUP_DIR: /backups
     ports:
       # Loopback-only: the TLS-terminating reverse proxy on the host is the sole
       # client, which is what makes trustProxies(at: '*') safe.
       - "127.0.0.1:8080:80"
     volumes:
-      - attachments:/var/www/html/storage/app
-      - ./backups:/backups
+      - abode-data:/data
     depends_on:
       db:
         condition: service_healthy
@@ -28,7 +25,7 @@ services:
     command: ["scheduler"]
     env_file: .env
     volumes:
-      - attachments:/var/www/html/storage/app
+      - abode-data:/data
     depends_on:
       app:
         condition: service_healthy
@@ -50,4 +47,4 @@ services:
 
 volumes:
   pgdata:
-  attachments:
+  abode-data:
