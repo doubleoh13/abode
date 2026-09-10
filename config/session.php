@@ -30,7 +30,10 @@ return [
 
     'domain' => null,
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    /*
+    | Overridden per request by SecureCookiesOnSecureRequests.
+    */
+    'secure' => false,
 
     'http_only' => true,
 

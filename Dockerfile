@@ -40,8 +40,7 @@ ENV APP_BUILD_SHA=${GIT_SHA} \
     DB_HOST=db \
     DB_PORT=5432 \
     LOG_CHANNEL=stderr \
-    LOG_LEVEL=info \
-    SESSION_SECURE_COOKIE=true
+    LOG_LEVEL=info
 LABEL org.opencontainers.image.revision=${GIT_SHA} \
       org.opencontainers.image.source=https://github.com/doubleoh13/abode
 WORKDIR /var/www/html
