@@ -1,58 +1,46 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Abode
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A household management app for the Richhart family. Currently focused on personal finance: a double-entry journal with commodities, lots, and cost basis; account and commodity dashboards; balance assertions; market pricing; and reports. It is a personal project — configuration lives in code, and there is no admin UI.
 
-## About Laravel
+## Stack
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Laravel (PHP 8.5) serving a versioned JSON API under `/api/v1`, documented with Scramble at `/docs` (local only)
+- Vue 3 SPA (Vite, TypeScript, Tailwind) consuming the API via Sanctum cookie auth
+- PostgreSQL — required; the schema uses `jsonb`, wide decimals, and check constraints
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Development
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer run setup        # install, .env, key, migrate, npm install, build
+composer run dev          # serve app + vite + logs
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+- `php artisan migrate:fresh` is the reset button: it recreates the dev user, permissions, and the deterministic API token (`DEVELOPMENT_API_TOKEN`). Finance data is never seeded automatically — run `php artisan db:seed --class=DevelopmentFinancialSeeder` when sample data is wanted.
+- `POST /dev/login` (and the login-page button) bypasses credentials in local only.
+- Commodity prices come from `php artisan financial:fetch-prices` (Yahoo and Indiana 529 sources), scheduled daily.
 
-## Contributing
+### Quality gates
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+php artisan test --parallel --compact                             # Pest, against Postgres
+npm test                                                          # JS money tests (PHP/JS allocation parity)
+vendor/bin/pint --dirty
+vendor/bin/phpstan analyse app database tests
+npm run build                                                     # vue-tsc type check + vite build
+```
 
-## Code of Conduct
+CI runs all of these on pull requests and pushes to `main`.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Production
 
-## Security Vulnerabilities
+Pushes to `main` that pass CI publish `ghcr.io/doubleoh13/abode` (`latest` + commit sha). The image serves the app with Apache and owns migration safety at startup: pending migrations trigger a `pg_dump` to the bind-mounted `backups/` directory, then `migrate --force` and a smoke check — on any failure the schema is restored from the dump and the container exits without serving.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+On the server:
 
-## License
+```bash
+# a directory containing compose.production.yml and a .env based on docker/env.production.example
+docker compose -f compose.production.yml up -d
+docker compose -f compose.production.yml exec app php artisan tinker   # create users
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+The app listens on `127.0.0.1:8080` for a TLS-terminating reverse proxy; the scheduler runs as a second container from the same image. Deploys are manual: `docker compose pull && docker compose up -d`.
