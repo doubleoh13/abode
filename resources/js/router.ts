@@ -14,6 +14,7 @@ import LoginPage from './pages/LoginPage.vue';
 import NotFoundPage from './pages/NotFoundPage.vue';
 import PayeesPage from './pages/PayeesPage.vue';
 import ReportsPage from './pages/ReportsPage.vue';
+import SettingsPage from './pages/SettingsPage.vue';
 import SetupPage from './pages/SetupPage.vue';
 
 export const router = createRouter({
@@ -76,6 +77,7 @@ export const router = createRouter({
                         },
                     ],
                 },
+                { path: 'settings', name: 'settings', component: SettingsPage },
                 { path: ':pathMatch(.*)*', name: 'not-found', component: NotFoundPage },
             ],
         },

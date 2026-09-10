@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\V1\ApiTokenController;
 use App\Http\Controllers\Api\V1\AttachmentController;
+use App\Http\Controllers\Api\V1\CurrentUserController;
 use App\Http\Controllers\Api\V1\Financial\AccountController;
 use App\Http\Controllers\Api\V1\Financial\BalanceAssertionController;
 use App\Http\Controllers\Api\V1\Financial\CommodityController;
@@ -14,8 +16,6 @@ use App\Http\Controllers\Api\V1\Financial\ReportController;
 use App\Http\Controllers\Api\V1\Financial\TransactionController;
 use App\Http\Controllers\Api\V1\NoteController;
 use App\Http\Controllers\Api\V1\SetupController;
-use App\Http\Resources\UserResource;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -24,9 +24,11 @@ Route::prefix('v1')->group(function () {
 });
 
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
-    Route::get('/user', function (Request $request) {
-        return new UserResource($request->user()->load('permissions'));
-    });
+    Route::get('/user', [CurrentUserController::class, 'show']);
+    Route::patch('/user', [CurrentUserController::class, 'update']);
+    Route::put('/user/password', [CurrentUserController::class, 'updatePassword']);
+
+    Route::apiResource('tokens', ApiTokenController::class)->only(['index', 'store', 'destroy']);
 
     Route::apiResource('notes', NoteController::class)->except('show');
     Route::apiResource('attachments', AttachmentController::class)->only(['index', 'store', 'destroy']);

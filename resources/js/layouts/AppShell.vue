@@ -109,13 +109,23 @@ async function endSession(): Promise<void> {
                 <p class="text-sm font-medium">{{ auth.user?.name }}</p>
                 <p class="text-xs text-muted">{{ auth.user?.email }}</p>
 
-                <button
-                    type="button"
-                    class="mt-3 font-mono text-xs tracking-wider text-muted uppercase transition-colors hover:text-foreground"
-                    @click="endSession"
-                >
-                    Log out
-                </button>
+                <div class="mt-3 flex items-center gap-4 font-mono text-xs tracking-wider text-muted uppercase">
+                    <RouterLink
+                        :to="{ name: 'settings' }"
+                        class="transition-colors hover:text-foreground"
+                        @click="mobileNavigationOpen = false"
+                    >
+                        Settings
+                    </RouterLink>
+
+                    <button
+                        type="button"
+                        class="transition-colors hover:text-foreground"
+                        @click="endSession"
+                    >
+                        Log out
+                    </button>
+                </div>
             </div>
         </aside>
 
