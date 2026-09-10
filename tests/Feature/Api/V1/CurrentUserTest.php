@@ -28,3 +28,7 @@ test('a user without grants has an empty permissions list', function () {
 test('guests receive a 401', function () {
     $this->getJson('/api/v1/user')->assertUnauthorized();
 });
+
+test('guests without a json accept header still receive a 401', function () {
+    $this->get('/api/v1/user')->assertUnauthorized();
+});
