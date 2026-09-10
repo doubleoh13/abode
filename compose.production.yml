@@ -1,0 +1,53 @@
+services:
+  app:
+    image: ghcr.io/doubleoh13/abode:latest
+    command: ["app"]
+    env_file: .env
+    environment:
+      BACKUP_DIR: /backups
+    ports:
+      # Loopback-only: the TLS-terminating reverse proxy on the host is the sole
+      # client, which is what makes trustProxies(at: '*') safe.
+      - "127.0.0.1:8080:80"
+    volumes:
+      - attachments:/var/www/html/storage/app
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost/up"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+
+  scheduler:
+    image: ghcr.io/doubleoh13/abode:latest
+    command: ["scheduler"]
+    env_file: .env
+    volumes:
+      - attachments:/var/www/html/storage/app
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}"]
+      interval: 5s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  attachments:
