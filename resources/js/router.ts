@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory, type LocationQuery } from 'vue-router';
-import { auth, resolveAuthenticatedUser } from './auth';
+import { auth, resolveAuthenticatedUser, setupRequired } from './auth';
 import AccountPage from './pages/AccountPage.vue';
 import AccountsPage from './pages/AccountsPage.vue';
 import AppShell from './layouts/AppShell.vue';
@@ -14,6 +14,7 @@ import LoginPage from './pages/LoginPage.vue';
 import NotFoundPage from './pages/NotFoundPage.vue';
 import PayeesPage from './pages/PayeesPage.vue';
 import ReportsPage from './pages/ReportsPage.vue';
+import SetupPage from './pages/SetupPage.vue';
 
 export const router = createRouter({
     history: createWebHistory(),
@@ -79,6 +80,7 @@ export const router = createRouter({
             ],
         },
         { path: '/login', name: 'login', component: LoginPage },
+        { path: '/setup', name: 'setup', component: SetupPage },
     ],
 });
 
@@ -93,6 +95,14 @@ export function intendedDestination(query: LocationQuery): string {
 router.beforeEach(async (to) => {
     if (!auth.resolved) {
         await resolveAuthenticatedUser();
+    }
+
+    if (!auth.user && (await setupRequired())) {
+        return to.name === 'setup' ? undefined : { name: 'setup' };
+    }
+
+    if (to.name === 'setup') {
+        return auth.user ? intendedDestination(to.query) : { name: 'login' };
     }
 
     if (to.meta.requiresAuth && !auth.user) {

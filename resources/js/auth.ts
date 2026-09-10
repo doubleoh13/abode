@@ -16,6 +16,13 @@ export interface LoginCredentials {
     remember: boolean;
 }
 
+export interface SetupDetails {
+    name: string;
+    email: string;
+    password: string;
+    password_confirmation: string;
+}
+
 export const auth = reactive<{
     user: AuthenticatedUser | null;
     resolved: boolean;
@@ -53,4 +60,27 @@ export async function loginAsDevelopmentUser(): Promise<void> {
 export async function logout(): Promise<void> {
     await axios.post('/logout');
     auth.user = null;
+}
+
+let setupRequiredCache: boolean | null = null;
+
+export async function setupRequired(): Promise<boolean> {
+    if (setupRequiredCache === null) {
+        try {
+            setupRequiredCache = (
+                await axios.get<{ data: { required: boolean } }>('/api/v1/setup')
+            ).data.data.required;
+        } catch {
+            setupRequiredCache = false;
+        }
+    }
+
+    return setupRequiredCache;
+}
+
+export async function completeSetup(details: SetupDetails): Promise<void> {
+    await axios.get('/sanctum/csrf-cookie');
+    const { data } = await axios.post<{ data: AuthenticatedUser }>('/api/v1/setup', details);
+    auth.user = data.data;
+    setupRequiredCache = false;
 }

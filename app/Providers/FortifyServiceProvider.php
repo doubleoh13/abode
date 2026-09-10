@@ -52,5 +52,9 @@ class FortifyServiceProvider extends ServiceProvider
                 ($credentialId ?: $request->session()->getId()).'|'.$request->ip()
             );
         });
+
+        RateLimiter::for('setup', function (Request $request) {
+            return Limit::perMinute(5)->by($request->ip());
+        });
     }
 }

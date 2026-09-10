@@ -13,9 +13,15 @@ use App\Http\Controllers\Api\V1\Financial\PostingController;
 use App\Http\Controllers\Api\V1\Financial\ReportController;
 use App\Http\Controllers\Api\V1\Financial\TransactionController;
 use App\Http\Controllers\Api\V1\NoteController;
+use App\Http\Controllers\Api\V1\SetupController;
 use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+
+Route::prefix('v1')->group(function () {
+    Route::get('/setup', [SetupController::class, 'show']);
+    Route::post('/setup', [SetupController::class, 'store'])->middleware('throttle:setup');
+});
 
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {

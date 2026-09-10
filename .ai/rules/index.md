@@ -16,6 +16,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/** | .ai/rules/models.md |
 | app/Http/Requests/Financial/** | .ai/rules/requests-financial.md |
 | resources/** | .ai/rules/resources.md |
+| routes/** | .ai/rules/routes.md |
 | app/Support/Financial/** | .ai/rules/support-financial.md |
 | tests/** | .ai/rules/tests.md |
 | app/Http/Controllers/Api/V1/Financial/** | .ai/rules/v1-financial.md |
