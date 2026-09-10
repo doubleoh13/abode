@@ -27,7 +27,8 @@ class TransactionController extends Controller
     /**
      * Journal transactions, newest first. Optional filters: an account
      * (including its descendants), a payee/memo search, a date range, and
-     * the derived transaction status.
+     * the derived transaction status — included via `status`, excluded via
+     * `exclude_status`.
      */
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -38,6 +39,8 @@ class TransactionController extends Controller
             'to' => ['nullable', 'date'],
             'status' => ['nullable', 'array'],
             'status.*' => [Rule::enum(PostingStatus::class)],
+            'exclude_status' => ['nullable', 'array'],
+            'exclude_status.*' => [Rule::enum(PostingStatus::class)],
         ]);
 
         return TransactionResource::collection(
@@ -53,17 +56,24 @@ class TransactionController extends Controller
                 ->when($validated['from'] ?? null, fn (Builder $query, string $from) => $query->where('date', '>=', $from))
                 ->when($validated['to'] ?? null, fn (Builder $query, string $to) => $query->where('date', '<=', $to))
                 ->when($validated['status'] ?? null, fn (Builder $query, array $statuses) => $query
-                    ->where(function (Builder $matches) use ($statuses): void {
-                        foreach ($statuses as $status) {
-                            $matches->orWhere(fn (Builder $derived) => $this
-                                ->whereDerivedStatus($derived, PostingStatus::from($status)));
-                        }
-                    }))
+                    ->where(fn (Builder $matches) => $this->whereAnyDerivedStatus($matches, $statuses)))
+                ->when($validated['exclude_status'] ?? null, fn (Builder $query, array $statuses) => $query
+                    ->whereNot(fn (Builder $matches) => $this->whereAnyDerivedStatus($matches, $statuses)))
                 ->orderByDesc('date')
                 ->orderByDesc('id')
                 ->paginate(50)
                 ->withQueryString(),
         );
+    }
+
+    /**
+     * @param  list<string>  $statuses
+     */
+    private function whereAnyDerivedStatus(Builder $query, array $statuses): void
+    {
+        foreach ($statuses as $status) {
+            $query->orWhere(fn (Builder $derived) => $this->whereDerivedStatus($derived, PostingStatus::from($status)));
+        }
     }
 
     /**

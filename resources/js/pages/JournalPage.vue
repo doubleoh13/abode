@@ -36,8 +36,10 @@ const payees = ref<Payee[]>([]);
 const issues = ref<JournalIssue[]>([]);
 const issuesChecked = ref(false);
 const loaded = ref(false);
+type StatusFilterMode = 'include' | 'exclude';
+
 const filterAccountId = ref<number | null>(null);
-const filterStatus = ref<PostingStatus[]>([]);
+const statusFilterModes = ref<Partial<Record<PostingStatus, StatusFilterMode>>>({});
 const filterFrom = ref('');
 const filterTo = ref('');
 const searchQuery = ref('');
@@ -52,19 +54,48 @@ const statusOptions: Array<{ value: PostingStatus; label: string }> = [
     { value: 'reconciled', label: 'Reconciled' },
 ];
 
+const includedStatuses = computed(() => statusesInMode('include'));
+const excludedStatuses = computed(() => statusesInMode('exclude'));
+
 const hasActiveFilters = computed(
     () =>
         filterAccountId.value !== null ||
-        filterStatus.value.length > 0 ||
+        includedStatuses.value.length > 0 ||
+        excludedStatuses.value.length > 0 ||
         filterFrom.value !== '' ||
         filterTo.value !== '' ||
         searchQuery.value !== '',
 );
 
-function toggleStatusFilter(status: PostingStatus): void {
-    filterStatus.value = filterStatus.value.includes(status)
-        ? filterStatus.value.filter((candidate) => candidate !== status)
-        : [...filterStatus.value, status];
+function statusesInMode(mode: StatusFilterMode): PostingStatus[] {
+    return statusOptions
+        .map((option) => option.value)
+        .filter((status) => statusFilterModes.value[status] === mode);
+}
+
+function nextStatusFilterMode(mode: StatusFilterMode | undefined): StatusFilterMode | undefined {
+    if (mode === undefined) {
+        return 'include';
+    }
+
+    return mode === 'include' ? 'exclude' : undefined;
+}
+
+function cycleStatusFilter(status: PostingStatus): void {
+    statusFilterModes.value = {
+        ...statusFilterModes.value,
+        [status]: nextStatusFilterMode(statusFilterModes.value[status]),
+    };
+}
+
+function statusFilterHint(status: PostingStatus): string {
+    const mode = statusFilterModes.value[status];
+
+    if (mode === 'include') {
+        return 'Included — click to exclude';
+    }
+
+    return mode === 'exclude' ? 'Excluded — click to clear' : 'Click to include';
 }
 const formOpen = ref(false);
 const editingTransaction = ref<Transaction | null>(null);
@@ -107,7 +138,8 @@ async function loadTransactions(): Promise<void> {
             params: {
                 page: page.value,
                 financial_account_id: filterAccountId.value ?? undefined,
-                status: filterStatus.value.length > 0 ? filterStatus.value : undefined,
+                status: includedStatuses.value.length > 0 ? includedStatuses.value : undefined,
+                exclude_status: excludedStatuses.value.length > 0 ? excludedStatuses.value : undefined,
                 from: filterFrom.value || undefined,
                 to: filterTo.value || undefined,
                 search: searchQuery.value || undefined,
@@ -124,9 +156,9 @@ async function applyFilters(): Promise<void> {
     await loadTransactions();
 }
 
-watch([filterAccountId, filterStatus, filterFrom, filterTo], () => {
+watch([filterAccountId, statusFilterModes, filterFrom, filterTo], () => {
     void applyFilters();
-}, { deep: true });
+});
 
 let searchDebounce: number | undefined;
 
@@ -286,9 +318,13 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                             :key="option.value"
                             type="button"
                             class="button-subtle"
-                            :class="{ 'border-accent text-accent hover:text-accent': filterStatus.includes(option.value) }"
-                            :aria-pressed="filterStatus.includes(option.value)"
-                            @click="toggleStatusFilter(option.value)"
+                            :class="{
+                                'border-accent text-accent hover:text-accent': statusFilterModes[option.value] === 'include',
+                                'border-danger text-danger line-through hover:text-danger': statusFilterModes[option.value] === 'exclude',
+                            }"
+                            :aria-pressed="statusFilterModes[option.value] === 'include' ? 'true' : statusFilterModes[option.value] === 'exclude' ? 'mixed' : 'false'"
+                            :title="statusFilterHint(option.value)"
+                            @click="cycleStatusFilter(option.value)"
                         >
                             {{ option.label }}
                         </button>

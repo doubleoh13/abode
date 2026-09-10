@@ -692,6 +692,28 @@ describe('with finance permissions', function () {
                 ->toBe([$reconciled->id, $cleared->id]);
         });
 
+        test('an exclude status filter hides the derived status and keeps statusless transactions', function () {
+            $pending = journalEntry('2026-08-01', $this->checking, $this->groceries, [], 'pending');
+            $cleared = journalEntry('2026-08-02', $this->checking, $this->groceries);
+            $reconciled = journalEntry('2026-08-03', $this->checking, $this->groceries, [], 'reconciled');
+            $statusless = Transaction::factory()->on('2026-08-04')->create();
+            Posting::factory()->forTransaction($statusless, 0)->inAccount($this->gains)->ofCommodity($this->usd)
+                ->create(['amount' => 100, 'status' => null]);
+            Posting::factory()->forTransaction($statusless, 1)->inAccount($this->groceries)->ofCommodity($this->usd)
+                ->create(['amount' => -100, 'status' => null]);
+
+            expect(indexIds($this, 'exclude_status[]=reconciled'))
+                ->toBe([$statusless->id, $cleared->id, $pending->id])
+                ->and(indexIds($this, 'exclude_status[]=pending&exclude_status[]=cleared'))
+                ->toBe([$statusless->id, $reconciled->id])
+                ->and(indexIds($this, 'status[]=pending&status[]=cleared&exclude_status[]=cleared'))
+                ->toBe([$pending->id]);
+
+            $this->getJson('/api/v1/financial/transactions?exclude_status[]=settled')
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('exclude_status.0');
+        });
+
         test('an unknown filter account is rejected', function () {
             $this->getJson('/api/v1/financial/transactions?financial_account_id=999999')
                 ->assertUnprocessable()
