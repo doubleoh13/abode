@@ -46,8 +46,10 @@ class SetupController extends Controller
             return $user;
         });
 
-        Auth::guard('web')->login($user);
-        $request->session()->regenerate();
+        if ($request->hasSession()) {
+            Auth::guard('web')->login($user);
+            $request->session()->regenerate();
+        }
 
         return new UserResource($user->load('permissions'));
     }

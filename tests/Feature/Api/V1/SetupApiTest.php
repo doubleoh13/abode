@@ -50,6 +50,15 @@ test('setup creates the first user with full permissions and an authenticated se
     expect(Hash::check('a-strong-password', $user->password))->toBeTrue();
 });
 
+test('setup without a same-origin referer creates the user but starts no session', function () {
+    $this->postJson('/api/v1/setup', setupPayload())
+        ->assertCreated()
+        ->assertJsonPath('data.email', 'jake@example.com');
+
+    $this->assertGuest();
+    $this->assertDatabaseCount('users', 1);
+});
+
 test('setup rejects an empty submission with form-language errors', function () {
     $this->postJson('/api/v1/setup', [])
         ->assertUnprocessable()
