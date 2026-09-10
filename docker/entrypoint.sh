@@ -2,8 +2,26 @@
 set -euo pipefail
 
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
-export PGPASSWORD="${DB_PASSWORD:-}"
-PG=(-h "${DB_HOST:-db}" -p "${DB_PORT:-5432}" -U "${DB_USERNAME:-abode}")
+
+require_environment() {
+    local name missing=()
+    for name in APP_KEY APP_URL DB_CONNECTION DB_HOST DB_PORT DB_DATABASE DB_USERNAME DB_PASSWORD; do
+        if [[ -z "${!name:-}" ]]; then
+            missing+=("$name")
+        fi
+    done
+    if ((${#missing[@]} > 0)); then
+        echo "Missing required environment variables: ${missing[*]}" >&2
+        echo "See docker/env.production.example for the full set" >&2
+        exit 1
+    fi
+    if [[ "$DB_CONNECTION" != "pgsql" ]]; then
+        echo "DB_CONNECTION must be pgsql (got '$DB_CONNECTION') - the migration protocol guards Postgres only" >&2
+        exit 1
+    fi
+    export PGPASSWORD="$DB_PASSWORD"
+    PG=(-h "$DB_HOST" -p "$DB_PORT" -U "$DB_USERNAME")
+}
 
 wait_for_database() {
     for _ in $(seq 1 60); do
@@ -13,7 +31,7 @@ wait_for_database() {
         fi
         sleep 2
     done
-    echo "Database ${DB_HOST:-db}:${DB_PORT:-5432}/${DB_DATABASE} unreachable after 120s" >&2
+    echo "Database ${DB_HOST}:${DB_PORT}/${DB_DATABASE} unreachable after 120s" >&2
     exit 1
 }
 
@@ -50,7 +68,7 @@ run_migration_protocol() {
     # would leave behind.
     psql "${PG[@]}" -d "$DB_DATABASE" -v ON_ERROR_STOP=1 \
         -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' \
-        -c "GRANT ALL ON SCHEMA public TO \"${DB_USERNAME:-abode}\";"
+        -c "GRANT ALL ON SCHEMA public TO \"${DB_USERNAME}\";"
     if ! pg_restore "${PG[@]}" -d "$DB_DATABASE" --no-owner --exit-on-error "$dump"; then
         echo "RESTORE FAILED - dump preserved at $dump" >&2
         exit 2
@@ -61,6 +79,7 @@ run_migration_protocol() {
 
 case "${1:-app}" in
     app)
+        require_environment
         wait_for_database
         if migrations_pending; then
             run_migration_protocol
@@ -69,6 +88,7 @@ case "${1:-app}" in
         exec apache2-foreground
         ;;
     scheduler)
+        require_environment
         wait_for_database
         cache_laravel
         exec php artisan schedule:work
