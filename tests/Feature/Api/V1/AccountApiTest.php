@@ -64,14 +64,18 @@ describe('with finance permissions', function () {
             ->assertJsonPath('errors.name.0', 'Enter an account name.');
     });
 
-    test('the index derives full paths for the whole tree', function () {
+    test('the index derives full paths and orders by them', function () {
         $food = Account::factory()->create(['name' => 'food']);
         Account::factory()->childOf($food)->create(['name' => 'dining-out']);
+        Account::factory()->ofType(AccountType::Asset)->create(['name' => 'Zebra-Savings']);
+        Account::factory()->ofType(AccountType::Asset)->create(['name' => 'checking']);
 
         $this->getJson('/api/v1/financial/accounts')
             ->assertOk()
-            ->assertJsonPath('data.0.path', 'expenses:food:dining-out')
-            ->assertJsonPath('data.1.path', 'expenses:food');
+            ->assertJsonPath('data.0.path', 'assets:checking')
+            ->assertJsonPath('data.1.path', 'assets:Zebra-Savings')
+            ->assertJsonPath('data.2.path', 'expenses:food')
+            ->assertJsonPath('data.3.path', 'expenses:food:dining-out');
     });
 
     test('an account can be created at an institution', function () {

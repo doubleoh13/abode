@@ -21,7 +21,7 @@ class AccountController extends Controller
 {
     public function index(): AnonymousResourceCollection
     {
-        $accounts = Account::query()->with('institution')->orderBy('name')->get();
+        $accounts = Account::query()->with('institution')->get();
 
         $accountsById = $accounts->keyBy('id');
 
@@ -31,7 +31,9 @@ class AccountController extends Controller
             }
         }
 
-        return AccountResource::collection($accounts);
+        return AccountResource::collection(
+            $accounts->sortBy(fn (Account $account): string => $account->path, SORT_NATURAL | SORT_FLAG_CASE)->values(),
+        );
     }
 
     public function store(StoreAccountRequest $request): AccountResource
