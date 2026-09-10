@@ -96,14 +96,14 @@ async function deleteInstitution(institution: Institution): Promise<void> {
                     <span class="flex items-center gap-3 font-mono text-xs text-muted">
                         <button
                             type="button"
-                            class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+                            class="tracking-wider uppercase transition-opacity sm:opacity-0 sm:group-hover:opacity-100 hover:text-foreground"
                             @click="openEditForm(institution)"
                         >
                             Edit
                         </button>
                         <button
                             type="button"
-                            class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
+                            class="tracking-wider uppercase transition-opacity sm:opacity-0 sm:group-hover:opacity-100 hover:text-danger"
                             @click="deleteInstitution(institution)"
                         >
                             Delete

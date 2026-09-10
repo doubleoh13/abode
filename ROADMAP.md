@@ -1,0 +1,35 @@
+# Roadmap
+
+Working list for Abode. Add ideas as they come up; move items to Done with the commit that shipped them.
+
+## Next
+
+- SimpleFIN import: pull transactions per linked account, create them Pending with the source and external id in metadata, never auto-categorize.
+- Duplicate candidate finder: surface likely pairs by account, amount, and a date window; each pair opens the merge dialog.
+- Accounts index balances: show a USD value and holdings count per row as of today, reusing the balance sheet builder.
+- Payee hygiene: search box, transaction count per payee, and a merge action that reassigns and deletes.
+
+## Backlog
+
+- Parent account pages roll up descendants into holdings and register instead of showing "No postings yet".
+- Upcoming band above the journal register for future-dated transactions, muted and separate from the paginated history.
+- Account balances shown without an as-of date currently include future-dated postings; decide whether displayed balances default to today.
+- Net Worth Over Time report: BalanceSheetBuilder sampled at period ends, hand-rolled SVG like the price chart.
+- Income Statement report.
+- Investment Performance report. Open question: attributing realized gains per commodity; start by inferring from sibling lot postings in the sale transaction.
+- Reconciliation batch action: assert a balance and mark everything through that date reconciled in one step.
+- Recurring schedules with lot-bearing legs (a recurring brokerage buy needs the day's price).
+- Business-day adjustment for schedules (previous or next business day when a due date lands on a weekend).
+- Expose the default recurring lead window through the API so the form's placeholder isn't hardcoded to the config value.
+
+## Decide
+
+- Liabilities tile shows a negative number under a heading that already says liabilities. Keep the sign or show the magnitude?
+- Institutions: none exist and the account tree already encodes the institution as its top segment. Drop the concept or start using it?
+- In-kind transfers inflate a lot's acquired-quantity denominator, so allocated bases can sum below lot cost. Affects the lots endpoint, account and commodity pages, and the balance sheet equally.
+
+## Done
+
+- Recurring transactions with scheduled posting, per-schedule lead window, journal Repeat toggle and Duplicate, Schedules page (74bb5fd, 2026-09-10).
+- Merge two transactions from the journal (89594d6, 2026-09-10).
+- Visual review pass: touch-visible row actions, Finances landing page, page titles, register headers, narrower simple modals, commodity and journal wrapping (2026-09-10).

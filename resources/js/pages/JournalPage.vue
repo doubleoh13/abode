@@ -427,8 +427,8 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                     }"
                     @click="pickMergeTarget(transaction)"
                 >
-                    <div class="flex items-center gap-4" :class="{ italic: transaction.status === 'pending' }">
-                        <span class="font-mono text-xs text-muted">{{ transaction.date }}</span>
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1" :class="{ italic: transaction.status === 'pending' }">
+                        <span class="font-mono text-xs whitespace-nowrap text-muted">{{ transaction.date }}</span>
 
                         <span
                             v-if="transaction.financial_recurring_transaction_id !== null"
@@ -453,45 +453,45 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                             </span>
                         </span>
 
-                        <span class="flex items-center gap-3 font-mono text-xs text-muted not-italic">
+                        <span class="flex basis-full items-center justify-end gap-3 font-mono text-xs text-muted not-italic sm:basis-auto">
                             <button
                                 type="button"
-                                class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+                                class="tracking-wider uppercase transition-opacity sm:opacity-0 sm:group-hover:opacity-100 hover:text-foreground"
                                 @click.stop="openEditForm(transaction)"
                             >
                                 Edit
                             </button>
                             <button
                                 type="button"
-                                class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+                                class="tracking-wider uppercase transition-opacity sm:opacity-0 sm:group-hover:opacity-100 hover:text-foreground"
                                 @click.stop="openDuplicateForm(transaction)"
                             >
                                 Duplicate
                             </button>
                             <button
                                 type="button"
-                                class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+                                class="tracking-wider uppercase transition-opacity sm:opacity-0 sm:group-hover:opacity-100 hover:text-foreground"
                                 @click.stop="startMerge(transaction)"
                             >
                                 Merge
                             </button>
                             <button
                                 type="button"
-                                class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
+                                class="tracking-wider uppercase transition-opacity sm:opacity-0 sm:group-hover:opacity-100 hover:text-danger"
                                 @click.stop="deleteTransaction(transaction)"
                             >
                                 Delete
                             </button>
                         </span>
 
-                        <span class="w-8 shrink-0"></span>
+                        <span class="hidden w-8 shrink-0 sm:block"></span>
                     </div>
 
                     <div class="mt-1 flex flex-col">
                         <div
                             v-for="posting in transaction.postings"
                             :key="posting.id"
-                            class="flex items-center gap-4 py-0.5 pl-24"
+                            class="flex items-center gap-4 py-0.5 pl-6 sm:pl-24"
                             :class="{
                                 italic:
                                     transaction.status === 'pending' &&
@@ -548,7 +548,7 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                     <span class="h-3 w-4 rounded-sm bg-edge/60"></span>
                     <span class="h-3 w-64 rounded-sm bg-edge/60"></span>
                 </div>
-                <div class="mt-2.5 flex flex-col gap-2 pb-1 pl-24">
+                <div class="mt-2.5 flex flex-col gap-2 pb-1 pl-6 sm:pl-24">
                     <div v-for="line in 2" :key="line" class="flex items-center justify-between">
                         <span class="h-3 w-72 rounded-sm bg-edge/60"></span>
                         <span class="h-3 w-24 rounded-sm bg-edge/60"></span>

@@ -2,6 +2,7 @@
 import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { setPageTitle } from '../router';
 import ComboBox from '../components/ComboBox.vue';
 import ModalDialog from '../components/ModalDialog.vue';
 import PaginationBar from '../components/PaginationBar.vue';
@@ -331,6 +332,7 @@ async function loadAccount(): Promise<void> {
     ]);
 
     account.value = accountResponse.data.data;
+    setPageTitle(account.value.path);
     balances.value = balancesResponse.data.data;
     lots.value = lotsResponse.data.data;
     commodities.value = commoditiesResponse.data.data;
@@ -513,11 +515,11 @@ watch(accountId, () => {
                             <input v-model="assertionForm.memo" type="text" class="input" />
                         </label>
 
-                        <div class="flex justify-end gap-3">
+                        <div class="flex gap-3">
+                            <button type="submit" class="button-primary">Save</button>
                             <button type="button" class="button-subtle" @click="assertionFormOpen = false">
                                 Cancel
                             </button>
-                            <button type="submit" class="button-primary">Save</button>
                         </div>
                     </form>
                 </ModalDialog>
@@ -528,6 +530,14 @@ watch(accountId, () => {
                     v-else
                     class="mt-2 divide-y divide-edge overflow-hidden rounded-md border border-edge bg-surface"
                 >
+                    <li class="grid grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_8.5rem_2rem] items-center gap-x-4 bg-background/40 px-4 py-2">
+                        <span class="field-label">Date</span>
+                        <span class="field-label">Payee</span>
+                        <span class="field-label">Counterparty</span>
+                        <span class="field-label text-right">Amount</span>
+                        <span class="field-label text-right">Balance</span>
+                        <span></span>
+                    </li>
                     <template v-for="row in registerRows" :key="row.kind === 'posting' ? `p-${row.posting.id}` : `a-${row.assertion.id}`">
                     <li
                         v-if="row.kind === 'assertion'"

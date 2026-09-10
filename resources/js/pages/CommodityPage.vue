@@ -2,6 +2,7 @@
 import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { setPageTitle } from '../router';
 import ModalDialog from '../components/ModalDialog.vue';
 import PaginationBar from '../components/PaginationBar.vue';
 import PriceChart from '../components/PriceChart.vue';
@@ -170,6 +171,7 @@ async function reloadPrices(): Promise<void> {
     ]);
 
     commodity.value = commodityResponse.data.data;
+    setPageTitle(commodity.value.code);
 }
 
 async function savePrice(): Promise<void> {
@@ -249,6 +251,7 @@ async function loadCommodity(): Promise<void> {
         ]);
 
     commodity.value = commodityResponse.data.data;
+    setPageTitle(commodity.value.code);
     balances.value = balancesResponse.data.data;
     lots.value = lotsResponse.data.data;
     accounts.value = accountsResponse.data.data;
@@ -432,7 +435,7 @@ watch(commodityId, () => {
                                     <span class="font-mono text-sm">{{ formatUsd(point.price) }}</span>
                                     <button
                                         type="button"
-                                        class="font-mono text-xs tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
+                                        class="font-mono text-xs tracking-wider uppercase transition-opacity sm:opacity-0 sm:group-hover:opacity-100 hover:text-danger"
                                         @click="deletePrice(point)"
                                     >
                                         Delete

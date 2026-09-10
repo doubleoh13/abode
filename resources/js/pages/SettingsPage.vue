@@ -224,7 +224,7 @@ function formatDate(value: string | null): string {
 
                     <button
                         type="button"
-                        class="font-mono text-xs tracking-wider text-muted uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
+                        class="font-mono text-xs tracking-wider text-muted uppercase transition-opacity sm:opacity-0 sm:group-hover:opacity-100 hover:text-danger"
                         @click="revokeToken(token)"
                     >
                         Revoke

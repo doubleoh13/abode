@@ -7,7 +7,6 @@ import BalanceSheetPage from './pages/BalanceSheetPage.vue';
 import CommoditiesPage from './pages/CommoditiesPage.vue';
 import CommodityPage from './pages/CommodityPage.vue';
 import FinancesPage from './pages/FinancesPage.vue';
-import HomePage from './pages/HomePage.vue';
 import InstitutionsPage from './pages/InstitutionsPage.vue';
 import JournalPage from './pages/JournalPage.vue';
 import LoginPage from './pages/LoginPage.vue';
@@ -26,71 +25,85 @@ export const router = createRouter({
             component: AppShell,
             meta: { requiresAuth: true },
             children: [
-                { path: '', name: 'home', component: HomePage },
+                { path: '', name: 'home', redirect: { name: 'finances' } },
                 {
                     path: 'finances',
                     children: [
-                        { path: '', name: 'finances', component: FinancesPage },
+                        { path: '', name: 'finances', component: FinancesPage, meta: { title: 'Finances' } },
                         {
                             path: 'journal',
                             name: 'finances.journal',
                             component: JournalPage,
+                            meta: { title: 'Journal' },
                         },
                         {
                             path: 'schedules',
                             name: 'finances.schedules',
                             component: SchedulesPage,
+                            meta: { title: 'Schedules' },
                         },
                         {
                             path: 'accounts',
                             name: 'finances.accounts',
                             component: AccountsPage,
+                            meta: { title: 'Accounts' },
                         },
                         {
                             path: 'accounts/:id',
                             name: 'finances.account',
                             component: AccountPage,
+                            meta: { title: 'Account' },
                         },
                         {
                             path: 'commodities',
                             name: 'finances.commodities',
                             component: CommoditiesPage,
+                            meta: { title: 'Commodities' },
                         },
                         {
                             path: 'commodities/:id',
                             name: 'finances.commodity',
                             component: CommodityPage,
+                            meta: { title: 'Commodity' },
                         },
                         {
                             path: 'reports',
                             name: 'finances.reports',
                             component: ReportsPage,
+                            meta: { title: 'Reports' },
                         },
                         {
                             path: 'reports/balance-sheet',
                             name: 'finances.reports.balance-sheet',
                             component: BalanceSheetPage,
+                            meta: { title: 'Balance sheet' },
                         },
                         {
                             path: 'institutions',
                             name: 'finances.institutions',
                             component: InstitutionsPage,
+                            meta: { title: 'Institutions' },
                         },
                         {
                             path: 'payees',
                             name: 'finances.payees',
                             component: PayeesPage,
+                            meta: { title: 'Payees' },
                         },
                     ],
                 },
-                { path: 'settings', name: 'settings', component: SettingsPage },
-                { path: ':pathMatch(.*)*', name: 'not-found', component: NotFoundPage },
+                { path: 'settings', name: 'settings', component: SettingsPage, meta: { title: 'Settings' } },
+                { path: ':pathMatch(.*)*', name: 'not-found', component: NotFoundPage, meta: { title: 'Not found' } },
             ],
         },
-        { path: '/login', name: 'login', component: LoginPage },
-        { path: '/setup', name: 'setup', component: SetupPage },
+        { path: '/login', name: 'login', component: LoginPage, meta: { title: 'Log in' } },
+        { path: '/setup', name: 'setup', component: SetupPage, meta: { title: 'Setup' } },
     ],
 });
+
+export function setPageTitle(title: string | undefined): void {
+    document.title = title ? `${title} · Abode` : 'Abode';
+}
 
 export function intendedDestination(query: LocationQuery): string {
     const redirect = query.redirect;
@@ -120,4 +133,8 @@ router.beforeEach(async (to) => {
     if (to.name === 'login' && auth.user) {
         return intendedDestination(to.query);
     }
+});
+
+router.afterEach((to) => {
+    setPageTitle(typeof to.meta.title === 'string' ? to.meta.title : undefined);
 });

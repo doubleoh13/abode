@@ -199,14 +199,14 @@ async function deleteAccount(account: Account): Promise<void> {
 
                                 <button
                                     type="button"
-                                    class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+                                    class="tracking-wider uppercase transition-opacity sm:opacity-0 sm:group-hover:opacity-100 hover:text-foreground"
                                     @click="openEditForm(account)"
                                 >
                                     Edit
                                 </button>
                                 <button
                                     type="button"
-                                    class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
+                                    class="tracking-wider uppercase transition-opacity sm:opacity-0 sm:group-hover:opacity-100 hover:text-danger"
                                     @click="deleteAccount(account)"
                                 >
                                     Delete

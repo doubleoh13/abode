@@ -42,7 +42,7 @@ async function save(): Promise<void> {
 </script>
 
 <template>
-    <form class="rounded-md border border-edge bg-surface p-6" @submit.prevent="save">
+    <form class="mx-auto max-w-md rounded-md border border-edge bg-surface p-6" @submit.prevent="save">
         <h2 class="font-mono text-xs tracking-wider text-muted uppercase">
             {{ institution ? 'Edit institution' : 'New institution' }}
         </h2>

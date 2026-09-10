@@ -92,7 +92,7 @@ function exampleAmount(commodity: Commodity): string {
                     </thead>
                     <tbody class="divide-y divide-edge">
                         <tr v-for="commodity in commodities" :key="commodity.id" class="group">
-                            <td class="px-4 py-2 font-mono">
+                            <td class="px-4 py-2 font-mono whitespace-nowrap">
                                 <RouterLink
                                     :to="{ name: 'finances.commodity', params: { id: commodity.id } }"
                                     class="transition-colors hover:text-accent"
@@ -102,11 +102,11 @@ function exampleAmount(commodity: Commodity): string {
                             </td>
                             <td class="px-4 py-2">{{ commodity.name }}</td>
                             <td class="px-4 py-2 text-muted">{{ commodity.kind }}</td>
-                            <td class="px-4 py-2 text-right font-mono text-muted">
+                            <td class="px-4 py-2 text-right font-mono whitespace-nowrap text-muted">
                                 {{ exampleAmount(commodity) }}
                             </td>
                             <td
-                                class="px-4 py-2 text-right font-mono"
+                                class="px-4 py-2 text-right font-mono whitespace-nowrap"
                                 :title="commodity.latest_priced_at ? `priced ${commodity.latest_priced_at}` : undefined"
                             >
                                 <template v-if="commodity.latest_price && usd">
@@ -121,14 +121,14 @@ function exampleAmount(commodity: Commodity): string {
                                 >
                                     <button
                                         type="button"
-                                        class="opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+                                        class="transition-opacity sm:opacity-0 sm:group-hover:opacity-100 hover:text-foreground"
                                         @click="openEditForm(commodity)"
                                     >
                                         Edit
                                     </button>
                                     <button
                                         type="button"
-                                        class="opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
+                                        class="transition-opacity sm:opacity-0 sm:group-hover:opacity-100 hover:text-danger"
                                         @click="deleteCommodity(commodity)"
                                     >
                                         Delete

@@ -113,9 +113,15 @@ async function deleteSchedule(schedule: RecurringTransaction): Promise<void> {
                 v-else
                 class="mt-6 divide-y divide-edge overflow-hidden rounded-md border border-edge bg-surface"
             >
+                <li class="flex items-center gap-4 bg-background/40 px-4 py-2">
+                    <span class="field-label w-20">Next due</span>
+                    <span class="field-label flex-1">Schedule</span>
+                    <span class="field-label">Repeats</span>
+                    <span class="w-8 shrink-0"></span>
+                </li>
                 <li v-for="schedule in schedules" :key="schedule.id" class="group px-4 py-2">
                     <div class="flex items-center gap-4">
-                        <span class="font-mono text-xs text-muted" title="Next due">{{ schedule.next_due_on }}</span>
+                        <span class="w-20 font-mono text-xs whitespace-nowrap text-muted">{{ schedule.next_due_on }}</span>
 
                         <span class="min-w-0 flex-1 truncate text-sm">
                             {{ schedule.payee?.name ?? schedule.memo ?? '—' }}
@@ -131,14 +137,14 @@ async function deleteSchedule(schedule: RecurringTransaction): Promise<void> {
                         <span class="flex items-center gap-3 font-mono text-xs text-muted">
                             <button
                                 type="button"
-                                class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+                                class="tracking-wider uppercase transition-opacity sm:opacity-0 sm:group-hover:opacity-100 hover:text-foreground"
                                 @click="openEditForm(schedule)"
                             >
                                 Edit
                             </button>
                             <button
                                 type="button"
-                                class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
+                                class="tracking-wider uppercase transition-opacity sm:opacity-0 sm:group-hover:opacity-100 hover:text-danger"
                                 @click="deleteSchedule(schedule)"
                             >
                                 Delete

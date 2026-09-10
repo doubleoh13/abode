@@ -47,7 +47,7 @@ async function copyToken(): Promise<void> {
 <template>
     <form
         v-if="plainTextToken === ''"
-        class="rounded-md border border-edge bg-surface p-6"
+        class="mx-auto max-w-md rounded-md border border-edge bg-surface p-6"
         @submit.prevent="create"
     >
         <h2 class="font-mono text-xs tracking-wider text-muted uppercase">New token</h2>
