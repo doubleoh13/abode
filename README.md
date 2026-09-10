@@ -1,6 +1,6 @@
 # Abode
 
-A household management app for the Richhart family. Currently focused on personal finance: a double-entry journal with commodities, lots, and cost basis; account and commodity dashboards; balance assertions; market pricing; and reports. It is a personal project — configuration lives in code, and there is no admin UI.
+A household management app for the Richhart family. Currently focused on personal finance: recording transactions in a double-entry journal (with commodities, lots, and cost basis), reconciling accounts against statements with balance assertions, tracking investments at market prices, and reading the results on account and commodity dashboards and reports. It is a personal project — configuration lives in code, and there is no admin UI.
 
 ## Stack
 
@@ -31,16 +31,8 @@ npm run build                                                     # vue-tsc type
 
 CI runs all of these on pull requests and pushes to `main`.
 
-## Production
+## How it runs
 
-Pushes to `main` that pass CI publish `ghcr.io/doubleoh13/abode` (`latest` + commit sha). The image serves the app with Apache and owns migration safety at startup: pending migrations trigger a `pg_dump` to the bind-mounted `backups/` directory, then `migrate --force` and a smoke check — on any failure the schema is restored from the dump and the container exits without serving.
+Production is a Docker Compose stack on the family home server, behind a TLS-terminating reverse proxy. Merging to `main` publishes the image (`ghcr.io/doubleoh13/abode`); updating the server is a deliberate, manual `docker compose pull && up -d`. The container migrates its own database on startup and refuses to serve if that fails, restoring from an automatic pre-migration backup.
 
-On the server:
-
-```bash
-# a directory containing compose.production.yml and a .env based on docker/env.production.example
-docker compose -f compose.production.yml up -d
-docker compose -f compose.production.yml exec app php artisan tinker   # create users
-```
-
-The app listens on `127.0.0.1:8080` for a TLS-terminating reverse proxy; the scheduler runs as a second container from the same image. Deploys are manual: `docker compose pull && docker compose up -d`.
+`compose.production.yml` defines the stack and `docker/env.production.example` documents its environment; the startup protocol lives in `docker/entrypoint.sh`. Users are created by hand — there is no registration.
