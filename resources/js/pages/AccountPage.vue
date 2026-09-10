@@ -3,6 +3,7 @@ import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { setPageTitle } from '../router';
+import DateInput from '../components/DateInput.vue';
 import ComboBox from '../components/ComboBox.vue';
 import ModalDialog from '../components/ModalDialog.vue';
 import PaginationBar from '../components/PaginationBar.vue';
@@ -488,7 +489,7 @@ watch(accountId, () => {
 
                         <label class="flex flex-col gap-1.5">
                             <span class="field-label">Date</span>
-                            <input v-model="assertionForm.asserted_at" type="date" required class="input" />
+                            <DateInput v-model="assertionForm.asserted_at" required />
                             <p v-if="assertionErrors.asserted_at" class="text-sm text-danger">
                                 {{ assertionErrors.asserted_at[0] }}
                             </p>

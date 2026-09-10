@@ -30,6 +30,8 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Done
 
+- DateInput replaces every native date picker (ISO text, arrow-key nudges, T for today); modal focus trap and restore; secondary form buttons out of the tab order; Enter on the last amount adds a posting (2026-09-10).
+
 - Recurring transactions with scheduled posting, per-schedule lead window, journal Repeat toggle and Duplicate, Schedules page (74bb5fd, 2026-09-10).
 - Merge two transactions from the journal (89594d6, 2026-09-10).
 - Visual review pass: touch-visible row actions, Finances landing page, page titles, register headers, narrower simple modals, commodity and journal wrapping (2026-09-10).

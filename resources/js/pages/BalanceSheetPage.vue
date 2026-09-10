@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import axios from 'axios';
 import { computed, onMounted, ref, watch } from 'vue';
+import DateInput from '../components/DateInput.vue';
 import SkeletonList from '../components/SkeletonList.vue';
 import { decimalToScaledInteger, formatAmount, scaledIntegerToDecimal } from '../money';
 import type { Account, AccountType, BalanceSheet, BalanceSheetRow, Commodity } from '../types';
@@ -279,7 +280,7 @@ function toggleHoldings(accountId: number): void {
 
             <label class="flex items-center gap-2">
                 <span class="field-label">As of</span>
-                <input v-model="asOf" type="date" class="input" />
+                <DateInput v-model="asOf" />
             </label>
         </div>
 

@@ -2,6 +2,7 @@
 import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, ref, watch } from 'vue';
 import AccountForm from './AccountForm.vue';
+import DateInput from './DateInput.vue';
 import ComboBox from './ComboBox.vue';
 import ModalDialog from './ModalDialog.vue';
 import PostingRow from './PostingRow.vue';
@@ -179,7 +180,8 @@ const title = computed(() => {
 
 const errors = ref<Record<string, string[]>>({});
 const submitting = ref(false);
-const dateInput = ref<HTMLInputElement | null>(null);
+const dateInput = ref<{ focus: () => void } | null>(null);
+const autofocusPostingIndex = ref<number | null>(null);
 
 onMounted(() => dateInput.value?.focus());
 
@@ -377,6 +379,20 @@ function addPosting(): void {
     postings.value.push(emptyDraft());
 }
 
+/**
+ * Enter on the last posting's amount starts the next posting instead of
+ * submitting; anywhere else Enter still saves.
+ */
+function handleAmountEnter(index: number, event: KeyboardEvent): void {
+    if (index !== postings.value.length - 1) {
+        return;
+    }
+
+    event.preventDefault();
+    autofocusPostingIndex.value = postings.value.length;
+    addPosting();
+}
+
 function removePosting(index: number): void {
     postings.value.splice(index, 1);
 }
@@ -524,7 +540,7 @@ async function save(): Promise<void> {
         <div class="mt-4 grid grid-cols-1 gap-4" :class="repeatAvailable ? 'sm:grid-cols-[1fr_1fr_1fr_auto]' : 'sm:grid-cols-3'">
             <label class="flex flex-col gap-1.5">
                 <span class="field-label">Date</span>
-                <input ref="dateInput" v-model="form.date" type="date" required class="input" />
+                <DateInput ref="dateInput" v-model="form.date" required />
                 <p v-if="errors.date" class="text-sm text-danger">{{ errors.date[0] }}</p>
             </label>
 
@@ -578,7 +594,7 @@ async function save(): Promise<void> {
             />
             <ComboBox v-model="repeat.frequency" :options="frequencyOptions" class="w-28" />
             <span>until</span>
-            <input v-model="repeat.ends_on" type="date" class="input" aria-label="End date" />
+            <DateInput v-model="repeat.ends_on" aria-label="End date" />
             <span>, posting</span>
             <input
                 v-model="repeat.lead_days"
@@ -632,6 +648,8 @@ async function save(): Promise<void> {
                     :errors="errors"
                     :removable="postings.length > 2"
                     :suggested-amount="index === postings.length - 1 ? balancingAmount : null"
+                    :autofocus="index === autofocusPostingIndex"
+                    @amount-enter="handleAmountEnter(index, $event)"
                     @remove="removePosting(index)"
                     @lots-loaded="registerLots"
                     @create-account="openAccountForm(index)"
@@ -645,6 +663,7 @@ async function save(): Promise<void> {
             <div class="flex items-center justify-between gap-4 border-t border-edge px-3 py-2 font-mono text-xs">
                 <button
                     type="button"
+                    tabindex="-1"
                     class="tracking-wider text-muted uppercase transition-colors hover:text-foreground"
                     @click="addPosting"
                 >

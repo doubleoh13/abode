@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import DateInput from '../components/DateInput.vue';
 import ComboBox from './ComboBox.vue';
 import type { Account, AccountType, Institution } from '../types';
 
@@ -140,13 +141,13 @@ async function save(): Promise<void> {
 
             <label class="flex flex-col gap-1.5">
                 <span class="field-label">Opened</span>
-                <input v-model="form.opened_at" type="date" class="input" />
+                <DateInput v-model="form.opened_at" />
                 <p v-if="errors.opened_at" class="text-sm text-danger">{{ errors.opened_at[0] }}</p>
             </label>
 
             <label class="flex flex-col gap-1.5">
                 <span class="field-label">Closed</span>
-                <input v-model="form.closed_at" type="date" class="input" />
+                <DateInput v-model="form.closed_at" />
                 <p v-if="errors.closed_at" class="text-sm text-danger">{{ errors.closed_at[0] }}</p>
             </label>
 

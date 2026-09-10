@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import DateInput from '../components/DateInput.vue';
 import ComboBox from './ComboBox.vue';
 import LotPicker from './LotPicker.vue';
 import type { Account, Commodity, Lot, PostingDraft, PostingStatus } from '../types';
@@ -15,10 +16,18 @@ const props = defineProps<{
     errors: Record<string, string[]>;
     removable: boolean;
     suggestedAmount: string | null;
+    autofocus?: boolean;
 }>();
 
-const emit = defineEmits<{ remove: []; lotsLoaded: [Lot[]]; createAccount: [] }>();
+const emit = defineEmits<{ remove: []; lotsLoaded: [Lot[]]; createAccount: []; amountEnter: [KeyboardEvent] }>();
 const memoOpen = ref(props.draft.memo !== '');
+const accountPicker = ref<{ focus: () => void } | null>(null);
+
+onMounted(() => {
+    if (props.autofocus) {
+        accountPicker.value?.focus();
+    }
+});
 
 const statusOptions: Array<{ value: PostingStatus; label: string }> = [
     { value: 'pending', label: 'Pending' },
@@ -98,6 +107,7 @@ function errorFor(field: string): string | null {
             <div class="flex flex-col gap-1.5">
                 <span class="field-label lg:sr-only">Account</span>
                 <ComboBox
+                    ref="accountPicker"
                     v-model="draft.financial_account_id"
                     :options="accountOptions"
                     fuzzy
@@ -119,11 +129,13 @@ function errorFor(field: string): string | null {
                         inputmode="decimal"
                         class="input w-full text-right font-mono"
                         :class="suggestedAmount !== null ? 'pr-8' : ''"
+                        @keydown.enter="emit('amountEnter', $event)"
                     />
                     <button
                         v-if="suggestedAmount !== null"
                         type="button"
                         class="absolute top-1/2 right-2 -translate-y-1/2 font-mono text-sm text-accent transition-colors hover:text-foreground"
+                        tabindex="-1"
                         title="Fill balancing amount"
                         aria-label="Fill balancing amount"
                         @click="draft.amount = suggestedAmount"
@@ -156,6 +168,7 @@ function errorFor(field: string): string | null {
                 v-if="removable"
                 type="button"
                 class="self-center font-mono text-lg leading-none text-muted transition-colors hover:text-danger"
+                tabindex="-1"
                 title="Remove posting"
                 aria-label="Remove posting"
                 @click="emit('remove')"
@@ -227,6 +240,7 @@ function errorFor(field: string): string | null {
                             Cost ({{ draft.lotCostMode === 'total' ? 'total' : 'per unit' }})
                             <button
                                 type="button"
+                                tabindex="-1"
                                 class="ml-1 font-mono text-xs tracking-wider text-muted uppercase hover:text-foreground"
                                 @click.prevent="draft.lotCostMode = draft.lotCostMode === 'total' ? 'unit' : 'total'"
                             >
@@ -241,7 +255,7 @@ function errorFor(field: string): string | null {
 
                     <label class="flex flex-col gap-1.5">
                         <span class="field-label">Acquired</span>
-                        <input v-model="draft.lotAcquiredAt" type="date" class="input" />
+                        <DateInput v-model="draft.lotAcquiredAt" />
                         <p v-if="errorFor('lot.acquired_at')" class="text-sm text-danger">
                             {{ errorFor('lot.acquired_at') }}
                         </p>
@@ -253,6 +267,7 @@ function errorFor(field: string): string | null {
         <div v-if="!memoOpen" class="mt-1.5 pl-1">
             <button
                 type="button"
+                tabindex="-1"
                 class="font-mono text-xs tracking-wider text-muted uppercase transition-colors hover:text-foreground"
                 @click="memoOpen = true"
             >

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, ref, watch } from 'vue';
+import DateInput from '../components/DateInput.vue';
 import ComboBox from '../components/ComboBox.vue';
 import MergeDialog from '../components/MergeDialog.vue';
 import ModalDialog from '../components/ModalDialog.vue';
@@ -395,12 +396,12 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
 
                 <label class="flex flex-col gap-1.5">
                     <span class="field-label">From</span>
-                    <input v-model="filterFrom" type="date" class="input" />
+                    <DateInput v-model="filterFrom" />
                 </label>
 
                 <label class="flex flex-col gap-1.5">
                     <span class="field-label">To</span>
-                    <input v-model="filterTo" type="date" class="input" />
+                    <DateInput v-model="filterTo" />
                 </label>
 
                 <label class="flex min-w-48 flex-1 flex-col gap-1.5">

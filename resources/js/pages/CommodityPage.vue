@@ -3,6 +3,7 @@ import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { setPageTitle } from '../router';
+import DateInput from '../components/DateInput.vue';
 import ModalDialog from '../components/ModalDialog.vue';
 import PaginationBar from '../components/PaginationBar.vue';
 import PriceChart from '../components/PriceChart.vue';
@@ -457,7 +458,7 @@ watch(commodityId, () => {
 
                         <label class="flex flex-col gap-1.5">
                             <span class="field-label">Date</span>
-                            <input v-model="priceForm.priced_at" type="date" required class="input" />
+                            <DateInput v-model="priceForm.priced_at" required />
                             <p v-if="priceErrors.priced_at" class="text-sm text-danger">
                                 {{ priceErrors.priced_at[0] }}
                             </p>

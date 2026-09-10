@@ -3,12 +3,20 @@ const openDialogs: symbol[] = [];
 </script>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, watch } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = defineProps<{ open: boolean; nested?: boolean }>();
 
 const emit = defineEmits<{ close: [] }>();
 const dialogId = Symbol();
+const panel = ref<HTMLElement | null>(null);
+let opener: Element | null = null;
+
+const FOCUSABLE = 'a[href], button:not([disabled]):not([tabindex="-1"]), input:not([disabled]):not([tabindex="-1"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function focusables(): HTMLElement[] {
+    return [...(panel.value?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])];
+}
 
 function removeFromStack(): void {
     const index = openDialogs.indexOf(dialogId);
@@ -25,14 +33,52 @@ watch(
 
         if (open) {
             openDialogs.push(dialogId);
+            opener = document.activeElement;
+
+            void nextTick(() => {
+                if (!panel.value?.contains(document.activeElement)) {
+                    focusables()[0]?.focus();
+                }
+            });
+        } else if (opener instanceof HTMLElement && document.contains(opener)) {
+            opener.focus();
+            opener = null;
         }
     },
     { immediate: true },
 );
 
 function handleKeydown(event: KeyboardEvent): void {
-    if (props.open && event.key === 'Escape' && openDialogs.at(-1) === dialogId) {
+    if (!props.open || openDialogs.at(-1) !== dialogId) {
+        return;
+    }
+
+    if (event.key === 'Escape') {
         emit('close');
+    }
+
+    if (event.key === 'Tab') {
+        trapFocus(event);
+    }
+}
+
+function trapFocus(event: KeyboardEvent): void {
+    const elements = focusables();
+
+    if (elements.length === 0) {
+        return;
+    }
+
+    const first = elements[0];
+    const last = elements[elements.length - 1];
+    const active = document.activeElement;
+
+    if (event.shiftKey && (active === first || !panel.value?.contains(active))) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && (active === last || !panel.value?.contains(active))) {
+        event.preventDefault();
+        first.focus();
     }
 }
 
@@ -53,6 +99,7 @@ onBeforeUnmount(() => {
                 @click.self="emit('close')"
             >
                 <div
+                    ref="panel"
                     class="modal-panel w-full max-w-5xl"
                     role="dialog"
                     aria-modal="true"
