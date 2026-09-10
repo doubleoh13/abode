@@ -1,4 +1,4 @@
-import type { PostingStatus } from './types';
+import type { PostingStatus, RecurrenceFrequency } from './types';
 
 export function statusSymbol(status: PostingStatus | null): string {
     if (status === 'pending') {
@@ -44,4 +44,10 @@ export function accountPathAncestor(path: string | undefined): string {
 
 export function accountPathLeaf(path: string | undefined): string {
     return path?.split(':').at(-1) ?? '';
+}
+
+export function recurrenceLabel(frequency: RecurrenceFrequency, interval: number): string {
+    const unit = { daily: 'day', weekly: 'week', monthly: 'month', yearly: 'year' }[frequency];
+
+    return interval === 1 ? `Every ${unit}` : `Every ${interval} ${unit}s`;
 }

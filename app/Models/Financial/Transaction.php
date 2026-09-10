@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * @property-read PostingStatus|null $status
  */
-#[Fillable(['date', 'financial_payee_id', 'memo', 'metadata'])]
+#[Fillable(['date', 'financial_payee_id', 'financial_recurring_transaction_id', 'memo', 'metadata'])]
 class Transaction extends Model
 {
     /** @use HasFactory<TransactionFactory> */
@@ -31,6 +31,14 @@ class Transaction extends Model
     public function payee(): BelongsTo
     {
         return $this->belongsTo(Payee::class, 'financial_payee_id');
+    }
+
+    /**
+     * @return BelongsTo<RecurringTransaction, $this>
+     */
+    public function recurringTransaction(): BelongsTo
+    {
+        return $this->belongsTo(RecurringTransaction::class, 'financial_recurring_transaction_id');
     }
 
     /**

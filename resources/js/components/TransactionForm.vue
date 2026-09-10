@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import AccountForm from './AccountForm.vue';
 import ComboBox from './ComboBox.vue';
 import ModalDialog from './ModalDialog.vue';
@@ -21,11 +21,17 @@ import type {
     Payee,
     Posting,
     PostingDraft,
+    RecurrenceFrequency,
+    RecurringPosting,
+    RecurringTransaction,
     Transaction,
 } from '../types';
 
 const props = defineProps<{
     transaction: Transaction | null;
+    schedule?: RecurringTransaction | null;
+    duplicateOf?: Transaction | null;
+    repeatRequired?: boolean;
     accounts: Account[];
     commodities: Commodity[];
     institutions: Institution[];
@@ -99,15 +105,77 @@ function draftFromPosting(posting: Posting): PostingDraft {
     };
 }
 
+function draftFromRecurringPosting(posting: RecurringPosting): PostingDraft {
+    return {
+        ...emptyDraft(),
+        status: posting.status,
+        financial_account_id: posting.financial_account_id,
+        financial_commodity_id: posting.financial_commodity_id,
+        amount: posting.amount,
+        memo: posting.memo ?? '',
+    };
+}
+
+const prefill = props.transaction ?? props.schedule ?? props.duplicateOf ?? null;
+
 const form = ref({
-    date: props.transaction?.date ?? new Date().toISOString().slice(0, 10),
-    financial_payee_id: props.transaction?.financial_payee_id ?? null,
-    memo: props.transaction?.memo ?? '',
+    date: props.transaction?.date ?? props.schedule?.next_due_on ?? new Date().toISOString().slice(0, 10),
+    financial_payee_id: prefill?.financial_payee_id ?? null,
+    memo: prefill?.memo ?? '',
 });
 
-const postings = ref<PostingDraft[]>(
-    props.transaction?.postings?.map(draftFromPosting) ?? [emptyDraft(), emptyDraft()],
-);
+function initialDrafts(): PostingDraft[] {
+    if (props.transaction?.postings) {
+        return props.transaction.postings.map(draftFromPosting);
+    }
+
+    if (props.schedule?.postings) {
+        return props.schedule.postings.map(draftFromRecurringPosting);
+    }
+
+    if (props.duplicateOf?.postings) {
+        return props.duplicateOf.postings.map((posting) => ({ ...draftFromPosting(posting), id: null }));
+    }
+
+    return [emptyDraft(), emptyDraft()];
+}
+
+const postings = ref<PostingDraft[]>(initialDrafts());
+
+const repeatAvailable = props.transaction === null;
+
+const repeat = ref<{ enabled: boolean; frequency: RecurrenceFrequency; interval: string; ends_on: string; lead_days: string }>({
+    enabled: props.schedule !== null && props.schedule !== undefined || props.repeatRequired === true,
+    frequency: props.schedule?.frequency ?? 'monthly',
+    interval: String(props.schedule?.interval ?? 1),
+    ends_on: props.schedule?.ends_on ?? '',
+    lead_days: props.schedule?.lead_days === null || props.schedule?.lead_days === undefined ? '' : String(props.schedule.lead_days),
+});
+
+const frequencyOptions = computed<Array<{ value: RecurrenceFrequency; label: string }>>(() => {
+    const plural = Number(repeat.value.interval) === 1 ? '' : 's';
+
+    return [
+        { value: 'daily', label: `day${plural}` },
+        { value: 'weekly', label: `week${plural}` },
+        { value: 'monthly', label: `month${plural}` },
+        { value: 'yearly', label: `year${plural}` },
+    ];
+});
+
+const isSchedule = computed(() => repeatAvailable && repeat.value.enabled);
+
+const title = computed(() => {
+    if (props.transaction) {
+        return 'Edit transaction';
+    }
+
+    if (props.schedule) {
+        return 'Edit schedule';
+    }
+
+    return isSchedule.value ? 'New schedule' : 'New transaction';
+});
 
 const errors = ref<Record<string, string[]>>({});
 const submitting = ref(false);
@@ -341,22 +409,89 @@ function postingPayload(draft: PostingDraft): Record<string, unknown> {
     return payload;
 }
 
-async function save(): Promise<void> {
-    submitting.value = true;
-    errors.value = {};
-
-    const payload = {
+function transactionPayload(): Record<string, unknown> {
+    return {
         date: form.value.date,
         financial_payee_id: form.value.financial_payee_id,
         memo: form.value.memo || null,
         postings: postings.value.map(postingPayload),
     };
+}
+
+function schedulePayload(): Record<string, unknown> {
+    return {
+        ...transactionPayload(),
+        frequency: repeat.value.frequency,
+        interval: Number(repeat.value.interval),
+        ends_on: repeat.value.ends_on || null,
+        lead_days: repeat.value.lead_days.trim() === '' ? null : Number(repeat.value.lead_days),
+    };
+}
+
+const scheduleUrl = props.schedule
+    ? `/api/v1/financial/recurring-transactions/${props.schedule.id}`
+    : '/api/v1/financial/recurring-transactions';
+const previewUrl = props.schedule
+    ? `/api/v1/financial/recurring-transactions/preview/${props.schedule.id}`
+    : '/api/v1/financial/recurring-transactions/preview';
+
+const previewDueDates = ref<string[] | null>(null);
+let previewDebounce: number | undefined;
+let previewRequest = 0;
+
+async function loadPreview(): Promise<void> {
+    const request = ++previewRequest;
+
+    const incomplete = postings.value.some(
+        (draft) => draft.financial_account_id === null || parseAmount(draft.amount) === null,
+    );
+
+    if (!isSchedule.value || incomplete) {
+        previewDueDates.value = null;
+        return;
+    }
+
+    try {
+        const response = await axios.post<{ data: { due_dates: string[] } }>(previewUrl, schedulePayload());
+
+        if (request === previewRequest) {
+            previewDueDates.value = response.data.data.due_dates;
+        }
+    } catch (error) {
+        if (isAxiosError(error) && error.response?.status === 422) {
+            if (request === previewRequest) {
+                previewDueDates.value = null;
+            }
+        } else {
+            throw error;
+        }
+    }
+}
+
+watch(
+    [form, postings, repeat],
+    () => {
+        window.clearTimeout(previewDebounce);
+        previewDebounce = window.setTimeout(() => void loadPreview(), 300);
+    },
+    { deep: true, immediate: true },
+);
+
+async function save(): Promise<void> {
+    submitting.value = true;
+    errors.value = {};
 
     try {
         if (props.transaction) {
-            await axios.put(`/api/v1/financial/transactions/${props.transaction.id}`, payload);
+            await axios.put(`/api/v1/financial/transactions/${props.transaction.id}`, transactionPayload());
+        } else if (isSchedule.value) {
+            if (props.schedule) {
+                await axios.put(scheduleUrl, schedulePayload());
+            } else {
+                await axios.post(scheduleUrl, schedulePayload());
+            }
         } else {
-            await axios.post('/api/v1/financial/transactions', payload);
+            await axios.post('/api/v1/financial/transactions', transactionPayload());
         }
 
         emit('saved');
@@ -384,11 +519,9 @@ async function save(): Promise<void> {
     </ModalDialog>
 
     <form class="rounded-md border border-edge bg-surface p-5" @submit.prevent="save">
-        <h2 class="font-mono text-xs tracking-wider text-muted uppercase">
-            {{ transaction ? 'Edit transaction' : 'New transaction' }}
-        </h2>
+        <h2 class="font-mono text-xs tracking-wider text-muted uppercase">{{ title }}</h2>
 
-        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="mt-4 grid grid-cols-1 gap-4" :class="repeatAvailable ? 'sm:grid-cols-[1fr_1fr_1fr_auto]' : 'sm:grid-cols-3'">
             <label class="flex flex-col gap-1.5">
                 <span class="field-label">Date</span>
                 <input ref="dateInput" v-model="form.date" type="date" required class="input" />
@@ -418,7 +551,63 @@ async function save(): Promise<void> {
                 <input v-model="form.memo" type="text" class="input" />
                 <p v-if="errors.memo" class="text-sm text-danger">{{ errors.memo[0] }}</p>
             </label>
+
+            <label v-if="repeatAvailable" class="flex flex-col gap-1.5">
+                <span class="field-label">Repeat</span>
+                <span class="flex h-[2.375rem] items-center">
+                    <input
+                        v-model="repeat.enabled"
+                        type="checkbox"
+                        class="size-4 accent-accent"
+                        :disabled="repeatRequired"
+                    />
+                </span>
+            </label>
         </div>
+
+        <div v-if="isSchedule" class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-muted">
+            <span class="field-label">Repeats</span>
+            <span>every</span>
+            <input
+                v-model="repeat.interval"
+                type="number"
+                min="1"
+                max="365"
+                class="input w-16 text-right font-mono"
+                aria-label="Interval"
+            />
+            <ComboBox v-model="repeat.frequency" :options="frequencyOptions" class="w-28" />
+            <span>until</span>
+            <input v-model="repeat.ends_on" type="date" class="input" aria-label="End date" />
+            <span>, posting</span>
+            <input
+                v-model="repeat.lead_days"
+                type="number"
+                min="0"
+                max="365"
+                class="input w-16 text-right font-mono"
+                placeholder="14"
+                aria-label="Lead days"
+            />
+            <span>days ahead</span>
+
+            <p v-if="errors.frequency || errors.interval || errors.ends_on || errors.lead_days" class="basis-full text-danger">
+                {{ (errors.frequency ?? errors.interval ?? errors.ends_on ?? errors.lead_days)?.[0] }}
+            </p>
+        </div>
+
+        <p v-if="isSchedule" class="mt-2 text-sm text-muted">
+            <template v-if="previewDueDates === null">
+                <span class="font-mono text-xs tracking-wider uppercase">Complete the form to preview</span>
+            </template>
+            <template v-else-if="previewDueDates.length === 0">
+                Nothing posts now. The first occurrence is due {{ form.date }}.
+            </template>
+            <template v-else>
+                Posts now:
+                <span class="font-mono text-xs text-foreground">{{ previewDueDates.join(' · ') }}</span>
+            </template>
+        </p>
 
         <div class="mt-6 overflow-visible rounded-sm border border-edge bg-background/40">
             <div class="hidden grid-cols-[minmax(16rem,1fr)_9rem_8rem_8rem_2rem] gap-3 border-b border-edge px-3 py-2 lg:grid">

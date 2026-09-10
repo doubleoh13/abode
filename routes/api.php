@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\Financial\JournalIssueController;
 use App\Http\Controllers\Api\V1\Financial\LotController;
 use App\Http\Controllers\Api\V1\Financial\PayeeController;
 use App\Http\Controllers\Api\V1\Financial\PostingController;
+use App\Http\Controllers\Api\V1\Financial\RecurringTransactionController;
 use App\Http\Controllers\Api\V1\Financial\ReportController;
 use App\Http\Controllers\Api\V1\Financial\TransactionController;
 use App\Http\Controllers\Api\V1\NoteController;
@@ -42,6 +43,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('commodities', CommodityController::class)->only(['index', 'show']);
             Route::apiResource('payees', PayeeController::class)->only(['index', 'show']);
             Route::apiResource('transactions', TransactionController::class)->only(['index', 'show']);
+            Route::apiResource('recurring-transactions', RecurringTransactionController::class)->only(['index', 'show']);
             Route::get('accounts/{account}/balances', [AccountController::class, 'balances'])->name('accounts.balances');
             Route::get('commodities/{commodity}/balances', [CommodityController::class, 'balances'])->name('commodities.balances');
             Route::get('commodities/{commodity}/price-series', [CommodityController::class, 'priceSeries'])->name('commodities.price-series');
@@ -59,6 +61,9 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('commodities', CommodityController::class)->only(['store', 'update', 'destroy']);
             Route::apiResource('payees', PayeeController::class)->only(['store', 'update', 'destroy']);
             Route::apiResource('transactions', TransactionController::class)->only(['store', 'update', 'destroy']);
+            Route::post('recurring-transactions/preview/{recurring_transaction?}', [RecurringTransactionController::class, 'preview'])
+                ->name('recurring-transactions.preview');
+            Route::apiResource('recurring-transactions', RecurringTransactionController::class)->only(['store', 'update', 'destroy']);
             Route::apiResource('postings', PostingController::class)->only('update');
             Route::apiResource('balance-assertions', BalanceAssertionController::class)->only(['store', 'destroy']);
             Route::apiResource('commodity-prices', CommodityPriceController::class)->only(['store', 'destroy']);

@@ -99,6 +99,7 @@ function statusFilterHint(status: PostingStatus): string {
 }
 const formOpen = ref(false);
 const editingTransaction = ref<Transaction | null>(null);
+const duplicatingTransaction = ref<Transaction | null>(null);
 
 const issuesByTransaction = computed(() => {
     const map = new Map<number, JournalIssue[]>();
@@ -200,11 +201,19 @@ async function changePage(target: number): Promise<void> {
 
 function openCreateForm(): void {
     editingTransaction.value = null;
+    duplicatingTransaction.value = null;
     formOpen.value = true;
 }
 
 function openEditForm(transaction: Transaction): void {
     editingTransaction.value = transaction;
+    duplicatingTransaction.value = null;
+    formOpen.value = true;
+}
+
+function openDuplicateForm(transaction: Transaction): void {
+    editingTransaction.value = null;
+    duplicatingTransaction.value = transaction;
     formOpen.value = true;
 }
 
@@ -223,6 +232,7 @@ function registerAccount(account: Account): void {
 function closeForm(): void {
     formOpen.value = false;
     editingTransaction.value = null;
+    duplicatingTransaction.value = null;
 }
 
 async function transactionSaved(): Promise<void> {
@@ -283,8 +293,9 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
         <template v-if="loaded">
             <ModalDialog :open="formOpen" @close="closeForm">
                 <TransactionForm
-                    :key="editingTransaction?.id ?? 'new'"
+                    :key="editingTransaction?.id ?? (duplicatingTransaction ? `duplicate-${duplicatingTransaction.id}` : 'new')"
                     :transaction="editingTransaction"
+                    :duplicate-of="duplicatingTransaction"
                     :accounts="accounts"
                     :commodities="commodities"
                     :institutions="institutions"
@@ -360,6 +371,14 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                         <span class="font-mono text-xs text-muted">{{ transaction.date }}</span>
 
                         <span
+                            v-if="transaction.financial_recurring_transaction_id !== null"
+                            class="cursor-help font-mono text-xs text-muted"
+                            title="Posted from a schedule"
+                        >
+                            ↻
+                        </span>
+
+                        <span
                             v-if="issuesByTransaction.has(transaction.id)"
                             class="cursor-help text-danger"
                             :title="issuesByTransaction.get(transaction.id)?.map((issue) => issue.message).join('\n')"
@@ -381,6 +400,13 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                                 @click="openEditForm(transaction)"
                             >
                                 Edit
+                            </button>
+                            <button
+                                type="button"
+                                class="tracking-wider uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+                                @click="openDuplicateForm(transaction)"
+                            >
+                                Duplicate
                             </button>
                             <button
                                 type="button"

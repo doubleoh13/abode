@@ -67,12 +67,19 @@ class TransactionWriter
      */
     private function transactionAttributes(array $data): array
     {
-        return [
+        $attributes = [
             'date' => $data['date'],
             'financial_payee_id' => $data['financial_payee_id'] ?? null,
             'memo' => $data['memo'] ?? null,
             'metadata' => $data['metadata'] ?? [],
         ];
+
+        // Only the materializer sets the schedule link; API edits never clear it.
+        if (array_key_exists('financial_recurring_transaction_id', $data)) {
+            $attributes['financial_recurring_transaction_id'] = $data['financial_recurring_transaction_id'];
+        }
+
+        return $attributes;
     }
 
     /**

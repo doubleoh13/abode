@@ -100,10 +100,41 @@ export interface Transaction {
     date: string;
     financial_payee_id: number | null;
     payee?: Payee | null;
+    financial_recurring_transaction_id: number | null;
     memo: string | null;
     metadata: Record<string, unknown>;
     status?: PostingStatus | null;
     postings?: Posting[];
+}
+
+export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export interface RecurringPosting {
+    id: number;
+    position: number;
+    status: PostingStatus | null;
+    financial_account_id: number;
+    account?: Account;
+    financial_commodity_id: number;
+    commodity?: Commodity;
+    amount: string;
+    memo: string | null;
+    metadata: Record<string, unknown>;
+}
+
+export interface RecurringTransaction {
+    id: number;
+    financial_payee_id: number | null;
+    payee?: Payee | null;
+    memo: string | null;
+    metadata: Record<string, unknown>;
+    frequency: RecurrenceFrequency;
+    interval: number;
+    starts_on: string;
+    next_due_on: string;
+    ends_on: string | null;
+    lead_days: number | null;
+    postings?: RecurringPosting[];
 }
 
 export interface JournalIssue {

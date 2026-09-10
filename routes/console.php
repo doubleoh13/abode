@@ -17,3 +17,6 @@ Schedule::command('financial:fetch-prices')
     ->onFailure(function (Stringable $output): void {
         Log::error('financial:fetch-prices failed', ['output' => trim((string) $output)]);
     });
+
+// Runs after the price fetch so the day's new postings never race it.
+Schedule::command('financial:post-recurring')->dailyAt('05:30');

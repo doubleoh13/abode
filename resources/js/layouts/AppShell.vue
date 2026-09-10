@@ -83,6 +83,7 @@ async function endSession(): Promise<void> {
                         <RouterLink
                             v-for="subItem in [
                                 { name: 'finances.journal', label: 'Journal' },
+                                { name: 'finances.schedules', label: 'Schedules' },
                                 { name: 'finances.accounts', label: 'Accounts' },
                                 { name: 'finances.commodities', label: 'Commodities' },
                                 { name: 'finances.reports', label: 'Reports' },

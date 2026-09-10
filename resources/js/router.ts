@@ -14,6 +14,7 @@ import LoginPage from './pages/LoginPage.vue';
 import NotFoundPage from './pages/NotFoundPage.vue';
 import PayeesPage from './pages/PayeesPage.vue';
 import ReportsPage from './pages/ReportsPage.vue';
+import SchedulesPage from './pages/SchedulesPage.vue';
 import SettingsPage from './pages/SettingsPage.vue';
 import SetupPage from './pages/SetupPage.vue';
 
@@ -34,6 +35,11 @@ export const router = createRouter({
                             path: 'journal',
                             name: 'finances.journal',
                             component: JournalPage,
+                        },
+                        {
+                            path: 'schedules',
+                            name: 'finances.schedules',
+                            component: SchedulesPage,
                         },
                         {
                             path: 'accounts',

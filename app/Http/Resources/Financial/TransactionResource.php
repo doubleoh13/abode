@@ -24,6 +24,7 @@ class TransactionResource extends JsonResource
             'date' => $this->date->toDateString(),
             'financial_payee_id' => $this->financial_payee_id,
             'payee' => new PayeeResource($this->whenLoaded('payee')),
+            'financial_recurring_transaction_id' => $this->financial_recurring_transaction_id,
             'memo' => $this->memo,
             'metadata' => $this->metadata,
             /**
