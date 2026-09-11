@@ -2,6 +2,7 @@
 
 namespace App\Support\Financial;
 
+use App\Models\Financial\BankTransaction;
 use App\Models\Financial\Commodity;
 use App\Models\Financial\Lot;
 use App\Models\Financial\Posting;
@@ -71,11 +72,36 @@ class TransactionWriter
             foreach ($absorbed as $transaction) {
                 $transaction->notes()->update(['noteable_id' => $merged->id]);
                 $transaction->attachments()->update(['attachable_id' => $merged->id]);
+                $this->relinkBankTransactions($transaction, $merged);
                 $this->destroy($transaction);
             }
 
             return $merged;
         });
+    }
+
+    /**
+     * Bank links follow their posting into the merged transaction when a
+     * posting with the same account and amount survives; otherwise the bank
+     * row returns to the inbox.
+     */
+    private function relinkBankTransactions(Transaction $absorbed, Transaction $merged): void
+    {
+        $survivors = $merged->postings()->get();
+
+        foreach ($absorbed->postings()->with('bankTransaction')->get() as $posting) {
+            if ($posting->bankTransaction === null) {
+                continue;
+            }
+
+            $match = $survivors->first(
+                fn (Posting $candidate): bool => $candidate->financial_account_id === $posting->financial_account_id
+                    && $candidate->amount->isEqualTo($posting->amount)
+                    && ! BankTransaction::query()->where('financial_posting_id', $candidate->id)->exists(),
+            );
+
+            $posting->bankTransaction->update(['financial_posting_id' => $match?->id]);
+        }
     }
 
     public function destroy(Transaction $transaction): void

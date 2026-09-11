@@ -45,6 +45,9 @@ export interface Account {
     allow_postings: boolean;
     institution?: Institution | null;
     simplefin_account_id: string | null;
+    simplefin_synced_at: string | null;
+    simplefin_balance: string | null;
+    simplefin_balance_date: string | null;
     opened_at: string | null;
     closed_at: string | null;
 }
