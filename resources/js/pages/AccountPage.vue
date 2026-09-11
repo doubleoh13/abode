@@ -58,6 +58,8 @@ const loaded = ref(false);
 
 const accountId = computed(() => Number(route.params.id));
 
+const reconcilable = computed(() => account.value?.account_type === 'asset' || account.value?.account_type === 'liability');
+
 const commoditiesById = computed(() => new Map(commodities.value.map((commodity) => [commodity.id, commodity])));
 
 function lotBasisShare(lot: Lot): string {
@@ -1032,7 +1034,7 @@ async function accountSaved(): Promise<void> {
                     <h2 class="font-mono text-xs tracking-wider text-muted uppercase">Register</h2>
 
                     <span class="flex items-center gap-3">
-                        <button type="button" class="button-subtle" @click="openAssertionForm">
+                        <button v-if="reconcilable" type="button" class="button-subtle" @click="openAssertionForm">
                             New assertion
                         </button>
                         <button type="button" class="button-primary" @click="creatingTransaction = true">
