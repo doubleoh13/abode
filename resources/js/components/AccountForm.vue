@@ -33,7 +33,7 @@ const form = reactive({
     simplefin_account_id: (props.account?.simplefin_account_id ?? null) as string | null,
 });
 
-const simpleFinConfigured = ref(false);
+const simpleFinConfigured = ref<boolean | null>(null);
 const simpleFinAccounts = ref<SimpleFinAccount[]>([]);
 const simpleFinErrors = ref<string[]>([]);
 
@@ -195,7 +195,7 @@ async function save(): Promise<void> {
                 <p v-if="errors.closed_at" class="text-sm text-danger">{{ errors.closed_at[0] }}</p>
             </label>
 
-            <div v-if="simpleFinConfigured && reconcilable" class="flex flex-col gap-1.5">
+            <div v-if="simpleFinConfigured !== false && reconcilable" class="flex flex-col gap-1.5">
                 <span class="field-label">SimpleFIN account</span>
                 <ComboBox v-model="form.simplefin_account_id" :options="simpleFinOptions" nullable fuzzy />
                 <p v-if="errors.simplefin_account_id" class="text-sm text-danger">{{ errors.simplefin_account_id[0] }}</p>

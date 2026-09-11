@@ -30,6 +30,7 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Done
 
+- Account form shows the SimpleFIN picker immediately while the list loads; the four-hourly sync refreshes the cached account list so the picker is warm (2026-09-11).
 - SimpleFIN: config('financial.simplefin.ignored_description_patterns') drops Fidelity SPAXX core-position sweep rows (REDEMPTION FROM / PURCHASE INTO CORE ACCOUNT, REINVESTMENT) before staging; the dividend row itself still lands (2026-09-11).
 - Account register: Hide reconciled toggle (GET postings?hide_reconciled=1, running balances still count hidden lines), remembered per account in localStorage; while hidden, only the newest balance assertion marker shows (2026-09-11).
 - Account page: New transaction button prefills the first leg with the current account; the transaction form offers Save and new (Ctrl+Enter) when creating, keeping the date and default account; Enter anywhere on a balanced transaction saves, on the last amount of an unbalanced one it adds a posting; form buttons right-aligned (2026-09-11).

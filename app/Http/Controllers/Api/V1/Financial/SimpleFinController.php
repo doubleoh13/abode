@@ -11,13 +11,10 @@ use App\Support\Financial\SimpleFin\SimpleFinImporter;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Cache;
 
 #[Group('Financial / SimpleFIN')]
 class SimpleFinController extends Controller
 {
-    private const int CACHE_SECONDS = 3600;
-
     /**
      * The accounts SimpleFIN exposes, for mapping onto Abode accounts. The
      * bridge answer is cached for an hour, since it refreshes from banks
@@ -30,7 +27,7 @@ class SimpleFinController extends Controller
             return response()->json(['data' => [], 'configured' => false, 'errors' => []]);
         }
 
-        $result = Cache::remember('simplefin.accounts', self::CACHE_SECONDS, fn (): array => $client->accounts());
+        $result = $client->cachedAccounts();
 
         return response()->json([
             'data' => array_map(fn (SimpleFinAccount $account): array => [

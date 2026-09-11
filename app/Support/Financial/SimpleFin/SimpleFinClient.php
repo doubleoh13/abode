@@ -3,6 +3,7 @@
 namespace App\Support\Financial\SimpleFin;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -12,6 +13,29 @@ use RuntimeException;
  */
 class SimpleFinClient
 {
+    private const string ACCOUNTS_CACHE_KEY = 'simplefin.accounts';
+
+    private const int ACCOUNTS_CACHE_SECONDS = 3600;
+
+    /**
+     * The account list, served from cache for an hour so the account form
+     * opens without a bridge round trip.
+     *
+     * @return array{accounts: list<SimpleFinAccount>, errors: list<string>}
+     */
+    public function cachedAccounts(): array
+    {
+        return Cache::remember(self::ACCOUNTS_CACHE_KEY, self::ACCOUNTS_CACHE_SECONDS, fn (): array => $this->accounts());
+    }
+
+    /**
+     * Fetch the account list now and replace the cached copy.
+     */
+    public function refreshAccountsCache(): void
+    {
+        Cache::put(self::ACCOUNTS_CACHE_KEY, $this->accounts(), self::ACCOUNTS_CACHE_SECONDS);
+    }
+
     public function isConfigured(): bool
     {
         return is_string(config('services.simplefin.access_url')) && config('services.simplefin.access_url') !== '';

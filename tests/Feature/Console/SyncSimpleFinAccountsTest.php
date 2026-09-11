@@ -3,6 +3,7 @@
 use App\Models\Financial\Account;
 use App\Models\Financial\BankTransaction;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 test('an unconfigured bridge is reported without calling out', function () {
@@ -19,12 +20,13 @@ test('an unconfigured bridge is reported without calling out', function () {
 
 test('every mapped account is synced and a failing one does not stop the rest', function () {
     config()->set('services.simplefin.access_url', 'https://user:secret@bridge.example/simplefin');
+    Cache::flush();
     $checking = Account::factory()->create(['name' => 'Checking', 'simplefin_account_id' => 'ACT-1']);
     $savings = Account::factory()->create(['name' => 'Savings', 'simplefin_account_id' => 'ACT-GONE']);
     Account::factory()->create(['name' => 'Cash']);
 
     Http::fake(function ($request) {
-        $accountId = $request['account'];
+        $accountId = $request->data()['account'] ?? null;
 
         return Http::response([
             'errors' => [],
@@ -49,9 +51,10 @@ test('every mapped account is synced and a failing one does not stop the rest', 
         ->expectsOutputToContain("{$savings->path}: SimpleFIN no longer lists the mapped account.")
         ->assertFailed();
 
-    Http::assertSentCount(2);
+    Http::assertSentCount(3);
 
-    expect(BankTransaction::query()->where('financial_account_id', $checking->id)->count())->toBe(1)
+    expect(Cache::has('simplefin.accounts'))->toBeTrue()
+        ->and(BankTransaction::query()->where('financial_account_id', $checking->id)->count())->toBe(1)
         ->and($checking->refresh()->simplefin_synced_at)->not->toBeNull()
         ->and($savings->refresh()->simplefin_synced_at)->toBeNull();
 });

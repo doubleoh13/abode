@@ -24,6 +24,14 @@ class SyncSimpleFinAccounts extends Command
 
         $failed = 0;
 
+        try {
+            $client->refreshAccountsCache();
+        } catch (Throwable $exception) {
+            $failed++;
+            report($exception);
+            $this->error("Account list: {$exception->getMessage()}");
+        }
+
         Account::query()
             ->whereNotNull('simplefin_account_id')
             ->orderBy('id')
