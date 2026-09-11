@@ -466,6 +466,61 @@ describe('with finance permissions', function () {
         $this->assertModelMissing($droppedPosting);
     });
 
+    test('a reconciled posting is read-only until it is unreconciled, except for its memo', function () {
+        $created = $this->postJson('/api/v1/financial/transactions', [
+            'date' => '2026-08-01',
+            'postings' => [
+                journalLeg($this->checking, $this->usd, -100, ['status' => 'reconciled']),
+                journalLeg($this->groceries, $this->usd, 100),
+            ],
+        ])->assertCreated();
+
+        $transactionId = $created->json('data.id');
+        [$checkingLeg, $groceriesLeg] = $created->json('data.postings');
+
+        $this->putJson("/api/v1/financial/transactions/{$transactionId}", [
+            'date' => '2026-08-01',
+            'postings' => [
+                journalLeg($this->checking, $this->usd, -120, ['id' => $checkingLeg['id'], 'status' => 'reconciled']),
+                journalLeg($this->groceries, $this->usd, 120, ['id' => $groceriesLeg['id']]),
+            ],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['postings.0.status' => 'Unreconcile this posting before changing it.']);
+
+        $this->putJson("/api/v1/financial/transactions/{$transactionId}", [
+            'date' => '2026-08-01',
+            'postings' => [
+                journalLeg($this->groceries, $this->usd, 100, ['id' => $groceriesLeg['id']]),
+                journalLeg($this->gains, $this->usd, -100),
+            ],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['postings' => 'Unreconcile a posting before removing it.']);
+
+        $this->putJson("/api/v1/financial/transactions/{$transactionId}", [
+            'date' => '2026-08-02',
+            'postings' => [
+                journalLeg($this->checking, $this->usd, -100, ['id' => $checkingLeg['id'], 'status' => 'reconciled', 'memo' => 'Statement line 12']),
+                journalLeg($this->groceries, $this->usd, 100, ['id' => $groceriesLeg['id']]),
+            ],
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.postings.0.status', 'reconciled')
+            ->assertJsonPath('data.postings.0.memo', 'Statement line 12');
+
+        $this->putJson("/api/v1/financial/transactions/{$transactionId}", [
+            'date' => '2026-08-02',
+            'postings' => [
+                journalLeg($this->checking, $this->usd, -120, ['id' => $checkingLeg['id'], 'status' => 'cleared']),
+                journalLeg($this->groceries, $this->usd, 120, ['id' => $groceriesLeg['id']]),
+            ],
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.postings.0.status', 'cleared')
+            ->assertJsonPath('data.postings.0.amount', '-120');
+    });
+
     test('a zero posting amount is rejected by the database', function () {
         expect(fn () => Posting::factory()->create(['amount' => 0]))
             ->toThrow(QueryException::class, 'financial_postings_amount_nonzero');

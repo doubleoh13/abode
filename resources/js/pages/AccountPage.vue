@@ -407,6 +407,7 @@ const assertionForm = reactive({
     financial_commodity_id: null as number | null,
     balance: '',
     memo: '',
+    reconcile_postings: false,
 });
 const assertionErrors = ref<Record<string, string[]>>({});
 
@@ -416,6 +417,7 @@ function openAssertionForm(): void {
         balances.value[0]?.financial_commodity_id ?? usd.value?.id ?? null;
     assertionForm.balance = '';
     assertionForm.memo = '';
+    assertionForm.reconcile_postings = false;
     assertionErrors.value = {};
     assertionFormOpen.value = true;
     void prefillAssertionBalance();
@@ -446,14 +448,18 @@ watch(
 async function saveAssertion(): Promise<void> {
     assertionErrors.value = {};
 
+    let holds = true;
+
     try {
-        await axios.post('/api/v1/financial/balance-assertions', {
+        const response = await axios.post<{ holds: boolean; reconciled_postings: number }>('/api/v1/financial/balance-assertions', {
             financial_account_id: accountId.value,
             financial_commodity_id: assertionForm.financial_commodity_id,
             asserted_at: assertionForm.asserted_at,
             balance: assertionForm.balance,
             memo: assertionForm.memo || null,
+            reconcile_postings: assertionForm.reconcile_postings,
         });
+        holds = response.data.holds;
     } catch (error) {
         if (isAxiosError(error) && error.response?.status === 422) {
             assertionErrors.value = error.response.data.errors ?? {};
@@ -464,7 +470,11 @@ async function saveAssertion(): Promise<void> {
     }
 
     assertionFormOpen.value = false;
-    await loadAssertions();
+    await Promise.all([loadAssertions(), loadPostings()]);
+
+    if (assertionForm.reconcile_postings && !holds) {
+        alert('The journal does not match this balance, so nothing was marked reconciled.');
+    }
 }
 
 async function deleteAssertion(assertion: BalanceAssertion): Promise<void> {
@@ -943,6 +953,11 @@ async function accountSaved(): Promise<void> {
                         <label class="flex flex-col gap-1.5">
                             <span class="field-label">Memo</span>
                             <input v-model="assertionForm.memo" type="text" class="input" />
+                        </label>
+
+                        <label class="flex items-center gap-3 text-sm">
+                            <input v-model="assertionForm.reconcile_postings" type="checkbox" class="size-4 shrink-0 accent-accent" />
+                            <span>Reconcile through this date</span>
                         </label>
 
                         <div class="flex gap-3">

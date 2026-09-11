@@ -42,6 +42,12 @@ class StoreBalanceAssertionRequest extends FormRequest
                 new ExactDecimal(allowNegative: true, allowZero: true, message: 'Enter a valid balance.'),
             ],
             'memo' => ['nullable', 'string', 'max:255'],
+            /**
+             * When true and the journal agrees with the balance, every posting in this
+             * account and commodity dated on or before the assertion is marked reconciled.
+             * Counter legs in other accounts are never touched.
+             */
+            'reconcile_postings' => ['sometimes', 'boolean'],
         ];
     }
 

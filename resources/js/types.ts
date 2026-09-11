@@ -224,6 +224,7 @@ export interface PostingDraft {
     financial_lot_id: number | null;
     financial_bank_transaction_id: number | null;
     bankTransaction: BankTransaction | null;
+    locked: boolean;
     lotMode: 'existing' | 'new';
     lotCost: string;
     lotCostMode: 'total' | 'unit';

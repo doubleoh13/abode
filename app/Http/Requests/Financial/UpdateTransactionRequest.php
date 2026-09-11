@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Financial;
 
+use App\Enums\Financial\PostingStatus;
 use App\Models\Financial\Transaction;
+use Brick\Math\BigDecimal;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Validator;
 
@@ -42,8 +44,64 @@ class UpdateTransactionRequest extends StoreTransactionRequest
     {
         return [
             fn (Validator $validator) => $this->validatePostingOwnership($validator),
+            fn (Validator $validator) => $this->validateReconciledPostings($validator),
             ...parent::after(),
         ];
+    }
+
+    /**
+     * A reconciled posting is read-only: it can be neither changed nor
+     * removed while its status stays reconciled. Sending it back with any
+     * other status is the explicit unreconcile that unlocks it.
+     */
+    protected function validateReconciledPostings(Validator $validator): void
+    {
+        if ($validator->errors()->isNotEmpty()) {
+            return;
+        }
+
+        $reconciled = $this->transaction()->postings()
+            ->where('status', PostingStatus::Reconciled)
+            ->get()
+            ->keyBy('id');
+
+        if ($reconciled->isEmpty()) {
+            return;
+        }
+
+        $keptIds = [];
+
+        foreach ($this->postingInputs() as $index => $posting) {
+            $persisted = isset($posting['id']) ? $reconciled->get((int) $posting['id']) : null;
+
+            if ($persisted === null) {
+                continue;
+            }
+
+            $keptIds[] = $persisted->id;
+
+            if (($posting['status'] ?? null) !== PostingStatus::Reconciled->value) {
+                continue;
+            }
+
+            $unchanged = (int) $posting['financial_account_id'] === $persisted->financial_account_id
+                && (int) $posting['financial_commodity_id'] === $persisted->financial_commodity_id
+                && ($posting['financial_lot_id'] ?? null) === $persisted->financial_lot_id
+                && ! isset($posting['lot'])
+                && BigDecimal::of($posting['amount'])->isEqualTo($persisted->amount);
+
+            if (! $unchanged) {
+                $validator->errors()->add("postings.{$index}.status", 'Unreconcile this posting before changing it.');
+            }
+        }
+
+        foreach ($reconciled as $posting) {
+            if (! in_array($posting->id, $keptIds, true)) {
+                $validator->errors()->add('postings', 'Unreconcile a posting before removing it.');
+
+                break;
+            }
+        }
     }
 
     protected function validatePostingOwnership(Validator $validator): void

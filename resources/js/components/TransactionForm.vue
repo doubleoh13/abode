@@ -85,6 +85,7 @@ function emptyDraft(): PostingDraft {
         financial_lot_id: null,
         financial_bank_transaction_id: null,
         bankTransaction: null,
+        locked: false,
         lotMode: 'existing',
         lotCost: '',
         lotCostMode: 'total',
@@ -107,6 +108,7 @@ function draftFromPosting(posting: Posting): PostingDraft {
         financial_lot_id: posting.financial_lot_id,
         financial_bank_transaction_id: null,
         bankTransaction: posting.bank_transaction ?? null,
+        locked: posting.status === 'reconciled',
         lotMode: posting.lot && decimalToScaledInteger(posting.amount) > 0n ? 'new' : 'existing',
         lotCost: posting.lot ? posting.lot.cost : '',
         lotCostMode: 'total',
@@ -151,7 +153,7 @@ function initialDrafts(): PostingDraft[] {
     }
 
     if (props.duplicateOf?.postings) {
-        return props.duplicateOf.postings.map((posting) => ({ ...draftFromPosting(posting), id: null, bankTransaction: null }));
+        return props.duplicateOf.postings.map((posting) => ({ ...draftFromPosting(posting), id: null, bankTransaction: null, locked: false }));
     }
 
     if (props.bankTransaction) {
@@ -670,11 +672,10 @@ async function save(): Promise<void> {
         </p>
 
         <div class="mt-6 overflow-visible rounded-sm border border-edge bg-background/40">
-            <div class="hidden grid-cols-[minmax(16rem,1fr)_9rem_8rem_8rem_2rem] gap-3 border-b border-edge px-3 py-2 lg:grid">
+            <div class="hidden gap-3 border-b border-edge px-3 py-2 lg:grid" :class="postings.length > 2 ? 'grid-cols-[minmax(16rem,1fr)_9rem_8rem_3rem]' : 'grid-cols-[minmax(16rem,1fr)_9rem_8rem_1.5rem]'">
                 <span class="field-label">Account</span>
                 <span class="field-label text-right">Amount</span>
                 <span class="field-label">Commodity</span>
-                <span class="field-label">Status</span>
                 <span></span>
             </div>
 

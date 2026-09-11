@@ -8,6 +8,7 @@ const props = defineProps<{
     status: PostingStatus;
     matched?: boolean;
     detail?: string;
+    align?: 'left' | 'right';
 }>();
 
 const emit = defineEmits<{
@@ -26,7 +27,7 @@ function place(): void {
     const rect = trigger.value?.getBoundingClientRect();
 
     if (rect) {
-        position.value = { top: rect.bottom + 4, left: rect.right };
+        position.value = { top: rect.bottom + 4, left: props.align === 'left' ? rect.left : rect.right };
     }
 }
 
@@ -65,6 +66,7 @@ function onMenuKeydown(event: KeyboardEvent): void {
 
     if (event.key === 'Escape') {
         event.preventDefault();
+        event.stopPropagation();
         hide();
         trigger.value?.focus();
     } else if (event.key === 'ArrowDown') {
@@ -102,8 +104,8 @@ onBeforeUnmount(() => {
     <button
         ref="trigger"
         type="button"
-        class="w-8 shrink-0 rounded-sm text-right font-mono text-sm not-italic transition-colors hover:bg-edge/60 hover:text-foreground"
-        :class="statusClass(matched ?? false)"
+        class="shrink-0 rounded-sm font-mono text-sm not-italic transition-colors hover:bg-edge/60 hover:text-foreground"
+        :class="[statusClass(matched ?? false), align === 'left' ? 'px-1 text-center' : 'w-8 text-right']"
         :title="detail ? `${statusLabel(status)} · ${detail}` : statusLabel(status)"
         aria-haspopup="menu"
         :aria-expanded="open"
@@ -119,7 +121,8 @@ onBeforeUnmount(() => {
             ref="menu"
             role="menu"
             tabindex="-1"
-            class="fixed z-20 w-36 -translate-x-full rounded-sm border border-edge bg-surface py-1 outline-none"
+            class="fixed z-[70] w-36 rounded-sm border border-edge bg-surface py-1 outline-none"
+            :class="align === 'left' ? '' : '-translate-x-full'"
             :style="{ top: `${position.top}px`, left: `${position.left}px` }"
             @keydown="onMenuKeydown"
             @click.stop

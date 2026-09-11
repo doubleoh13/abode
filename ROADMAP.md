@@ -30,6 +30,8 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Done
 
+- Reconciled postings are read-only in the transaction form (memo still editable) behind an explicit Unreconcile; the update API rejects field changes or removal of a posting that stays reconciled (2026-09-11).
+- Balance assertion form: optional "mark this account's postings through this date reconciled"; applies only when the journal matches the balance and only to the asserted account's own legs (2026-09-11).
 - SimpleFIN chunk 7: financial:simplefin-sync every four hours; a matched pending bank row that settles clears a Pending posting (never touches Cleared/Reconciled); header shows the bank balance and the difference from the ledger; register and form flag a matched posting whose amount differs from the bank row (2026-09-11).
 - Register: a hover icon beside the payee opens the line's transaction in the form, where a matched bank row shows beneath its posting with an Unmatch action (POST bank-transactions/{id}/unmatch frees the row and declines that posting); a +n counterparty expands to list every counter leg with amounts. Account path prefixes capitalized (Assets:, Liabilities:, Income:, Expenses:, Equity:) (2026-09-11).
 - SimpleFIN chunk 6: hand matching — Match on a band row puts the register in pick mode (unmatched status-bearing lines clickable, others dimmed, Esc or Cancel exits); clicking a line calls POST bank-transactions/{id}/match (2026-09-11).

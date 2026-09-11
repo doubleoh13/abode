@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import DateInput from './DateInput.vue';
 import ComboBox from './ComboBox.vue';
 import LotPicker from './LotPicker.vue';
+import PostingStatusMenu from './PostingStatusMenu.vue';
 import { decimalToScaledInteger, formatAmount, parseAmount } from '../money';
 import type { Account, Commodity, Lot, PostingDraft, PostingStatus } from '../types';
 
@@ -38,11 +39,6 @@ onMounted(() => {
     }
 });
 
-const statusOptions: Array<{ value: PostingStatus; label: string }> = [
-    { value: 'pending', label: 'Pending' },
-    { value: 'cleared', label: 'Cleared' },
-    { value: 'reconciled', label: 'Reconciled' },
-];
 
 const accountOptions = computed(() => {
     const parentIds = new Set(
@@ -105,14 +101,50 @@ const attachedLot = computed(() =>
         : null,
 );
 
+const lockedAccountPath = computed(() => props.accounts.find((candidate) => candidate.id === props.draft.financial_account_id)?.path ?? '—');
+const lockedCommodity = computed(() => props.commodities.find((candidate) => candidate.id === props.draft.financial_commodity_id) ?? null);
+
+function changeLockedStatus(status: PostingStatus): void {
+    props.draft.status = status;
+    props.draft.locked = status === 'reconciled';
+}
+
 function errorFor(field: string): string | null {
     return props.errors[`postings.${props.index}.${field}`]?.[0] ?? null;
 }
 </script>
 
 <template>
-    <div class="px-3 py-2.5">
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,1fr)_9rem_8rem_8rem_2rem] lg:items-start">
+    <div v-if="draft.locked" class="px-3 py-2.5">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:items-center" :class="removable ? 'lg:grid-cols-[minmax(16rem,1fr)_9rem_8rem_3rem]' : 'lg:grid-cols-[minmax(16rem,1fr)_9rem_8rem_1.5rem]'">
+            <span class="truncate text-sm">{{ lockedAccountPath }}</span>
+            <span class="text-right font-mono text-sm">
+                {{ lockedCommodity ? formatAmount(draft.amount, lockedCommodity) : draft.amount }}
+            </span>
+            <span class="text-sm text-muted">{{ lockedCommodity?.code ?? '' }}</span>
+            <span class="flex items-center">
+                <PostingStatusMenu status="reconciled" align="left" @select="changeLockedStatus" />
+            </span>
+        </div>
+        <label v-if="memoOpen" class="mt-3 flex flex-col gap-1.5">
+            <span class="field-label">Posting memo</span>
+            <input v-model="draft.memo" type="text" class="input" />
+            <p v-if="errorFor('memo')" class="text-sm text-danger">{{ errorFor('memo') }}</p>
+        </label>
+        <div v-else class="mt-1.5 pl-1">
+            <button
+                type="button"
+                tabindex="-1"
+                class="font-mono text-xs tracking-wider text-muted uppercase transition-colors hover:text-foreground"
+                @click="memoOpen = true"
+            >
+                + Memo
+            </button>
+        </div>
+    </div>
+
+    <div v-else class="px-3 py-2.5">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:items-start" :class="removable ? 'lg:grid-cols-[minmax(16rem,1fr)_9rem_8rem_3rem]' : 'lg:grid-cols-[minmax(16rem,1fr)_9rem_8rem_1.5rem]'">
             <div class="flex flex-col gap-1.5">
                 <span class="field-label lg:sr-only">Account</span>
                 <ComboBox
@@ -164,27 +196,30 @@ function errorFor(field: string): string | null {
             </div>
 
             <div class="flex flex-col gap-1.5">
-                <span v-if="carriesStatus" class="field-label lg:sr-only">Status</span>
-                <template v-if="carriesStatus">
-                    <ComboBox v-model="draft.status" :options="statusOptions" />
-                    <p v-if="errorFor('status')" class="text-sm text-danger">
-                        {{ errorFor('status') }}
-                    </p>
-                </template>
+                <span v-if="carriesStatus" class="field-label sr-only">Status</span>
+                <span class="flex h-[2.375rem] items-center gap-1">
+                    <PostingStatusMenu
+                        v-if="carriesStatus && draft.status !== null"
+                        :status="draft.status"
+                        align="left"
+                        @select="draft.status = $event"
+                    />
+                    <button
+                        v-if="removable"
+                        type="button"
+                        class="px-1 font-mono text-lg leading-none text-muted transition-colors hover:text-danger"
+                        tabindex="-1"
+                        title="Remove posting"
+                        aria-label="Remove posting"
+                        @click="emit('remove')"
+                    >
+                        ×
+                    </button>
+                </span>
+                <p v-if="errorFor('status')" class="text-sm text-danger">
+                    {{ errorFor('status') }}
+                </p>
             </div>
-
-            <button
-                v-if="removable"
-                type="button"
-                class="self-center font-mono text-lg leading-none text-muted transition-colors hover:text-danger"
-                tabindex="-1"
-                title="Remove posting"
-                aria-label="Remove posting"
-                @click="emit('remove')"
-            >
-                ×
-            </button>
-            <span v-else class="hidden lg:block"></span>
         </div>
 
         <div
