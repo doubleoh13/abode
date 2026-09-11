@@ -29,6 +29,7 @@ return [
         'timezone' => 'America/Indiana/Indianapolis',
         'initial_days' => 30,
         'overlap_days' => 7,
+        'match_window_days' => 5,
     ],
 
 ];

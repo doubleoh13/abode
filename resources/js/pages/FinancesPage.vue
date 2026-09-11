@@ -3,11 +3,12 @@ import axios from 'axios';
 import { computed, onMounted, ref } from 'vue';
 import { recurrenceLabel } from '../journal';
 import { formatAmount } from '../money';
-import type { BalanceSheet, Commodity, JournalIssue, RecurringTransaction } from '../types';
+import type { BalanceSheet, BankTransaction, Commodity, JournalIssue, Paginated, RecurringTransaction } from '../types';
 
 const report = ref<BalanceSheet | null>(null);
 const schedules = ref<RecurringTransaction[]>([]);
 const issues = ref<JournalIssue[]>([]);
+const inboxCount = ref(0);
 const usd = ref<Commodity | null>(null);
 const loaded = ref(false);
 
@@ -18,13 +19,15 @@ function formatBaseAmount(value: string): string {
 }
 
 onMounted(async () => {
-    const [reportResponse, schedulesResponse, issuesResponse, commoditiesResponse] = await Promise.all([
+    const [reportResponse, schedulesResponse, issuesResponse, commoditiesResponse, inboxResponse] = await Promise.all([
         axios.get<{ data: BalanceSheet }>('/api/v1/financial/reports/balance-sheet'),
         axios.get<{ data: RecurringTransaction[] }>('/api/v1/financial/recurring-transactions'),
         axios.get<{ data: JournalIssue[] }>('/api/v1/financial/journal-issues'),
         axios.get<{ data: Commodity[] }>('/api/v1/financial/commodities'),
+        axios.get<Paginated<BankTransaction>>('/api/v1/financial/bank-transactions'),
     ]);
 
+    inboxCount.value = inboxResponse.data.meta.total;
     report.value = reportResponse.data.data;
     schedules.value = schedulesResponse.data.data;
     issues.value = issuesResponse.data.data;
@@ -44,6 +47,14 @@ onMounted(async () => {
                 class="mt-4 block rounded-md border border-danger/40 bg-danger/10 px-4 py-2 text-sm text-danger transition-colors hover:bg-danger/20"
             >
                 {{ issues.length }} journal {{ issues.length === 1 ? 'issue needs' : 'issues need' }} attention.
+            </RouterLink>
+
+            <RouterLink
+                v-if="inboxCount > 0"
+                :to="{ name: 'finances.inbox' }"
+                class="mt-4 block rounded-md border border-accent/40 bg-accent/10 px-4 py-2 text-sm transition-colors hover:bg-accent/20"
+            >
+                {{ inboxCount }} bank {{ inboxCount === 1 ? 'transaction' : 'transactions' }} to review.
             </RouterLink>
 
             <RouterLink :to="{ name: 'finances.reports.balance-sheet' }" class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">

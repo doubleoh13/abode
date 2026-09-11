@@ -7,6 +7,7 @@ import BalanceSheetPage from './pages/BalanceSheetPage.vue';
 import CommoditiesPage from './pages/CommoditiesPage.vue';
 import CommodityPage from './pages/CommodityPage.vue';
 import FinancesPage from './pages/FinancesPage.vue';
+import InboxPage from './pages/InboxPage.vue';
 import InstitutionsPage from './pages/InstitutionsPage.vue';
 import JournalPage from './pages/JournalPage.vue';
 import LoginPage from './pages/LoginPage.vue';
@@ -35,6 +36,12 @@ export const router = createRouter({
                             name: 'finances.journal',
                             component: JournalPage,
                             meta: { title: 'Journal' },
+                        },
+                        {
+                            path: 'inbox',
+                            name: 'finances.inbox',
+                            component: InboxPage,
+                            meta: { title: 'Inbox' },
                         },
                         {
                             path: 'schedules',

@@ -16,6 +16,7 @@ import {
 } from '../money';
 import type {
     Account,
+    BankTransaction,
     Commodity,
     Institution,
     Lot,
@@ -32,6 +33,7 @@ const props = defineProps<{
     transaction: Transaction | null;
     schedule?: RecurringTransaction | null;
     duplicateOf?: Transaction | null;
+    bankTransaction?: BankTransaction | null;
     repeatRequired?: boolean;
     accounts: Account[];
     commodities: Commodity[];
@@ -120,9 +122,9 @@ function draftFromRecurringPosting(posting: RecurringPosting): PostingDraft {
 const prefill = props.transaction ?? props.schedule ?? props.duplicateOf ?? null;
 
 const form = ref({
-    date: props.transaction?.date ?? props.schedule?.next_due_on ?? new Date().toISOString().slice(0, 10),
+    date: props.transaction?.date ?? props.schedule?.next_due_on ?? props.bankTransaction?.posted_on ?? new Date().toISOString().slice(0, 10),
     financial_payee_id: prefill?.financial_payee_id ?? null,
-    memo: prefill?.memo ?? '',
+    memo: prefill?.memo ?? props.bankTransaction?.description ?? '',
 });
 
 function initialDrafts(): PostingDraft[] {
@@ -136,6 +138,18 @@ function initialDrafts(): PostingDraft[] {
 
     if (props.duplicateOf?.postings) {
         return props.duplicateOf.postings.map((posting) => ({ ...draftFromPosting(posting), id: null }));
+    }
+
+    if (props.bankTransaction) {
+        return [
+            {
+                ...emptyDraft(),
+                status: props.bankTransaction.pending ? 'pending' : 'cleared',
+                financial_account_id: props.bankTransaction.financial_account_id,
+                amount: props.bankTransaction.amount,
+            },
+            emptyDraft(),
+        ];
     }
 
     return [emptyDraft(), emptyDraft()];
@@ -493,6 +507,30 @@ watch(
     { deep: true, immediate: true },
 );
 
+/**
+ * A transaction created from a bank row settles it with the posting on
+ * the bank's account for the bank's amount, if the form still has one.
+ */
+async function matchBankTransaction(created: Transaction): Promise<void> {
+    const bankTransaction = props.bankTransaction;
+
+    if (!bankTransaction) {
+        return;
+    }
+
+    const posting = created.postings?.find(
+        (candidate) =>
+            candidate.financial_account_id === bankTransaction.financial_account_id &&
+            decimalToScaledInteger(candidate.amount) === decimalToScaledInteger(bankTransaction.amount),
+    );
+
+    if (posting) {
+        await axios.post(`/api/v1/financial/bank-transactions/${bankTransaction.id}/match`, {
+            financial_posting_id: posting.id,
+        });
+    }
+}
+
 async function save(): Promise<void> {
     submitting.value = true;
     errors.value = {};
@@ -507,7 +545,11 @@ async function save(): Promise<void> {
                 await axios.post(scheduleUrl, schedulePayload());
             }
         } else {
-            await axios.post('/api/v1/financial/transactions', transactionPayload());
+            const created = (
+                await axios.post<{ data: Transaction }>('/api/v1/financial/transactions', transactionPayload())
+            ).data.data;
+
+            await matchBankTransaction(created);
         }
 
         emit('saved');

@@ -9,8 +9,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Collection;
 
 /**
+ * @property Collection<int, Posting> $candidates
+ *
  * A transaction as a bank reported it. Evidence, not a journal entry: it
  * becomes part of the ledger only when linked to a posting.
  */

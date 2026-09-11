@@ -4,12 +4,14 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Next
 
-- SimpleFIN, in chunks: (3) review inbox: unresolved bank rows with Match to an existing posting, Create via the transaction form pre-filled, and Ignore, plus candidate matching by account, amount, and date window; (4) opt-in balance assertions from the stored bank balance; (5) payee rules so repeat descriptions map to a payee and category.
+- SimpleFIN, in chunks: (4) opt-in balance assertions from the stored bank balance; (5) payee rules so repeat descriptions map to a payee and category.
 - Duplicate candidate finder: surface likely pairs by account, amount, and a date window; each pair opens the merge dialog.
 - Accounts index balances: show a USD value and holdings count per row as of today, reusing the balance sheet builder.
 - Payee hygiene: search box, transaction count per payee, and a merge action that reassigns and deletes.
 
 ## Backlog
+
+- Show a bank-link marker on journal postings that settle a bank transaction, and let a posting be unlinked from there.
 
 - Bank rows whose id changes between pending and posted leave a stale pending row; handle in the inbox first, automate only if it recurs.
 
@@ -31,6 +33,8 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 - In-kind transfers inflate a lot's acquired-quantity denominator, so allocated bases can sum below lot cost. Affects the lots endpoint, account and commodity pages, and the balance sheet equally.
 
 ## Done
+
+- SimpleFIN chunk 3: /finances/inbox lists unresolved bank rows with candidate postings (same account and amount within 5 days), Match, Create via the pre-filled transaction form, Ignore and Restore; landing page count (2026-09-11).
 
 - SimpleFIN chunk 2: financial_bank_transactions staging table linked per posting, importer every four hours with a 30-day first window and 7-day overlap, bank balance and sync time on accounts, merge carries bank links (2026-09-11).
 
