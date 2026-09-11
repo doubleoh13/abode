@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\Financial\PayeeController;
 use App\Http\Controllers\Api\V1\Financial\PostingController;
 use App\Http\Controllers\Api\V1\Financial\RecurringTransactionController;
 use App\Http\Controllers\Api\V1\Financial\ReportController;
+use App\Http\Controllers\Api\V1\Financial\SimpleFinController;
 use App\Http\Controllers\Api\V1\Financial\TransactionController;
 use App\Http\Controllers\Api\V1\NoteController;
 use App\Http\Controllers\Api\V1\SetupController;
@@ -68,6 +69,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('postings', PostingController::class)->only('update');
             Route::apiResource('balance-assertions', BalanceAssertionController::class)->only(['store', 'destroy']);
             Route::apiResource('commodity-prices', CommodityPriceController::class)->only(['store', 'destroy']);
+            Route::get('simplefin/accounts', [SimpleFinController::class, 'accounts'])->name('simplefin.accounts');
         });
     });
 });

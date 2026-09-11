@@ -26,6 +26,7 @@ class AccountResource extends JsonResource
             'parent_id' => $this->parent_id,
             'allow_postings' => $this->allow_postings,
             'institution' => new InstitutionResource($this->whenLoaded('institution')),
+            'simplefin_account_id' => $this->simplefin_account_id,
             'opened_at' => $this->opened_at?->toDateString(),
             'closed_at' => $this->closed_at?->toDateString(),
         ];

@@ -50,6 +50,11 @@ class UpdateAccountRequest extends StoreAccountRequest
         return parent::siblingUniqueNameRule()->ignore($this->account()->id);
     }
 
+    protected function simpleFinUniqueRule(): Unique
+    {
+        return parent::simpleFinUniqueRule()->ignore($this->account()->id);
+    }
+
     private function createsCycle(Account $account): bool
     {
         $ancestor = $this->parentAccount();

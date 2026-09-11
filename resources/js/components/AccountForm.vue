@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
-import DateInput from '../components/DateInput.vue';
+import DateInput from './DateInput.vue';
 import ComboBox from './ComboBox.vue';
-import type { Account, AccountType, Institution } from '../types';
+import type {
+    SimpleFinAccount, Account, AccountType, Institution } from '../types';
 
 const props = defineProps<{
     account: Account | null;
@@ -29,6 +30,40 @@ const form = reactive({
     financial_institution_id: props.account?.institution?.id ?? null,
     opened_at: props.account?.opened_at ?? '',
     closed_at: props.account?.closed_at ?? '',
+    simplefin_account_id: (props.account?.simplefin_account_id ?? null) as string | null,
+});
+
+const simpleFinConfigured = ref(false);
+const simpleFinAccounts = ref<SimpleFinAccount[]>([]);
+const simpleFinErrors = ref<string[]>([]);
+
+const reconcilable = computed(() => form.account_type === 'asset' || form.account_type === 'liability');
+
+const simpleFinOptions = computed(() => {
+    const options = simpleFinAccounts.value.map((account) => ({
+        value: account.id,
+        label: `${account.organization} · ${account.name}`,
+    }));
+
+    const current = form.simplefin_account_id;
+
+    if (current !== null && !options.some((option) => option.value === current)) {
+        options.unshift({ value: current, label: current });
+    }
+
+    return options;
+});
+
+onMounted(async () => {
+    const response = (
+        await axios.get<{ data: SimpleFinAccount[]; configured: boolean; errors: string[] }>(
+            '/api/v1/financial/simplefin/accounts',
+        )
+    ).data;
+
+    simpleFinConfigured.value = response.configured;
+    simpleFinAccounts.value = response.data;
+    simpleFinErrors.value = response.errors;
 });
 
 const hasChildren = computed(() =>
@@ -76,6 +111,7 @@ async function save(): Promise<void> {
         financial_institution_id: form.financial_institution_id,
         opened_at: form.opened_at || null,
         closed_at: form.closed_at || null,
+        simplefin_account_id: form.simplefin_account_id,
     };
 
     try {
@@ -150,6 +186,13 @@ async function save(): Promise<void> {
                 <DateInput v-model="form.closed_at" />
                 <p v-if="errors.closed_at" class="text-sm text-danger">{{ errors.closed_at[0] }}</p>
             </label>
+
+            <div v-if="simpleFinConfigured && reconcilable" class="flex flex-col gap-1.5">
+                <span class="field-label">SimpleFIN account</span>
+                <ComboBox v-model="form.simplefin_account_id" :options="simpleFinOptions" nullable fuzzy />
+                <p v-if="errors.simplefin_account_id" class="text-sm text-danger">{{ errors.simplefin_account_id[0] }}</p>
+                <p v-for="message in simpleFinErrors" :key="message" class="text-sm text-muted">{{ message }}</p>
+            </div>
 
             <label v-if="hasChildren" class="flex items-center gap-2 self-end pb-2">
                 <input v-model="form.allow_postings" type="checkbox" class="size-4 accent-accent" />

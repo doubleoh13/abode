@@ -44,6 +44,7 @@ export interface Account {
     parent_id: number | null;
     allow_postings: boolean;
     institution?: Institution | null;
+    simplefin_account_id: string | null;
     opened_at: string | null;
     closed_at: string | null;
 }
@@ -135,6 +136,15 @@ export interface RecurringTransaction {
     ends_on: string | null;
     lead_days: number | null;
     postings?: RecurringPosting[];
+}
+
+export interface SimpleFinAccount {
+    id: string;
+    organization: string;
+    name: string;
+    currency: string;
+    balance: string;
+    balance_date: string;
 }
 
 export interface JournalIssue {

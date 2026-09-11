@@ -46,6 +46,11 @@ class StoreAccountRequest extends FormRequest
             ],
             'opened_at' => ['nullable', 'date'],
             'closed_at' => ['nullable', 'date', 'after_or_equal:opened_at'],
+            /**
+             * The id SimpleFIN reports for this account, as listed by
+             * `financial:simplefin-accounts`. Links the account for import.
+             */
+            'simplefin_account_id' => ['nullable', 'string', 'max:128', $this->simpleFinUniqueRule()],
         ];
     }
 
@@ -70,6 +75,9 @@ class StoreAccountRequest extends FormRequest
             'opened_at.date' => 'Enter a valid opening date.',
             'closed_at.date' => 'Enter a valid closing date.',
             'closed_at.after_or_equal' => 'The closing date must be on or after the opening date.',
+            'simplefin_account_id.string' => 'Enter a valid SimpleFIN account id.',
+            'simplefin_account_id.max' => 'SimpleFIN account ids may not exceed 128 characters.',
+            'simplefin_account_id.unique' => 'Another account is already mapped to this SimpleFIN account.',
         ];
     }
 
@@ -105,6 +113,11 @@ class StoreAccountRequest extends FormRequest
     protected function accountKeepsChildren(): bool
     {
         return false;
+    }
+
+    protected function simpleFinUniqueRule(): Unique
+    {
+        return Rule::unique(Account::class, 'simplefin_account_id');
     }
 
     protected function siblingUniqueNameRule(): Unique

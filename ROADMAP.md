@@ -4,7 +4,7 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Next
 
-- SimpleFIN import: pull transactions per linked account, create them Pending with the source and external id in metadata, never auto-categorize.
+- SimpleFIN, in chunks: (2) importer every 4 hours with an import ledger, transactions against a holding account, needs the holding account name and a timezone; (3) review inbox with candidate matching; (4) opt-in balance assertions from bank balances.
 - Duplicate candidate finder: surface likely pairs by account, amount, and a date window; each pair opens the merge dialog.
 - Accounts index balances: show a USD value and holdings count per row as of today, reusing the balance sheet builder.
 - Payee hygiene: search box, transaction count per payee, and a merge action that reassigns and deletes.
@@ -29,6 +29,8 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 - In-kind transfers inflate a lot's acquired-quantity denominator, so allocated bases can sum below lot cost. Affects the lots endpoint, account and commodity pages, and the balance sheet equally.
 
 ## Done
+
+- SimpleFIN chunk 1: access URL in env, accounts endpoint cached an hour, account form picker to map an account to a SimpleFIN account (2026-09-11).
 
 - Journal filter bar: search plus preset chips (this month, last month, last 30 days, this year, pending, unreconciled) with the detailed filters collapsed behind a Filters toggle (2026-09-10).
 

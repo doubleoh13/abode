@@ -78,6 +78,27 @@ describe('with finance permissions', function () {
             ->assertJsonPath('data.3.path', 'expenses:food:dining-out');
     });
 
+    test('a SimpleFIN id round trips and must be unique', function () {
+        $response = $this->postJson('/api/v1/financial/accounts', [
+            'account_type' => 'asset',
+            'name' => 'checking',
+            'simplefin_account_id' => 'ACT-1',
+        ])->assertCreated()->assertJsonPath('data.simplefin_account_id', 'ACT-1');
+
+        $this->postJson('/api/v1/financial/accounts', [
+            'account_type' => 'asset',
+            'name' => 'savings',
+            'simplefin_account_id' => 'ACT-1',
+        ])->assertUnprocessable()
+            ->assertJsonPath('errors.simplefin_account_id.0', 'Another account is already mapped to this SimpleFIN account.');
+
+        $this->putJson("/api/v1/financial/accounts/{$response->json('data.id')}", [
+            'account_type' => 'asset',
+            'name' => 'checking',
+            'simplefin_account_id' => 'ACT-1',
+        ])->assertOk()->assertJsonPath('data.simplefin_account_id', 'ACT-1');
+    });
+
     test('an account can be created at an institution', function () {
         $institution = Institution::factory()->create();
 

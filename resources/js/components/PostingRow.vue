@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import DateInput from '../components/DateInput.vue';
+import DateInput from './DateInput.vue';
 import ComboBox from './ComboBox.vue';
 import LotPicker from './LotPicker.vue';
 import type { Account, Commodity, Lot, PostingDraft, PostingStatus } from '../types';
