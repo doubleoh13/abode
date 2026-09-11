@@ -90,3 +90,51 @@ test('a failing source is reported without stopping the others', function () {
     Exceptions::assertReported(RequestException::class);
     expect(CommodityPrice::query()->where('financial_commodity_id', $working->id)->count())->toBe(1);
 });
+
+test('the commodity option limits the fetch to one code', function () {
+    Commodity::factory()->create(['price_source' => 'yahoo', 'price_symbol' => 'AAA', 'code' => 'AAA']);
+    Commodity::factory()->create(['price_source' => 'yahoo', 'price_symbol' => 'ZZZ', 'code' => 'ZZZ']);
+    Http::fake(['query1.finance.yahoo.com/*' => Http::response(yahooChart([]))]);
+
+    $this->artisan('financial:fetch-prices', ['--commodity' => 'ZZZ'])
+        ->expectsOutputToContain('ZZZ: 0 new price point(s)')
+        ->doesntExpectOutputToContain('AAA')
+        ->assertSuccessful();
+
+    Http::assertSentCount(1);
+});
+
+test('an unknown commodity code fails', function () {
+    Http::fake();
+
+    $this->artisan('financial:fetch-prices', ['--commodity' => 'NOPE'])
+        ->expectsOutputToContain('NOPE: no such commodity')
+        ->assertFailed();
+
+    Http::assertNothingSent();
+});
+
+test('overwrite replaces stored prices for returned days', function () {
+    $vti = Commodity::factory()->create(['price_source' => 'yahoo', 'price_symbol' => 'VTI']);
+    $yesterday = CarbonImmutable::now('UTC')->subDay();
+    CommodityPrice::factory()->create([
+        'financial_commodity_id' => $vti->id,
+        'priced_at' => $yesterday->startOfDay(),
+        'price' => '12.25',
+    ]);
+    Http::fake([
+        'query1.finance.yahoo.com/*' => Http::response(yahooChart([
+            $yesterday->subDay()->toDateString() => 10.0,
+            $yesterday->toDateString() => 13.0,
+        ])),
+    ]);
+
+    $this->artisan('financial:fetch-prices', ['--overwrite' => true])
+        ->expectsOutputToContain(': 1 new price point(s), 1 overwritten')
+        ->assertSuccessful();
+
+    $stored = CommodityPrice::query()->where('financial_commodity_id', $vti->id)->orderBy('priced_at')->get();
+
+    expect($stored)->toHaveCount(2)
+        ->and((string) $stored[1]->price)->toBe('13');
+});

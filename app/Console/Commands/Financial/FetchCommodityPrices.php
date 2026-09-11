@@ -13,7 +13,10 @@ use Throwable;
 
 class FetchCommodityPrices extends Command
 {
-    protected $signature = 'financial:fetch-prices {--days=7 : How many days back to request}';
+    protected $signature = 'financial:fetch-prices
+        {--days=7 : How many days back to request}
+        {--commodity= : Only fetch this commodity code}
+        {--overwrite : Replace stored prices for every returned day instead of filling gaps only}';
 
     protected $description = 'Fetch daily closing prices for commodities with a fetchable price source. '
         .'Only finalized days (before today, UTC) are stored, since price points are immutable.';
@@ -21,11 +24,19 @@ class FetchCommodityPrices extends Command
     public function handle(): int
     {
         $failures = 0;
+        $overwrite = (bool) $this->option('overwrite');
 
         $commodities = Commodity::query()
             ->whereIn('price_source', [PriceSource::Yahoo, PriceSource::In529])
+            ->when($this->option('commodity'), fn ($query, string $code) => $query->where('code', $code))
             ->orderBy('code')
             ->get();
+
+        if ($commodities->isEmpty() && $this->option('commodity') !== null) {
+            $this->error("{$this->option('commodity')}: no such commodity with a fetchable price source");
+
+            return self::FAILURE;
+        }
 
         foreach ($commodities as $commodity) {
             try {
@@ -40,8 +51,8 @@ class FetchCommodityPrices extends Command
                 continue;
             }
 
-            $created = $this->storeNewPoints($commodity, $points);
-            $this->line("{$commodity->code}: {$created} new price point(s)");
+            [$created, $overwritten] = $this->storePoints($commodity, $points, $overwrite);
+            $this->line("{$commodity->code}: {$created} new price point(s)".($overwrite ? ", {$overwritten} overwritten" : ''));
         }
 
         return $failures === 0 ? self::SUCCESS : self::FAILURE;
@@ -49,14 +60,16 @@ class FetchCommodityPrices extends Command
 
     /**
      * Insert any fetched day the commodity does not already have, so a
-     * larger --days run can also fill historical gaps.
+     * larger --days run can also fill historical gaps. Overwriting also
+     * replaces the price on days already stored.
      *
      * @param  list<array{string, string}>  $points  [date, price] pairs
+     * @return array{int, int} [created, overwritten]
      */
-    private function storeNewPoints(Commodity $commodity, array $points): int
+    private function storePoints(Commodity $commodity, array $points, bool $overwrite): array
     {
         if ($points === []) {
-            return 0;
+            return [0, 0];
         }
 
         $today = CarbonImmutable::now('UTC')->toDateString();
@@ -68,9 +81,22 @@ class FetchCommodityPrices extends Command
             ->map(fn (mixed $pricedAt): string => substr((string) $pricedAt, 0, 10))
             ->flip();
         $created = 0;
+        $overwritten = 0;
 
         foreach ($points as [$date, $price]) {
-            if ($date >= $today || isset($existing[$date])) {
+            if ($date >= $today) {
+                continue;
+            }
+
+            if (isset($existing[$date])) {
+                if ($overwrite) {
+                    CommodityPrice::query()
+                        ->where('financial_commodity_id', $commodity->id)
+                        ->whereDate('priced_at', $date)
+                        ->update(['price' => $price]);
+                    $overwritten++;
+                }
+
                 continue;
             }
 
@@ -82,7 +108,7 @@ class FetchCommodityPrices extends Command
             $created++;
         }
 
-        return $created;
+        return [$created, $overwritten];
     }
 
     /**
