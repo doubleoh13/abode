@@ -15,7 +15,7 @@ composer run setup        # install, .env, key, migrate, npm install, build
 composer run dev          # serve app + vite + logs
 ```
 
-- `php artisan migrate:fresh` is the reset button: it recreates the dev user, permissions, and the deterministic API token (`DEVELOPMENT_API_TOKEN`). Finance data is never seeded automatically — run `php artisan db:seed --class=DevelopmentFinancialSeeder` when sample data is wanted.
+- `php artisan migrate:fresh` is the reset button: it recreates the dev user and permissions. Finance data is never seeded automatically — run `php artisan db:seed --class=DevelopmentFinancialSeeder` when sample data is wanted.
 - `POST /dev/login` (and the login-page button) bypasses credentials in local only.
 - Commodity prices come from `php artisan financial:fetch-prices` (Yahoo and Indiana 529 sources), scheduled daily.
 

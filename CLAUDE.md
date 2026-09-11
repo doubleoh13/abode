@@ -20,7 +20,7 @@
 
 ## Development Flow
 
-- `php artisan migrate:fresh` is the dev reset: it recreates Jake's user, permissions, and deterministic API token (local only). Finance data is never seeded automatically — run DevelopmentFinancialSeeder explicitly when sample data is wanted.
+- `php artisan migrate:fresh` is the dev reset: it recreates Jake's user and permissions (local only). Finance data is never seeded automatically — run DevelopmentFinancialSeeder explicitly when sample data is wanted.
 - Run tests with `php artisan test --parallel --compact` against Postgres.
 - Run `vendor/bin/pint --dirty --format agent` and `vendor/bin/phpstan analyse app database tests --no-progress` before finishing PHP changes; `npm run build` type-checks the frontend via vue-tsc.
 - `npm test` runs the JS money tests (Node's test runner) — required whenever resources/js/money.ts or CostBasisBalancer changes: it guards PHP/JS allocation parity.

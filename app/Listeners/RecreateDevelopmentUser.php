@@ -25,15 +25,5 @@ class RecreateDevelopmentUser
             ['permission' => Permission::ViewFinances],
             ['permission' => Permission::ManageFinances],
         ]);
-
-        $plainTextToken = config('development.api_token');
-
-        if ($plainTextToken !== null) {
-            $user->tokens()->create([
-                'name' => 'development',
-                'token' => hash('sha256', $plainTextToken),
-                'abilities' => ['*'],
-            ]);
-        }
     }
 }
