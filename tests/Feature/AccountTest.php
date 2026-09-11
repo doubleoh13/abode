@@ -8,8 +8,8 @@ test('path derives from ancestry with the type prefix', function () {
     $food = Account::factory()->create(['name' => 'food']);
     $diningOut = Account::factory()->childOf($food)->create(['name' => 'dining-out']);
 
-    expect($food->path)->toBe('expenses:food')
-        ->and($diningOut->path)->toBe('expenses:food:dining-out');
+    expect($food->path)->toBe('Expenses:food')
+        ->and($diningOut->path)->toBe('Expenses:food:dining-out');
 });
 
 test('path prefixes follow ledger naming', function (AccountType $accountType, string $expectedPath) {
@@ -17,11 +17,11 @@ test('path prefixes follow ledger naming', function (AccountType $accountType, s
 
     expect($account->path)->toBe($expectedPath);
 })->with([
-    'asset' => [AccountType::Asset, 'assets:root'],
-    'liability' => [AccountType::Liability, 'liabilities:root'],
-    'income' => [AccountType::Income, 'income:root'],
-    'expense' => [AccountType::Expense, 'expenses:root'],
-    'equity' => [AccountType::Equity, 'equity:root'],
+    'asset' => [AccountType::Asset, 'Assets:root'],
+    'liability' => [AccountType::Liability, 'Liabilities:root'],
+    'income' => [AccountType::Income, 'Income:root'],
+    'expense' => [AccountType::Expense, 'Expenses:root'],
+    'equity' => [AccountType::Equity, 'Equity:root'],
 ]);
 
 test('children resolve through the self-referential relationship', function () {

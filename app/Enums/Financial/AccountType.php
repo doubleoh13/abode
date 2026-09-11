@@ -11,16 +11,16 @@ enum AccountType: string
     case Equity = 'equity';
 
     /**
-     * The top-level segment of an account path: "expenses:food:dining-out".
+     * The top-level segment of an account path: "Expenses:food:dining-out".
      */
     public function pathPrefix(): string
     {
         return match ($this) {
-            self::Asset => 'assets',
-            self::Liability => 'liabilities',
-            self::Income => 'income',
-            self::Expense => 'expenses',
-            self::Equity => 'equity',
+            self::Asset => 'Assets',
+            self::Liability => 'Liabilities',
+            self::Income => 'Income',
+            self::Expense => 'Expenses',
+            self::Equity => 'Equity',
         };
     }
 }

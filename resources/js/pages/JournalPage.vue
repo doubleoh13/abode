@@ -328,9 +328,7 @@ async function transactionSaved(): Promise<void> {
     await Promise.all([loadTransactions(), loadIssues()]);
 }
 
-async function setStatus(transaction: Transaction, posting: Posting, status: PostingStatus): Promise<void> {
-    await axios.patch(`/api/v1/financial/postings/${posting.id}`, { status });
-
+async function refreshTransaction(transaction: Transaction): Promise<void> {
     const refreshed = (
         await axios.get<{ data: Transaction }>(`/api/v1/financial/transactions/${transaction.id}`)
     ).data.data;
@@ -339,6 +337,11 @@ async function setStatus(transaction: Transaction, posting: Posting, status: Pos
     if (index !== -1) {
         transactions.value[index] = refreshed;
     }
+}
+
+async function setStatus(transaction: Transaction, posting: Posting, status: PostingStatus): Promise<void> {
+    await axios.patch(`/api/v1/financial/postings/${posting.id}`, { status });
+    await refreshTransaction(transaction);
 }
 
 function startMerge(transaction: Transaction): void {
@@ -409,6 +412,7 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                     @cancelled="closeForm"
                     @payee-created="registerPayee"
                     @account-created="registerAccount"
+                    @bank-transaction-unmatched="editingTransaction && refreshTransaction(editingTransaction)"
                 />
             </ModalDialog>
 

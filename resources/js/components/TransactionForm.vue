@@ -47,6 +47,7 @@ const emit = defineEmits<{
     cancelled: [];
     payeeCreated: [Payee];
     accountCreated: [Account];
+    bankTransactionUnmatched: [];
 }>();
 
 const baseCurrency = computed(() => {
@@ -76,13 +77,14 @@ function registerLots(lots: Lot[]): void {
 function emptyDraft(): PostingDraft {
     return {
         id: null,
-        status: 'cleared',
+        status: 'pending',
         financial_account_id: null,
         financial_commodity_id: baseCurrency.value.id,
         amount: '',
         memo: '',
         financial_lot_id: null,
         financial_bank_transaction_id: null,
+        bankTransaction: null,
         lotMode: 'existing',
         lotCost: '',
         lotCostMode: 'total',
@@ -104,6 +106,7 @@ function draftFromPosting(posting: Posting): PostingDraft {
         memo: posting.memo ?? '',
         financial_lot_id: posting.financial_lot_id,
         financial_bank_transaction_id: null,
+        bankTransaction: posting.bank_transaction ?? null,
         lotMode: posting.lot && decimalToScaledInteger(posting.amount) > 0n ? 'new' : 'existing',
         lotCost: posting.lot ? posting.lot.cost : '',
         lotCostMode: 'total',
@@ -148,7 +151,7 @@ function initialDrafts(): PostingDraft[] {
     }
 
     if (props.duplicateOf?.postings) {
-        return props.duplicateOf.postings.map((posting) => ({ ...draftFromPosting(posting), id: null }));
+        return props.duplicateOf.postings.map((posting) => ({ ...draftFromPosting(posting), id: null, bankTransaction: null }));
     }
 
     if (props.bankTransaction) {
@@ -159,6 +162,7 @@ function initialDrafts(): PostingDraft[] {
                 financial_account_id: props.bankTransaction.financial_account_id,
                 amount: props.bankTransaction.amount,
                 financial_bank_transaction_id: props.bankTransaction.id,
+                bankTransaction: props.bankTransaction,
             },
             { ...emptyDraft(), amount: negateAmount(props.bankTransaction.amount) },
         ];
@@ -523,6 +527,16 @@ watch(
     { deep: true, immediate: true },
 );
 
+async function unmatchBankTransaction(draft: PostingDraft): Promise<void> {
+    if (!draft.bankTransaction || !confirm('Unmatch this bank transaction from the posting?')) {
+        return;
+    }
+
+    await axios.post(`/api/v1/financial/bank-transactions/${draft.bankTransaction.id}/unmatch`);
+    draft.bankTransaction = null;
+    emit('bankTransactionUnmatched');
+}
+
 async function save(): Promise<void> {
     submitting.value = true;
     errors.value = {};
@@ -681,6 +695,7 @@ async function save(): Promise<void> {
                     :autofocus="index === autofocusPostingIndex"
                     @amount-enter="handleAmountEnter(index, $event)"
                     @remove="removePosting(index)"
+                    @unmatch="unmatchBankTransaction(draft)"
                     @lots-loaded="registerLots"
                     @create-account="openAccountForm(index)"
                 />

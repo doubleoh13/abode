@@ -72,10 +72,10 @@ describe('with finance permissions', function () {
 
         $this->getJson('/api/v1/financial/accounts')
             ->assertOk()
-            ->assertJsonPath('data.0.path', 'assets:checking')
-            ->assertJsonPath('data.1.path', 'assets:Zebra-Savings')
-            ->assertJsonPath('data.2.path', 'expenses:food')
-            ->assertJsonPath('data.3.path', 'expenses:food:dining-out');
+            ->assertJsonPath('data.0.path', 'Assets:checking')
+            ->assertJsonPath('data.1.path', 'Assets:Zebra-Savings')
+            ->assertJsonPath('data.2.path', 'Expenses:food')
+            ->assertJsonPath('data.3.path', 'Expenses:food:dining-out');
     });
 
     test('a SimpleFIN id round trips and must be unique', function () {
@@ -108,7 +108,7 @@ describe('with finance permissions', function () {
             'name' => 'checking',
             'opened_at' => '2020-01-15',
         ])->assertCreated()
-            ->assertJsonPath('data.path', 'assets:checking')
+            ->assertJsonPath('data.path', 'Assets:checking')
             ->assertJsonPath('data.institution.name', $institution->name);
     });
 

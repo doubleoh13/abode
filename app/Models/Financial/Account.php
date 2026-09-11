@@ -48,7 +48,7 @@ class Account extends Model
 
     /**
      * Full colon-delimited path derived from ancestry, prefixed
-     * with the account type: "expenses:food:dining-out".
+     * with the account type: "Expenses:food:dining-out".
      */
     protected function path(): Attribute
     {

@@ -27,6 +27,7 @@ test('a viewer cannot match or reject', function () {
 
     $this->postJson("/api/v1/financial/bank-transactions/{$row->id}/match", ['financial_posting_id' => 1])->assertForbidden();
     $this->postJson("/api/v1/financial/bank-transactions/{$row->id}/reject", ['financial_posting_id' => 1])->assertForbidden();
+    $this->postJson("/api/v1/financial/bank-transactions/{$row->id}/unmatch")->assertForbidden();
 });
 
 describe('with finance permissions', function () {
@@ -175,6 +176,27 @@ describe('with finance permissions', function () {
         $this->postJson('/api/v1/financial/transactions', $payload($settled->id))
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['postings.0.financial_bank_transaction_id' => 'That bank transaction is already matched.']);
+    });
+
+    test('unmatching frees the row and declines the posting it settled', function () {
+        $posting = checkingLeg('2026-09-08', '-42.10', PostingStatus::Cleared);
+        $row = BankTransaction::factory()->linkedTo($posting)->create(['posted_on' => '2026-09-09']);
+
+        $this->postJson("/api/v1/financial/bank-transactions/{$row->id}/unmatch")
+            ->assertOk()
+            ->assertJsonPath('data.financial_posting_id', null)
+            ->assertJsonPath('data.rejected_posting_ids', [$posting->id]);
+
+        expect($posting->refresh()->status)->toBe(PostingStatus::Cleared);
+
+        $this->getJson("/api/v1/financial/bank-transactions?financial_account_id={$this->checking->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.candidate_posting_id', null);
+
+        $this->postJson("/api/v1/financial/bank-transactions/{$row->id}/unmatch")
+            ->assertConflict()
+            ->assertJsonPath('message', 'This bank transaction is not matched.');
     });
 
     test('rejecting a proposal returns the row to the unmatched list without that candidate', function () {

@@ -223,6 +223,7 @@ export interface PostingDraft {
     memo: string;
     financial_lot_id: number | null;
     financial_bank_transaction_id: number | null;
+    bankTransaction: BankTransaction | null;
     lotMode: 'existing' | 'new';
     lotCost: string;
     lotCostMode: 'total' | 'unit';

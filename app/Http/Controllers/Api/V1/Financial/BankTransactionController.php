@@ -72,6 +72,22 @@ class BankTransactionController extends Controller
     }
 
     /**
+     * Undo a match. The row returns to the unmatched list and the posting it
+     * settled is recorded as declined so it is not proposed straight back.
+     */
+    public function unmatch(BankTransaction $bankTransaction): BankTransactionResource
+    {
+        abort_if($bankTransaction->financial_posting_id === null, Response::HTTP_CONFLICT, 'This bank transaction is not matched.');
+
+        $bankTransaction->update([
+            'financial_posting_id' => null,
+            'rejected_posting_ids' => array_values(array_unique([...($bankTransaction->rejected_posting_ids ?? []), $bankTransaction->financial_posting_id])),
+        ]);
+
+        return new BankTransactionResource($bankTransaction->refresh());
+    }
+
+    /**
      * Decline a proposed posting so it is never suggested for this row
      * again. The row returns to the unmatched list.
      */

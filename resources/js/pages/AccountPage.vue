@@ -36,6 +36,7 @@ import type {
     Payee,
     Posting,
     PostingStatus,
+    Transaction,
 } from '../types';
 
 const route = useRoute();
@@ -158,19 +159,59 @@ function toggleLots(commodityId: number): void {
         : [...expandedCommodities.value, commodityId];
 }
 
-function counterAccountLabel(posting: Posting): string {
-    const siblings = (posting.transaction?.postings ?? []).filter((candidate) => candidate.id !== posting.id);
-    const counters = siblings.filter(
-        (candidate) => candidate.financial_account_id !== posting.financial_account_id,
+function counterPostings(posting: Posting): Posting[] {
+    return (posting.transaction?.postings ?? []).filter(
+        (candidate) => candidate.id !== posting.id && candidate.financial_account_id !== posting.financial_account_id,
     );
+}
+
+function counterAccountLabel(posting: Posting): string {
+    const counters = counterPostings(posting);
 
     if (counters.length === 0) {
-        return siblings.length > 0 ? '(this account)' : '—';
+        return (posting.transaction?.postings ?? []).length > 1 ? '(this account)' : '—';
     }
 
-    const first = counters[0].account?.path ?? '—';
+    return counters[0].account?.path ?? '—';
+}
 
-    return counters.length === 1 ? first : `${first} +${counters.length - 1}`;
+function formatCounterAmount(counter: Posting): string {
+    const commodity = commoditiesById.value.get(counter.financial_commodity_id);
+
+    return commodity ? formatAmount(counter.amount, commodity) : counter.amount;
+}
+
+const expandedCounterparties = ref(new Set<number>());
+
+function toggleCounterparties(posting: Posting): void {
+    const next = new Set(expandedCounterparties.value);
+
+    if (!next.delete(posting.id)) {
+        next.add(posting.id);
+    }
+
+    expandedCounterparties.value = next;
+}
+
+const editingTransaction = ref<Transaction | null>(null);
+
+async function openTransaction(posting: Posting): Promise<void> {
+    if (matchingBankTransaction.value || !posting.transaction) {
+        return;
+    }
+
+    const response = await axios.get<{ data: Transaction }>(`/api/v1/financial/transactions/${posting.transaction.id}`);
+
+    editingTransaction.value = response.data.data;
+}
+
+async function bankTransactionUnmatched(): Promise<void> {
+    await Promise.all([loadBankTransactions(), loadPostings()]);
+}
+
+async function transactionSaved(): Promise<void> {
+    editingTransaction.value = null;
+    await Promise.all([loadPostings(), loadBalances(), loadBankTransactions(), loadAssertions()]);
 }
 
 async function loadPostings(): Promise<void> {
@@ -724,6 +765,23 @@ async function accountSaved(): Promise<void> {
                 </div>
             </section>
 
+            <ModalDialog :open="editingTransaction !== null" @close="editingTransaction = null">
+                <TransactionForm
+                    v-if="editingTransaction"
+                    :key="editingTransaction.id"
+                    :transaction="editingTransaction"
+                    :accounts="allAccounts"
+                    :commodities="commodities"
+                    :institutions="institutions"
+                    :payees="payees"
+                    @saved="transactionSaved"
+                    @cancelled="editingTransaction = null"
+                    @payee-created="registerPayee"
+                    @account-created="registerAccount"
+                    @bank-transaction-unmatched="bankTransactionUnmatched"
+                />
+            </ModalDialog>
+
             <section v-if="unmatchedBankTransactions.length > 0" class="mt-8">
                 <h2 class="flex items-baseline gap-3 font-mono text-xs tracking-wider text-accent uppercase">
                     <span>{{ unmatchedBankTransactions.length }} unmatched</span>
@@ -907,7 +965,7 @@ async function accountSaved(): Promise<void> {
                     </li>
                     <li
                         v-else
-                        class="grid grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_8.5rem_2rem] items-center gap-x-4 px-4 py-2"
+                        class="group grid grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_8.5rem_2rem] items-start gap-x-4 px-4 py-2"
                         :class="{
                             italic: row.posting.status === 'pending',
                             'cursor-pointer transition-colors hover:bg-accent/10': canMatch(row.posting),
@@ -918,14 +976,29 @@ async function accountSaved(): Promise<void> {
                         @click="canMatch(row.posting) && matchTo(row.posting)"
                         @keydown.enter="canMatch(row.posting) && matchTo(row.posting)"
                     >
-                        <span class="font-mono text-xs text-muted">{{ row.posting.transaction?.date }}</span>
+                        <span class="font-mono text-xs leading-5 text-muted">{{ row.posting.transaction?.date }}</span>
 
                         <span class="min-w-0 text-sm">
-                            <span class="block truncate">
-                                {{ row.posting.transaction?.payee?.name ?? row.posting.transaction?.memo ?? '—' }}
-                                <span v-if="row.posting.transaction?.payee && row.posting.transaction?.memo" class="text-muted">
-                                    · {{ row.posting.transaction.memo }}
+                            <span class="flex items-center gap-2">
+                                <span class="truncate">
+                                    {{ row.posting.transaction?.payee?.name ?? row.posting.transaction?.memo ?? '—' }}
+                                    <span v-if="row.posting.transaction?.payee && row.posting.transaction?.memo" class="text-muted">
+                                        · {{ row.posting.transaction.memo }}
+                                    </span>
                                 </span>
+                                <button
+                                    v-if="!matchingBankTransaction"
+                                    type="button"
+                                    class="shrink-0 rounded-sm text-muted transition-opacity hover:text-accent focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                                    title="Open transaction"
+                                    @click.stop="openTransaction(row.posting)"
+                                >
+                                    <svg class="size-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M6.5 3.5H3.5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9.5" />
+                                        <path d="M9.5 2.5h4v4M13.5 2.5 7.5 8.5" />
+                                    </svg>
+                                    <span class="sr-only">Open transaction</span>
+                                </button>
                             </span>
 
                             <span
@@ -960,8 +1033,34 @@ async function accountSaved(): Promise<void> {
                             </span>
                         </span>
 
-                        <span class="truncate text-sm text-muted" :title="counterAccountLabel(row.posting)">
-                            {{ counterAccountLabel(row.posting) }}
+                        <span class="min-w-0 text-sm text-muted">
+                            <template v-if="counterPostings(row.posting).length > 1">
+                                <button
+                                    type="button"
+                                    class="flex max-w-full items-center gap-2 text-left transition-colors hover:text-foreground"
+                                    :aria-expanded="expandedCounterparties.has(row.posting.id)"
+                                    @click.stop="toggleCounterparties(row.posting)"
+                                    @dblclick.stop
+                                >
+                                    <span class="truncate">{{ counterAccountLabel(row.posting) }}</span>
+                                    <span class="shrink-0 font-mono text-xs">
+                                        {{ expandedCounterparties.has(row.posting.id) ? '▾' : `+${counterPostings(row.posting).length - 1}` }}
+                                    </span>
+                                </button>
+                                <ul v-if="expandedCounterparties.has(row.posting.id)" class="mt-1 space-y-0.5 font-mono text-xs not-italic">
+                                    <li
+                                        v-for="counter in counterPostings(row.posting)"
+                                        :key="counter.id"
+                                        class="flex justify-between gap-3"
+                                    >
+                                        <span class="truncate">{{ counter.account?.path ?? '—' }}</span>
+                                        <span class="shrink-0" :class="amountClass(counter.amount)">{{ formatCounterAmount(counter) }}</span>
+                                    </li>
+                                </ul>
+                            </template>
+                            <span v-else class="block truncate" :title="counterAccountLabel(row.posting)">
+                                {{ counterAccountLabel(row.posting) }}
+                            </span>
                         </span>
 
                         <span class="text-right font-mono text-sm">

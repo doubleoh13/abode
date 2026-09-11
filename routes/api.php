@@ -75,6 +75,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::post('accounts/{account}/simplefin-sync', [SimpleFinController::class, 'sync'])->name('accounts.simplefin-sync');
             Route::post('bank-transactions/{bank_transaction}/match', [BankTransactionController::class, 'match'])->name('bank-transactions.match');
             Route::post('bank-transactions/{bank_transaction}/reject', [BankTransactionController::class, 'reject'])->name('bank-transactions.reject');
+            Route::post('bank-transactions/{bank_transaction}/unmatch', [BankTransactionController::class, 'unmatch'])->name('bank-transactions.unmatch');
         });
     });
 });

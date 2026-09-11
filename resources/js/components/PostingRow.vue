@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import DateInput from './DateInput.vue';
 import ComboBox from './ComboBox.vue';
 import LotPicker from './LotPicker.vue';
+import { formatAmount } from '../money';
 import type { Account, Commodity, Lot, PostingDraft, PostingStatus } from '../types';
 
 const props = defineProps<{
@@ -19,7 +20,7 @@ const props = defineProps<{
     autofocus?: boolean;
 }>();
 
-const emit = defineEmits<{ remove: []; lotsLoaded: [Lot[]]; createAccount: []; amountEnter: [KeyboardEvent] }>();
+const emit = defineEmits<{ remove: []; lotsLoaded: [Lot[]]; createAccount: []; amountEnter: [KeyboardEvent]; unmatch: [] }>();
 const memoOpen = ref(props.draft.memo !== '');
 const accountPicker = ref<{ focus: () => void } | null>(null);
 
@@ -76,7 +77,7 @@ watch(
     carriesStatus,
     (statusApplies) => {
         if (statusApplies && props.draft.status === null) {
-            props.draft.status = 'cleared';
+            props.draft.status = 'pending';
         }
 
         if (!statusApplies) {
@@ -272,6 +273,34 @@ function errorFor(field: string): string | null {
                 @click="memoOpen = true"
             >
                 + Memo
+            </button>
+        </div>
+
+        <div
+            v-if="draft.bankTransaction"
+            class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-sm border border-accent/30 bg-accent/5 px-3 py-1.5 font-mono text-xs"
+            :class="{ italic: draft.bankTransaction.pending }"
+        >
+            <span class="size-1.5 shrink-0 rounded-full bg-accent"></span>
+            <span class="text-muted">{{ draft.bankTransaction.posted_on }}</span>
+            <span v-if="draft.bankTransaction.pending" class="tracking-wider text-accent uppercase">pending</span>
+            <span class="min-w-0 flex-1 truncate">
+                {{ draft.bankTransaction.payee ?? draft.bankTransaction.description ?? draft.bankTransaction.external_id }}
+                <span v-if="draft.bankTransaction.payee && draft.bankTransaction.description" class="text-muted">
+                    · {{ draft.bankTransaction.description }}
+                </span>
+            </span>
+            <span :class="draft.bankTransaction.amount.startsWith('-') ? 'text-danger' : ''">
+                {{ formatAmount(draft.bankTransaction.amount, baseCurrency) }}
+            </span>
+            <button
+                v-if="draft.id !== null"
+                type="button"
+                tabindex="-1"
+                class="tracking-wider text-muted uppercase not-italic transition-colors hover:text-danger"
+                @click="emit('unmatch')"
+            >
+                Unmatch
             </button>
         </div>
     </div>
