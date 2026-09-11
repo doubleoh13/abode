@@ -33,6 +33,7 @@ class FetchCommodityPrices extends Command
                     ? $this->fetchYahoo($commodity->price_symbol)
                     : $this->fetchIn529($commodity->price_symbol);
             } catch (Throwable $exception) {
+                report($exception);
                 $this->error("{$commodity->code}: {$exception->getMessage()}");
                 $failures++;
 

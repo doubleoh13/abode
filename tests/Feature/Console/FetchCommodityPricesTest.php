@@ -3,6 +3,8 @@
 use App\Models\Financial\Commodity;
 use App\Models\Financial\CommodityPrice;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 
 function yahooChart(array $days): array
@@ -71,6 +73,7 @@ test('in529 pages are scraped after the cookie handshake', function () {
 });
 
 test('a failing source is reported without stopping the others', function () {
+    Exceptions::fake();
     Commodity::factory()->create(['price_source' => 'yahoo', 'price_symbol' => 'AAA', 'code' => 'AAA']);
     $working = Commodity::factory()->create(['price_source' => 'yahoo', 'price_symbol' => 'ZZZ', 'code' => 'ZZZ']);
     $yesterday = CarbonImmutable::now('UTC')->subDay();
@@ -84,5 +87,6 @@ test('a failing source is reported without stopping the others', function () {
 
     $this->artisan('financial:fetch-prices')->assertFailed();
 
+    Exceptions::assertReported(RequestException::class);
     expect(CommodityPrice::query()->where('financial_commodity_id', $working->id)->count())->toBe(1);
 });
