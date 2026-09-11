@@ -2,6 +2,7 @@
 
 namespace App\Support\Financial\SimpleFin;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -29,6 +30,27 @@ class SimpleFinClient
             'accounts' => array_map(SimpleFinAccount::fromPayload(...), $payload['accounts'] ?? []),
             'errors' => array_values(array_map(strval(...), $payload['errors'] ?? [])),
         ];
+    }
+
+    /**
+     * One account with its transactions posted on or after the start date,
+     * pending ones included. Null when the bridge no longer lists the account.
+     */
+    public function accountTransactions(string $simpleFinAccountId, CarbonImmutable $startDate): ?SimpleFinAccount
+    {
+        $payload = $this->get([
+            'account' => $simpleFinAccountId,
+            'start-date' => $startDate->startOfDay()->getTimestamp(),
+            'pending' => 1,
+        ]);
+
+        foreach ($payload['accounts'] ?? [] as $account) {
+            if ((string) $account['id'] === $simpleFinAccountId) {
+                return SimpleFinAccount::fromPayload($account);
+            }
+        }
+
+        return null;
     }
 
     /**

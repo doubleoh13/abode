@@ -3,6 +3,7 @@
 use App\Enums\Financial\AccountType;
 use App\Enums\Permission;
 use App\Models\Financial\Account;
+use App\Models\Financial\BankTransaction;
 use App\Models\Financial\Commodity;
 use App\Models\Financial\Lot;
 use App\Models\Financial\Payee;
@@ -159,13 +160,16 @@ describe('with finance permissions', function () {
         'maximum magnitude' => str_repeat('9', 53).'.'.str_repeat('9', 25),
     ]);
 
-    test('the index is date-descending and paginated', function () {
+    test('the index is date-descending and paginated, with bank links on postings', function () {
         Transaction::factory()->on('2026-03-01')->create();
         $newest = Transaction::factory()->on('2026-07-01')->create();
+        $posting = Posting::factory()->forTransaction($newest, 0)->create();
+        $bankRow = BankTransaction::factory()->linkedTo($posting)->create();
 
         $this->getJson('/api/v1/financial/transactions')
             ->assertOk()
             ->assertJsonPath('data.0.id', $newest->id)
+            ->assertJsonPath('data.0.postings.0.bank_transaction.id', $bankRow->id)
             ->assertJsonPath('meta.per_page', 50)
             ->assertJsonPath('meta.total', 2);
     });

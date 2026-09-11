@@ -21,7 +21,7 @@ use Illuminate\Validation\Rule;
 #[Group('Financial / Transactions')]
 class TransactionController extends Controller
 {
-    private const array EAGER_LOADS = ['payee', 'postings.account', 'postings.commodity', 'postings.lot'];
+    private const array EAGER_LOADS = ['payee', 'postings.account', 'postings.commodity', 'postings.lot', 'postings.bankTransaction'];
 
     public function __construct(private readonly TransactionWriter $transactionWriter) {}
 

@@ -5,6 +5,7 @@ namespace App\Http\Requests\Financial;
 use App\Enums\Financial\AccountType;
 use App\Enums\Financial\PostingStatus;
 use App\Models\Financial\Account;
+use App\Models\Financial\BankTransaction;
 use App\Models\Financial\Commodity;
 use App\Models\Financial\Lot;
 use App\Models\Financial\Payee;
@@ -81,6 +82,10 @@ class StoreTransactionRequest extends FormRequest
             ],
             'postings.*.memo' => ['nullable', 'string', 'max:255'],
             'postings.*.metadata' => ['sometimes', 'array'],
+            /**
+             * An unmatched bank transaction in the posting's account that this posting settles.
+             */
+            'postings.*.financial_bank_transaction_id' => ['nullable', 'integer', Rule::exists(BankTransaction::class, 'id')],
             'postings.*.financial_lot_id' => ['nullable', 'integer', Rule::exists(Lot::class, 'id')],
             'postings.*.lot' => ['nullable', 'array'],
             'postings.*.lot.acquired_at' => ['nullable', 'date'],
@@ -126,6 +131,8 @@ class StoreTransactionRequest extends FormRequest
             'postings.*.memo.string' => 'Enter a valid posting memo.',
             'postings.*.memo.max' => 'Posting memos may not exceed 255 characters.',
             'postings.*.metadata.array' => 'Posting metadata must be an array.',
+            'postings.*.financial_bank_transaction_id.integer' => 'Choose a valid bank transaction.',
+            'postings.*.financial_bank_transaction_id.exists' => 'Choose a valid bank transaction.',
             'postings.*.financial_lot_id.integer' => 'Choose a valid lot.',
             'postings.*.financial_lot_id.exists' => 'Choose a valid lot.',
             'postings.*.lot.array' => 'New lot details must be an array.',
@@ -148,8 +155,57 @@ class StoreTransactionRequest extends FormRequest
             fn (Validator $validator) => $this->validatePostingStatuses($validator),
             fn (Validator $validator) => $this->validateLotStructure($validator),
             fn (Validator $validator) => $this->validateReferencedLots($validator),
+            fn (Validator $validator) => $this->validateBankTransactions($validator),
             fn (Validator $validator) => $this->validateBalance($validator),
         ];
+    }
+
+    /**
+     * A bank transaction settles one posting in its own account, and never
+     * one that is already matched.
+     */
+    protected function validateBankTransactions(Validator $validator): void
+    {
+        if ($validator->errors()->isNotEmpty()) {
+            return;
+        }
+
+        $referenced = collect($this->postingInputs())
+            ->pluck('financial_bank_transaction_id')
+            ->filter()
+            ->map(fn (mixed $id): int => (int) $id);
+
+        if ($referenced->isEmpty()) {
+            return;
+        }
+
+        $rows = BankTransaction::query()->findMany($referenced->unique())->keyBy('id');
+        $seen = [];
+
+        foreach ($this->postingInputs() as $index => $posting) {
+            $id = $posting['financial_bank_transaction_id'] ?? null;
+
+            if ($id === null) {
+                continue;
+            }
+
+            $row = $rows->get((int) $id);
+            $field = "postings.{$index}.financial_bank_transaction_id";
+
+            if ($row === null) {
+                continue;
+            }
+
+            if ($row->financial_posting_id !== null && $row->financial_posting_id !== (int) ($posting['id'] ?? 0)) {
+                $validator->errors()->add($field, 'That bank transaction is already matched.');
+            } elseif ((int) $row->financial_account_id !== (int) $posting['financial_account_id']) {
+                $validator->errors()->add($field, 'The bank transaction belongs to a different account.');
+            } elseif (in_array((int) $id, $seen, true)) {
+                $validator->errors()->add($field, 'Each bank transaction can settle only one posting.');
+            }
+
+            $seen[] = (int) $id;
+        }
     }
 
     /**

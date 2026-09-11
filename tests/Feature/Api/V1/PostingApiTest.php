@@ -4,6 +4,7 @@ use App\Enums\Financial\AccountType;
 use App\Enums\Financial\PostingStatus;
 use App\Enums\Permission;
 use App\Models\Financial\Account;
+use App\Models\Financial\BankTransaction;
 use App\Models\Financial\Commodity;
 use App\Models\Financial\Posting;
 use App\Models\Financial\Transaction;
@@ -73,6 +74,9 @@ describe('with view permissions', function () {
                 ->create(['amount' => bcmul($amount, '-1', 2), 'status' => null]);
         }
 
+        $newest = Posting::query()->where('financial_account_id', $checking->id)->orderByDesc('id')->firstOrFail();
+        $bankRow = BankTransaction::factory()->linkedTo($newest)->create(['posted_on' => '2026-01-21']);
+
         $this->getJson("/api/v1/financial/postings?financial_account_id={$checking->id}")
             ->assertOk()
             ->assertJsonCount(3, 'data')
@@ -80,7 +84,10 @@ describe('with view permissions', function () {
             ->assertJsonPath('data.0.running_balance', '49.5')
             ->assertJsonPath('data.1.running_balance', '70')
             ->assertJsonPath('data.2.running_balance', '100')
-            ->assertJsonPath('data.0.transaction.date', '2026-01-20');
+            ->assertJsonPath('data.0.transaction.date', '2026-01-20')
+            ->assertJsonPath('data.0.bank_transaction.id', $bankRow->id)
+            ->assertJsonPath('data.0.bank_transaction.posted_on', '2026-01-21')
+            ->assertJsonPath('data.1.bank_transaction', null);
     });
 });
 

@@ -35,6 +35,7 @@ class PostingController extends Controller
         // column; the commodity register never renders them.
         if ($validated['financial_account_id'] ?? null) {
             $eagerLoads[] = 'transaction.postings.account';
+            $eagerLoads[] = 'bankTransaction';
         }
 
         return PostingResource::collection(

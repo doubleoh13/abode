@@ -27,6 +27,9 @@ class AccountResource extends JsonResource
             'allow_postings' => $this->allow_postings,
             'institution' => new InstitutionResource($this->whenLoaded('institution')),
             'simplefin_account_id' => $this->simplefin_account_id,
+            'simplefin_synced_at' => $this->simplefin_synced_at?->toIso8601String(),
+            'simplefin_balance' => $this->simplefin_balance === null ? null : (string) $this->simplefin_balance->strippedOfTrailingZeros(),
+            'simplefin_balance_date' => $this->simplefin_balance_date?->toDateString(),
             'opened_at' => $this->opened_at?->toDateString(),
             'closed_at' => $this->closed_at?->toDateString(),
         ];

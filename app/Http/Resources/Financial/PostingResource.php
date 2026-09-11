@@ -33,6 +33,7 @@ class PostingResource extends JsonResource
             'memo' => $this->memo,
             'metadata' => $this->metadata,
             'transaction' => new TransactionResource($this->whenLoaded('transaction')),
+            'bank_transaction' => new BankTransactionResource($this->whenLoaded('bankTransaction')),
             'running_balance' => $this->when(
                 isset($this->running_balance),
                 fn (): string => (string) BigDecimal::of($this->running_balance)->strippedOfTrailingZeros(),

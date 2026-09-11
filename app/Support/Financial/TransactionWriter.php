@@ -2,6 +2,7 @@
 
 namespace App\Support\Financial;
 
+use App\Models\Financial\BankTransaction;
 use App\Models\Financial\Commodity;
 use App\Models\Financial\Lot;
 use App\Models\Financial\Posting;
@@ -137,8 +138,15 @@ class TransactionWriter
             if ($persisted !== null) {
                 $persisted->update($attributes);
                 $keptIds[] = $persisted->id;
+                $posting = $persisted;
             } else {
-                $transaction->postings()->create($attributes);
+                $posting = $transaction->postings()->create($attributes);
+            }
+
+            if (isset($payload['financial_bank_transaction_id'])) {
+                BankTransaction::query()
+                    ->whereKey((int) $payload['financial_bank_transaction_id'])
+                    ->update(['financial_posting_id' => $posting->id]);
             }
         }
 

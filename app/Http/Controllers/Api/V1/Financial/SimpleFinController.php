@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\Api\V1\Financial;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Financial\AccountResource;
+use App\Models\Financial\Account;
 use App\Support\Financial\SimpleFin\SimpleFinAccount;
 use App\Support\Financial\SimpleFin\SimpleFinClient;
+use App\Support\Financial\SimpleFin\SimpleFinImporter;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 
 #[Group('Financial / SimpleFIN')]
@@ -40,5 +44,19 @@ class SimpleFinController extends Controller
             'configured' => true,
             'errors' => $result['errors'],
         ]);
+    }
+
+    /**
+     * Pull the account's bank transactions from SimpleFIN into the staging
+     * table and record the bank balance. Nothing is written to the journal.
+     */
+    public function sync(Account $account, SimpleFinClient $client, SimpleFinImporter $importer): AccountResource
+    {
+        abort_if($account->simplefin_account_id === null, Response::HTTP_CONFLICT, 'The account is not mapped to a SimpleFIN account.');
+        abort_unless($client->isConfigured(), Response::HTTP_CONFLICT, 'SimpleFIN is not configured.');
+
+        $result = $importer->sync($account);
+
+        return (new AccountResource($account->refresh()->load('institution')))->additional($result);
     }
 }

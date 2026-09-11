@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\AttachmentController;
 use App\Http\Controllers\Api\V1\CurrentUserController;
 use App\Http\Controllers\Api\V1\Financial\AccountController;
 use App\Http\Controllers\Api\V1\Financial\BalanceAssertionController;
+use App\Http\Controllers\Api\V1\Financial\BankTransactionController;
 use App\Http\Controllers\Api\V1\Financial\CommodityController;
 use App\Http\Controllers\Api\V1\Financial\CommodityPriceController;
 use App\Http\Controllers\Api\V1\Financial\InstitutionController;
@@ -49,6 +50,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::get('commodities/{commodity}/balances', [CommodityController::class, 'balances'])->name('commodities.balances');
             Route::get('commodities/{commodity}/price-series', [CommodityController::class, 'priceSeries'])->name('commodities.price-series');
             Route::apiResource('balance-assertions', BalanceAssertionController::class)->only('index');
+            Route::get('bank-transactions', [BankTransactionController::class, 'index'])->name('bank-transactions.index');
             Route::get('postings', [PostingController::class, 'index'])->name('postings.index');
             Route::get('lots', [LotController::class, 'index'])->name('lots.index');
             Route::get('journal-issues', [JournalIssueController::class, 'index'])->name('journal-issues.index');
@@ -70,6 +72,9 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('balance-assertions', BalanceAssertionController::class)->only(['store', 'destroy']);
             Route::apiResource('commodity-prices', CommodityPriceController::class)->only(['store', 'destroy']);
             Route::get('simplefin/accounts', [SimpleFinController::class, 'accounts'])->name('simplefin.accounts');
+            Route::post('accounts/{account}/simplefin-sync', [SimpleFinController::class, 'sync'])->name('accounts.simplefin-sync');
+            Route::post('bank-transactions/{bank_transaction}/match', [BankTransactionController::class, 'match'])->name('bank-transactions.match');
+            Route::post('bank-transactions/{bank_transaction}/reject', [BankTransactionController::class, 'reject'])->name('bank-transactions.reject');
         });
     });
 });
