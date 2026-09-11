@@ -40,10 +40,18 @@ const simpleFinErrors = ref<string[]>([]);
 const reconcilable = computed(() => form.account_type === 'asset' || form.account_type === 'liability');
 
 const simpleFinOptions = computed(() => {
-    const options = simpleFinAccounts.value.map((account) => ({
-        value: account.id,
-        label: `${account.organization} · ${account.name}`,
-    }));
+    const takenElsewhere = new Set(
+        props.accounts
+            .filter((candidate) => candidate.id !== props.account?.id && candidate.simplefin_account_id !== null)
+            .map((candidate) => candidate.simplefin_account_id),
+    );
+
+    const options = simpleFinAccounts.value
+        .filter((account) => !takenElsewhere.has(account.id))
+        .map((account) => ({
+            value: account.id,
+            label: `${account.organization} · ${account.name}`,
+        }));
 
     const current = form.simplefin_account_id;
 
