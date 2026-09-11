@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Api\V1\Financial;
 
 use App\Http\Controllers\Controller;
-use Dedoc\Scramble\Attributes\Group;
 use App\Http\Requests\Financial\StoreInstitutionRequest;
 use App\Http\Requests\Financial\UpdateInstitutionRequest;
 use App\Http\Resources\Financial\InstitutionResource;
 use App\Models\Financial\Institution;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 
