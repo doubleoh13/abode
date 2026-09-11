@@ -21,7 +21,7 @@ class AccountController extends Controller
 {
     public function index(): AnonymousResourceCollection
     {
-        $accounts = Account::query()->with('institution')->get();
+        $accounts = Account::query()->with('institution')->withCount('unmatchedBankTransactions')->get();
 
         $accountsById = $accounts->keyBy('id');
 

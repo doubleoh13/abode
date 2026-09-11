@@ -186,11 +186,16 @@ async function deleteAccount(account: Account): Promise<void> {
                         >
                             <RouterLink
                                 :to="{ name: 'finances.account', params: { id: account.id } }"
-                                class="text-sm transition-colors hover:text-accent"
+                                class="flex items-center gap-2 text-sm transition-colors hover:text-accent"
                                 :class="account.closed_at ? 'text-muted line-through' : ''"
                                 :style="{ paddingLeft: `${depth * 1.25}rem` }"
                             >
                                 {{ account.name }}
+                                <span
+                                    v-if="account.unmatched_bank_transactions_count"
+                                    class="size-1.5 rounded-full bg-accent"
+                                    title="Unmatched bank transactions"
+                                />
                             </RouterLink>
 
                             <span class="flex items-center gap-3 font-mono text-xs text-muted">

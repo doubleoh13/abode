@@ -1,11 +1,21 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { auth, hasPermission, logout } from '../auth';
+import { hasUnmatchedBankTransactions, refreshUnmatchedBankTransactions } from '../bankImports';
 
 const route = useRoute();
 const router = useRouter();
 const mobileNavigationOpen = ref(false);
+
+async function refreshBankImports(): Promise<void> {
+    if (hasPermission('view-finances')) {
+        await refreshUnmatchedBankTransactions();
+    }
+}
+
+onMounted(refreshBankImports);
+watch(() => route.fullPath, refreshBankImports);
 
 async function endSession(): Promise<void> {
     await logout();
@@ -65,7 +75,7 @@ async function endSession(): Promise<void> {
                 <template v-if="hasPermission('view-finances')">
                     <RouterLink
                         :to="{ name: 'finances' }"
-                        class="rounded-sm border-l-2 px-3 py-2 text-sm transition-colors"
+                        class="flex items-center gap-2 rounded-sm border-l-2 px-3 py-2 text-sm transition-colors"
                         :class="
                             String(route.name).startsWith('finances')
                                 ? 'border-accent bg-background text-foreground'
@@ -74,6 +84,11 @@ async function endSession(): Promise<void> {
                         @click="mobileNavigationOpen = false"
                     >
                         Finances
+                        <span
+                            v-if="hasUnmatchedBankTransactions()"
+                            class="size-1.5 rounded-full bg-accent"
+                            title="Unmatched bank transactions"
+                        />
                     </RouterLink>
 
                     <div
@@ -92,7 +107,7 @@ async function endSession(): Promise<void> {
                             ]"
                             :key="subItem.name"
                             :to="{ name: subItem.name }"
-                            class="rounded-sm px-3 py-1.5 text-sm transition-colors"
+                            class="flex items-center gap-2 rounded-sm px-3 py-1.5 text-sm transition-colors"
                             :class="
                                 String(route.name).startsWith(subItem.name)
                                     ? 'bg-background text-foreground'
@@ -101,6 +116,11 @@ async function endSession(): Promise<void> {
                             @click="mobileNavigationOpen = false"
                         >
                             {{ subItem.label }}
+                            <span
+                                v-if="subItem.name === 'finances.accounts' && hasUnmatchedBankTransactions()"
+                                class="size-1.5 rounded-full bg-accent"
+                                title="Unmatched bank transactions"
+                            />
                         </RouterLink>
                     </div>
                 </template>

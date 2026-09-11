@@ -47,6 +47,24 @@ class Account extends Model
     }
 
     /**
+     * @return HasMany<BankTransaction, $this>
+     */
+    public function bankTransactions(): HasMany
+    {
+        return $this->hasMany(BankTransaction::class, 'financial_account_id');
+    }
+
+    /**
+     * Bank-reported rows not yet linked to a posting.
+     *
+     * @return HasMany<BankTransaction, $this>
+     */
+    public function unmatchedBankTransactions(): HasMany
+    {
+        return $this->bankTransactions()->whereNull('financial_posting_id');
+    }
+
+    /**
      * Full colon-delimited path derived from ancestry, prefixed
      * with the account type: "Expenses:food:dining-out".
      */

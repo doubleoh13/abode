@@ -3,6 +3,7 @@ import axios, { isAxiosError } from 'axios';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { setPageTitle } from '../router';
+import { setUnmatchedBankTransactionCount } from '../bankImports';
 import AccountForm from '../components/AccountForm.vue';
 import DateInput from '../components/DateInput.vue';
 import ComboBox from '../components/ComboBox.vue';
@@ -319,6 +320,7 @@ async function loadBankTransactions(): Promise<void> {
     });
 
     bankTransactions.value = response.data.data;
+    setUnmatchedBankTransactionCount(accountId.value, bankTransactions.value.length);
 }
 
 const unmatchedBankTransactions = computed(() =>
