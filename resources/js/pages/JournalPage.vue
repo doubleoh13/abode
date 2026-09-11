@@ -7,13 +7,10 @@ import MergeDialog from '../components/MergeDialog.vue';
 import ModalDialog from '../components/ModalDialog.vue';
 import PaginationBar from '../components/PaginationBar.vue';
 import TransactionForm from '../components/TransactionForm.vue';
+import PostingStatusMenu from '../components/PostingStatusMenu.vue';
 import {
     accountPathAncestor,
     accountPathLeaf,
-    nextStatus,
-    statusClass,
-    statusLabel,
-    statusSymbol,
 } from '../journal';
 import { formatAmount } from '../money';
 import type {
@@ -331,14 +328,8 @@ async function transactionSaved(): Promise<void> {
     await Promise.all([loadTransactions(), loadIssues()]);
 }
 
-async function flipStatus(transaction: Transaction, posting: Posting): Promise<void> {
-    if (posting.status === null) {
-        return;
-    }
-
-    await axios.patch(`/api/v1/financial/postings/${posting.id}`, {
-        status: nextStatus(posting.status),
-    });
+async function setStatus(transaction: Transaction, posting: Posting, status: PostingStatus): Promise<void> {
+    await axios.patch(`/api/v1/financial/postings/${posting.id}`, { status });
 
     const refreshed = (
         await axios.get<{ data: Transaction }>(`/api/v1/financial/transactions/${transaction.id}`)
@@ -652,17 +643,13 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                                 {{ posting.commodity ? formatAmount(posting.amount, posting.commodity) : posting.amount }}
                             </span>
 
-                            <button
+                            <PostingStatusMenu
                                 v-if="posting.status !== null"
-                                type="button"
-                                class="w-8 shrink-0 rounded-sm text-right font-mono text-sm transition-colors hover:bg-edge/60 hover:text-foreground"
-                                :class="statusClass(posting.status)"
-                                :title="`${statusLabel(posting.status)} — click to mark ${statusLabel(nextStatus(posting.status)).toLowerCase()}`"
-                                @click.stop="flipStatus(transaction, posting)"
-                            >
-                                <span aria-hidden="true">{{ statusSymbol(posting.status) }}</span>
-                                <span class="sr-only">{{ statusLabel(posting.status) }}</span>
-                            </button>
+                                :status="posting.status"
+                                :matched="Boolean(posting.bank_transaction)"
+                                :detail="posting.bank_transaction ? `bank ${posting.bank_transaction.posted_on}` : undefined"
+                                @select="setStatus(transaction, posting, $event)"
+                            />
 
                             <span v-else class="w-8 shrink-0"></span>
                         </div>

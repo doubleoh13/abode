@@ -24,3 +24,9 @@ Financial API values (posting amounts, lot costs and quantities, journal residua
 
 ## money.test.mjs guards PHP/JS allocation parity — run npm test
 tests/Unit/money.test.mjs (Node's test runner, run via `npm test`) is the only automated check that money.ts allocation matches CostBasisBalancer bit-for-bit; both suites assert the same vectors. Run it whenever money.ts or CostBasisBalancer changes, and keep the shared vectors in sync in both test files.
+
+## Posting status is set from a dismissable menu, never by cycling on click
+Clicking a posting's status glyph opens components/PostingStatusMenu.vue: a small menu listing Pending / Cleared / Reconciled with glyphs, the current one checked. Choosing any option PATCHes /financial/postings/{id} with that status; Escape, Tab, click outside, scroll or resize dismiss without change so a mis-click costs nothing. The menu is teleported to body and positioned fixed from the trigger's rect because register lists use overflow-hidden for rounded corners. The old click-to-cycle (nextStatus) is gone — do not reintroduce it.
+
+## Posting status column: _ / C / lock, cyan when matched to a bank row
+Status glyphs come from components/PostingStatusGlyph.vue everywhere a posting status is shown: pending = "_" (never blank — the glyph is the click target for the status menu), cleared = C, reconciled = an inline SVG padlock. Never the old P/C/R letters or emoji. A posting linked to a bank row (posting.bank_transaction, loaded on the account register and journal) renders the whole status button in accent cyan via statusClass(matched); unmatched postings are muted, reconciled included. There is no separate "imported" marker next to the payee — the cyan status column is the only trace of a bank match. A proposed, not yet approved, match shows on the register line as an accent dot, bank date · payee, ✓ (approve) and ✕ (not a match).

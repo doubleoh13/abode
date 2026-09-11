@@ -199,7 +199,7 @@ async function deleteAccount(account: Account): Promise<void> {
                                     class="tracking-wider text-accent uppercase"
                                     title="Mapped to a SimpleFIN account for import"
                                 >
-                                    Imports
+                                    SimpleFIN
                                 </span>
                                 <span v-if="account.institution">{{ account.institution.name }}</span>
                                 <span v-if="account.closed_at">closed {{ account.closed_at }}</span>

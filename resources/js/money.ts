@@ -112,3 +112,7 @@ export function totalCostFromUnitCost(unitCost: string, quantity: string): strin
 
     return parseAmount(scaledIntegerToDecimal(numerator / decimalScale));
 }
+
+export function negateAmount(amount: string): string {
+    return scaledIntegerToDecimal(-decimalToScaledInteger(amount));
+}

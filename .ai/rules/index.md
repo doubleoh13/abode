@@ -17,6 +17,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Middleware/** | .ai/rules/middleware.md |
 | database/migrations/** | .ai/rules/migrations.md |
 | app/Models/** | .ai/rules/models.md |
+| resources/js/pages/AccountPage.vue | .ai/rules/pages.md |
 | app/Http/Requests/Financial/** | .ai/rules/requests-financial.md |
 | resources/** | .ai/rules/resources.md |
 | routes/**, routes/console.php | .ai/rules/routes.md |

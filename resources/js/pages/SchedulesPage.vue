@@ -4,7 +4,8 @@ import { onMounted, ref } from 'vue';
 import ModalDialog from '../components/ModalDialog.vue';
 import SkeletonList from '../components/SkeletonList.vue';
 import TransactionForm from '../components/TransactionForm.vue';
-import { accountPathAncestor, accountPathLeaf, recurrenceLabel, statusLabel, statusSymbol } from '../journal';
+import PostingStatusGlyph from '../components/PostingStatusGlyph.vue';
+import { accountPathAncestor, accountPathLeaf, recurrenceLabel, statusLabel } from '../journal';
 import { formatAmount } from '../money';
 import type { Account, Commodity, Institution, Payee, RecurringTransaction } from '../types';
 
@@ -173,7 +174,7 @@ async function deleteSchedule(schedule: RecurringTransaction): Promise<void> {
                                 class="w-8 shrink-0 text-right font-mono text-sm text-muted"
                                 :title="posting.status !== null ? `Posts as ${statusLabel(posting.status).toLowerCase()}` : undefined"
                             >
-                                <span aria-hidden="true">{{ statusSymbol(posting.status) }}</span>
+                                <PostingStatusGlyph :status="posting.status" />
                                 <span v-if="posting.status !== null" class="sr-only">{{ statusLabel(posting.status) }}</span>
                             </span>
                         </div>

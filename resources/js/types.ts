@@ -45,8 +45,29 @@ export interface Account {
     allow_postings: boolean;
     institution?: Institution | null;
     simplefin_account_id: string | null;
+    simplefin_synced_at: string | null;
+    simplefin_balance: string | null;
+    simplefin_balance_date: string | null;
     opened_at: string | null;
     closed_at: string | null;
+}
+
+export interface BankTransaction {
+    id: number;
+    financial_account_id: number;
+    source: string;
+    external_id: string;
+    posted_on: string;
+    transacted_on: string | null;
+    pending: boolean;
+    amount: string;
+    currency: string;
+    description: string | null;
+    payee: string | null;
+    memo: string | null;
+    financial_posting_id: number | null;
+    rejected_posting_ids: number[];
+    candidate_posting_id: number | null;
 }
 
 export type PostingStatus = 'pending' | 'cleared' | 'reconciled';
@@ -76,6 +97,7 @@ export interface Posting {
     memo: string | null;
     metadata: Record<string, unknown>;
     transaction?: Transaction;
+    bank_transaction?: BankTransaction | null;
     running_balance?: string;
 }
 
@@ -200,6 +222,7 @@ export interface PostingDraft {
     amount: string;
     memo: string;
     financial_lot_id: number | null;
+    financial_bank_transaction_id: number | null;
     lotMode: 'existing' | 'new';
     lotCost: string;
     lotCostMode: 'total' | 'unit';

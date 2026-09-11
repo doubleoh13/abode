@@ -9,13 +9,10 @@ import ModalDialog from '../components/ModalDialog.vue';
 import PaginationBar from '../components/PaginationBar.vue';
 import PriceChart from '../components/PriceChart.vue';
 import SkeletonList from '../components/SkeletonList.vue';
+import PostingStatusMenu from '../components/PostingStatusMenu.vue';
 import {
     accountPathAncestor,
     accountPathLeaf,
-    nextStatus,
-    statusClass,
-    statusLabel,
-    statusSymbol,
 } from '../journal';
 import {
     allocateBasis,
@@ -25,7 +22,7 @@ import {
     scaledIntegerToDecimal,
     subtractAmounts,
 } from '../money';
-import type { Account, Commodity, CommodityBalance, CommodityPrice, Lot, Paginated, Posting } from '../types';
+import type { Account, Commodity, CommodityBalance, CommodityPrice, Lot, Paginated, Posting, PostingStatus } from '../types';
 
 const route = useRoute();
 
@@ -230,14 +227,8 @@ async function changePage(target: number): Promise<void> {
     await loadPostings();
 }
 
-async function flipStatus(posting: Posting): Promise<void> {
-    if (posting.status === null) {
-        return;
-    }
-
-    await axios.patch(`/api/v1/financial/postings/${posting.id}`, {
-        status: nextStatus(posting.status),
-    });
+async function setStatus(posting: Posting, status: PostingStatus): Promise<void> {
+    await axios.patch(`/api/v1/financial/postings/${posting.id}`, { status });
     await loadPostings();
 }
 
@@ -552,17 +543,11 @@ watch(commodityId, () => {
                                 : '—' }}
                         </span>
 
-                        <button
+                        <PostingStatusMenu
                             v-if="posting.status !== null"
-                            type="button"
-                            class="w-8 shrink-0 rounded-sm text-right font-mono text-sm not-italic transition-colors hover:bg-edge/60 hover:text-foreground"
-                            :class="statusClass(posting.status)"
-                            :title="`${statusLabel(posting.status)} — click to mark ${statusLabel(nextStatus(posting.status)).toLowerCase()}`"
-                            @click="flipStatus(posting)"
-                        >
-                            <span aria-hidden="true">{{ statusSymbol(posting.status) }}</span>
-                            <span class="sr-only">{{ statusLabel(posting.status) }}</span>
-                        </button>
+                            :status="posting.status"
+                            @select="setStatus(posting, $event)"
+                        />
                         <span v-else class="w-8 shrink-0"></span>
                     </li>
                 </ul>

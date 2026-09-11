@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { setPageTitle } from '../router';
 import AccountForm from '../components/AccountForm.vue';
@@ -8,14 +8,12 @@ import DateInput from '../components/DateInput.vue';
 import ComboBox from '../components/ComboBox.vue';
 import ModalDialog from '../components/ModalDialog.vue';
 import PaginationBar from '../components/PaginationBar.vue';
+import PostingStatusMenu from '../components/PostingStatusMenu.vue';
+import TransactionForm from '../components/TransactionForm.vue';
 import SkeletonList from '../components/SkeletonList.vue';
 import {
     accountPathAncestor,
     accountPathLeaf,
-    nextStatus,
-    statusClass,
-    statusLabel,
-    statusSymbol,
 } from '../journal';
 import {
     allocateBasis,
@@ -30,11 +28,14 @@ import type {
     Account,
     AccountBalance,
     BalanceAssertion,
+    BankTransaction,
     Commodity,
     JournalIssue,
     Lot,
     Paginated,
+    Payee,
     Posting,
+    PostingStatus,
 } from '../types';
 
 const route = useRoute();
@@ -97,6 +98,44 @@ const holdings = computed<Holding[]>(() => {
 
 const usd = computed(() => commodities.value.find((commodity) => commodity.code === 'USD'));
 
+const hasNonCashHoldings = computed(() => holdings.value.some((holding) => holding.commodity.code !== 'USD'));
+
+interface Headline {
+    label: string;
+    value: string | null;
+    asOf: string | null;
+}
+
+const headline = computed<Headline | null>(() => {
+    if (holdings.value.length === 0) {
+        return null;
+    }
+
+    let total = 0n;
+
+    for (const holding of holdings.value) {
+        const value = marketValue(holding.quantity, holding.commodity);
+
+        if (value === null) {
+            return { label: 'Market value', value: null, asOf: null };
+        }
+
+        total += decimalToScaledInteger(value);
+    }
+
+    if (!hasNonCashHoldings.value) {
+        return { label: 'Balance', value: scaledIntegerToDecimal(total), asOf: null };
+    }
+
+    const priceDates = holdings.value
+        .filter((holding) => holding.commodity.kind !== 'currency')
+        .map((holding) => holding.commodity.latest_priced_at)
+        .filter((date): date is string => date !== undefined)
+        .sort();
+
+    return { label: 'Market value', value: scaledIntegerToDecimal(total), asOf: priceDates[0] ?? null };
+});
+
 const openLots = computed(() =>
     lots.value.filter((lot) => decimalToScaledInteger(lot.open_quantity ?? '0') > 0n),
 );
@@ -150,14 +189,14 @@ async function changePage(target: number): Promise<void> {
     await loadPostings();
 }
 
-async function flipStatus(posting: Posting): Promise<void> {
-    if (posting.status === null) {
-        return;
-    }
+function bankDetail(posting: Posting): string | undefined {
+    return posting.bank_transaction
+        ? `bank ${posting.bank_transaction.posted_on} · ${bankTransactionLabel(posting.bank_transaction)} · ${formatUsd(posting.bank_transaction.amount)}`
+        : undefined;
+}
 
-    await axios.patch(`/api/v1/financial/postings/${posting.id}`, {
-        status: nextStatus(posting.status),
-    });
+async function setStatus(posting: Posting, status: PostingStatus): Promise<void> {
+    await axios.patch(`/api/v1/financial/postings/${posting.id}`, { status });
     await loadPostings();
 }
 
@@ -167,6 +206,119 @@ const assertionIssues = ref<JournalIssue[]>([]);
 const issuesByAssertion = computed(
     () => new Map(assertionIssues.value.map((issue) => [issue.financial_balance_assertion_id, issue])),
 );
+
+const bankTransactions = ref<BankTransaction[]>([]);
+
+async function loadBankTransactions(): Promise<void> {
+    const response = await axios.get<{ data: BankTransaction[] }>('/api/v1/financial/bank-transactions', {
+        params: { financial_account_id: accountId.value },
+    });
+
+    bankTransactions.value = response.data.data;
+}
+
+const unmatchedBankTransactions = computed(() =>
+    bankTransactions.value.filter((bankTransaction) => bankTransaction.candidate_posting_id === null),
+);
+
+const proposalsByPosting = computed(() => {
+    const map = new Map<number, BankTransaction>();
+
+    for (const bankTransaction of bankTransactions.value) {
+        if (bankTransaction.candidate_posting_id !== null) {
+            map.set(bankTransaction.candidate_posting_id, bankTransaction);
+        }
+    }
+
+    return map;
+});
+
+function bankTransactionLabel(bankTransaction: BankTransaction): string {
+    return bankTransaction.payee ?? bankTransaction.description ?? bankTransaction.external_id;
+}
+
+async function approveProposal(bankTransaction: BankTransaction): Promise<void> {
+    await axios.post(`/api/v1/financial/bank-transactions/${bankTransaction.id}/match`, {
+        financial_posting_id: bankTransaction.candidate_posting_id,
+    });
+    await Promise.all([loadBankTransactions(), loadPostings()]);
+}
+
+const payees = ref<Payee[]>([]);
+const convertingBankTransaction = ref<BankTransaction | null>(null);
+
+function registerPayee(payee: Payee): void {
+    if (!payees.value.some((candidate) => candidate.id === payee.id)) {
+        payees.value.push(payee);
+    }
+}
+
+function registerAccount(created: Account): void {
+    if (!allAccounts.value.some((candidate) => candidate.id === created.id)) {
+        allAccounts.value.push(created);
+    }
+}
+
+const matchingBankTransaction = ref<BankTransaction | null>(null);
+
+function onMatchingKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+        matchingBankTransaction.value = null;
+    }
+}
+
+watch(matchingBankTransaction, (selected) => {
+    if (selected) {
+        window.addEventListener('keydown', onMatchingKeydown);
+    } else {
+        window.removeEventListener('keydown', onMatchingKeydown);
+    }
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('keydown', onMatchingKeydown);
+});
+
+function canMatch(posting: Posting): boolean {
+    return matchingBankTransaction.value !== null && !posting.bank_transaction && posting.status !== null;
+}
+
+async function matchTo(posting: Posting): Promise<void> {
+    const bankTransaction = matchingBankTransaction.value;
+
+    if (!bankTransaction || !canMatch(posting)) {
+        return;
+    }
+
+    try {
+        await axios.post(`/api/v1/financial/bank-transactions/${bankTransaction.id}/match`, {
+            financial_posting_id: posting.id,
+        });
+    } catch (error) {
+        if (isAxiosError(error) && (error.response?.status === 422 || error.response?.status === 409)) {
+            alert(error.response.data.errors?.financial_posting_id?.[0] ?? error.response.data.message);
+            return;
+        }
+
+        throw error;
+    } finally {
+        matchingBankTransaction.value = null;
+    }
+
+    await Promise.all([loadBankTransactions(), loadPostings()]);
+}
+
+async function bankTransactionConverted(): Promise<void> {
+    convertingBankTransaction.value = null;
+    await Promise.all([loadBankTransactions(), loadPostings(), loadBalances()]);
+}
+
+async function rejectProposal(bankTransaction: BankTransaction): Promise<void> {
+    await axios.post(`/api/v1/financial/bank-transactions/${bankTransaction.id}/reject`, {
+        financial_posting_id: bankTransaction.candidate_posting_id,
+    });
+    await loadBankTransactions();
+}
 
 async function loadAssertions(): Promise<void> {
     const [assertionsResponse, issuesResponse] = await Promise.all([
@@ -322,28 +474,36 @@ function amountClass(amount: string | null): string {
     return amount !== null && amount.startsWith('-') ? 'text-danger' : '';
 }
 
+async function loadBalances(): Promise<void> {
+    const response = await axios.get<{ data: AccountBalance[] }>(`/api/v1/financial/accounts/${accountId.value}/balances`);
+
+    balances.value = response.data.data;
+}
+
 async function loadAccount(): Promise<void> {
     loaded.value = false;
     page.value = 1;
 
-    const [accountResponse, balancesResponse, lotsResponse, commoditiesResponse, accountsResponse, institutionsResponse] = await Promise.all([
+    const [accountResponse, lotsResponse, commoditiesResponse, accountsResponse, institutionsResponse, payeesResponse] = await Promise.all([
         axios.get<{ data: Account }>(`/api/v1/financial/accounts/${accountId.value}`),
-        axios.get<{ data: AccountBalance[] }>(`/api/v1/financial/accounts/${accountId.value}/balances`),
         axios.get<{ data: Lot[] }>('/api/v1/financial/lots', {
             params: { financial_account_id: accountId.value },
         }),
         axios.get<{ data: Commodity[] }>('/api/v1/financial/commodities'),
         axios.get<{ data: Account[] }>('/api/v1/financial/accounts'),
         axios.get<{ data: Institution[] }>('/api/v1/financial/institutions'),
+        axios.get<{ data: Payee[] }>('/api/v1/financial/payees'),
+        loadBalances(),
         loadPostings(),
         loadAssertions(),
+        loadBankTransactions(),
     ]);
 
     account.value = accountResponse.data.data;
     allAccounts.value = accountsResponse.data.data;
     institutions.value = institutionsResponse.data.data;
+    payees.value = payeesResponse.data.data;
     setPageTitle(account.value.path);
-    balances.value = balancesResponse.data.data;
     lots.value = lotsResponse.data.data;
     commodities.value = commoditiesResponse.data.data;
     loaded.value = true;
@@ -354,6 +514,38 @@ watch(accountId, () => {
     void loadAccount();
 });
 
+const syncing = ref(false);
+
+function formatSyncedAt(value: string): string {
+    const date = new Date(value);
+    const pad = (part: number): string => String(part).padStart(2, '0');
+
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+async function syncSimpleFin(): Promise<void> {
+    if (!account.value) {
+        return;
+    }
+
+    syncing.value = true;
+
+    try {
+        const response = await axios.post<{ data: Account }>(`/api/v1/financial/accounts/${account.value.id}/simplefin-sync`);
+        account.value = response.data.data;
+        await loadBankTransactions();
+    } catch (error) {
+        if (isAxiosError(error) && error.response?.status === 409) {
+            alert(error.response.data.message);
+            return;
+        }
+
+        throw error;
+    } finally {
+        syncing.value = false;
+    }
+}
+
 async function accountSaved(): Promise<void> {
     editFormOpen.value = false;
     await loadAccount();
@@ -362,27 +554,52 @@ async function accountSaved(): Promise<void> {
 
 <template>
     <div>
-        <div class="flex flex-wrap items-baseline justify-between gap-4">
-            <h1 class="text-xl font-semibold">
-                <span class="text-muted">{{ accountPathAncestor(account?.path) }}</span>{{ accountPathLeaf(account?.path) }}
-            </h1>
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+                <div class="flex flex-wrap items-baseline gap-3">
+                    <h1 class="text-xl font-semibold">
+                        <span class="text-muted">{{ accountPathAncestor(account?.path) }}</span>{{ accountPathLeaf(account?.path) }}
+                    </h1>
 
-            <span v-if="account" class="flex items-center gap-3 font-mono text-xs tracking-wider text-muted uppercase">
-                <span>{{ account.account_type }}</span>
-                <span v-if="account.institution">{{ account.institution.name }}</span>
-                <span v-if="account.opened_at">opened {{ account.opened_at }}</span>
-                <span v-if="account.closed_at" class="text-danger">closed {{ account.closed_at }}</span>
-                <span
-                    v-if="account.simplefin_account_id"
-                    class="rounded-sm border border-accent/40 px-1.5 py-0.5 text-accent"
-                    title="Mapped to a SimpleFIN account for import"
-                >
-                    Imports
-                </span>
-                <button type="button" class="tracking-wider uppercase transition-colors hover:text-foreground" @click="editFormOpen = true">
-                    Edit
-                </button>
-            </span>
+                    <span v-if="account?.simplefin_account_id" class="flex items-center gap-3 font-mono text-xs tracking-wider text-muted uppercase">
+                        <span>{{ account.simplefin_synced_at ? `synced ${formatSyncedAt(account.simplefin_synced_at)}` : 'never synced' }}</span>
+                        <button
+                            type="button"
+                            class="tracking-wider uppercase transition-colors hover:text-foreground disabled:cursor-wait disabled:hover:text-muted"
+                            :disabled="syncing"
+                            @click="syncSimpleFin"
+                        >
+                            {{ syncing ? 'Syncing…' : 'Sync' }}
+                        </button>
+                    </span>
+                </div>
+
+                <div v-if="account" class="mt-1 flex flex-wrap items-center gap-3 font-mono text-xs tracking-wider text-muted uppercase">
+                    <span>{{ account.account_type }}</span>
+                    <span v-if="account.institution">{{ account.institution.name }}</span>
+                    <span v-if="account.opened_at">opened {{ account.opened_at }}</span>
+                    <span v-if="account.closed_at" class="text-danger">closed {{ account.closed_at }}</span>
+                    <span
+                        v-if="account.simplefin_account_id"
+                        class="rounded-sm border border-accent/40 px-1.5 py-0.5 text-accent"
+                        title="Mapped to a SimpleFIN account for import"
+                    >
+                        SimpleFIN
+                    </span>
+                    <button type="button" class="tracking-wider uppercase transition-colors hover:text-foreground" @click="editFormOpen = true">
+                        Edit
+                    </button>
+                </div>
+            </div>
+
+            <div v-if="loaded && headline" class="text-right">
+                <div class="font-mono text-2xl tabular-nums" :class="amountClass(headline.value)">
+                    {{ formatUsd(headline.value) }}
+                </div>
+                <div class="mt-1 font-mono text-xs tracking-wider text-muted uppercase">
+                    {{ headline.label }}<span v-if="headline.asOf"> · as of {{ headline.asOf }}</span>
+                </div>
+            </div>
         </div>
 
         <ModalDialog :open="editFormOpen" @close="editFormOpen = false">
@@ -398,7 +615,7 @@ async function accountSaved(): Promise<void> {
         </ModalDialog>
 
         <template v-if="loaded">
-            <section v-if="holdings.length > 0" class="mt-6">
+            <section v-if="hasNonCashHoldings" class="mt-6">
                 <h2 class="font-mono text-xs tracking-wider text-muted uppercase">Holdings</h2>
 
                 <div class="mt-2 overflow-x-auto rounded-md border border-edge bg-surface">
@@ -507,6 +724,86 @@ async function accountSaved(): Promise<void> {
                 </div>
             </section>
 
+            <section v-if="unmatchedBankTransactions.length > 0" class="mt-8">
+                <h2 class="flex items-baseline gap-3 font-mono text-xs tracking-wider text-accent uppercase">
+                    <span>{{ unmatchedBankTransactions.length }} unmatched</span>
+                    <span v-if="matchingBankTransaction" class="text-muted">
+                        pick the register line this settles · Esc to cancel
+                    </span>
+                </h2>
+
+                <ModalDialog :open="convertingBankTransaction !== null" @close="convertingBankTransaction = null">
+                    <TransactionForm
+                        v-if="convertingBankTransaction"
+                        :key="`bank-${convertingBankTransaction.id}`"
+                        :transaction="null"
+                        :bank-transaction="convertingBankTransaction"
+                        :accounts="allAccounts"
+                        :commodities="commodities"
+                        :institutions="institutions"
+                        :payees="payees"
+                        @saved="bankTransactionConverted"
+                        @cancelled="convertingBankTransaction = null"
+                        @payee-created="registerPayee"
+                        @account-created="registerAccount"
+                    />
+                </ModalDialog>
+
+                <ul class="mt-2 divide-y divide-edge overflow-hidden rounded-md border border-accent/40 bg-surface">
+                    <li
+                        v-for="bankTransaction in unmatchedBankTransactions"
+                        :key="bankTransaction.id"
+                        class="group grid grid-cols-[5.5rem_minmax(0,1fr)_auto_8rem] items-center gap-x-4 px-4 py-2"
+                        :class="{
+                            italic: bankTransaction.pending,
+                            'bg-accent/10': matchingBankTransaction?.id === bankTransaction.id,
+                            'opacity-50': matchingBankTransaction && matchingBankTransaction.id !== bankTransaction.id,
+                        }"
+                    >
+                        <span class="font-mono text-xs text-muted">{{ bankTransaction.posted_on }}</span>
+
+                        <span class="truncate text-sm">
+                            {{ bankTransaction.payee ?? bankTransaction.description ?? '—' }}
+                            <span v-if="bankTransaction.payee && bankTransaction.description" class="text-muted">
+                                · {{ bankTransaction.description }}
+                            </span>
+                            <span v-if="bankTransaction.pending" class="ml-2 font-mono text-xs tracking-wider text-muted uppercase not-italic">pending</span>
+                        </span>
+
+                        <span class="flex items-center gap-3 font-mono text-xs tracking-wider uppercase not-italic">
+                            <button
+                                v-if="matchingBankTransaction?.id === bankTransaction.id"
+                                type="button"
+                                class="text-accent transition-colors hover:text-foreground"
+                                @click="matchingBankTransaction = null"
+                            >
+                                Cancel
+                            </button>
+                            <template v-else>
+                                <button
+                                    type="button"
+                                    class="text-muted transition-opacity hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100"
+                                    @click="matchingBankTransaction = bankTransaction"
+                                >
+                                    Match
+                                </button>
+                                <button
+                                    type="button"
+                                    class="text-muted transition-opacity hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100"
+                                    @click="convertingBankTransaction = bankTransaction"
+                                >
+                                    New transaction
+                                </button>
+                            </template>
+                        </span>
+
+                        <span class="text-right font-mono text-sm" :class="amountClass(bankTransaction.amount)">
+                            {{ formatUsd(bankTransaction.amount) }}
+                        </span>
+                    </li>
+                </ul>
+            </section>
+
             <section class="mt-8">
                 <div class="flex items-center justify-between">
                     <h2 class="font-mono text-xs tracking-wider text-muted uppercase">Register</h2>
@@ -611,14 +908,55 @@ async function accountSaved(): Promise<void> {
                     <li
                         v-else
                         class="grid grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_8.5rem_2rem] items-center gap-x-4 px-4 py-2"
-                        :class="{ italic: row.posting.status === 'pending' }"
+                        :class="{
+                            italic: row.posting.status === 'pending',
+                            'cursor-pointer transition-colors hover:bg-accent/10': canMatch(row.posting),
+                            'opacity-40': matchingBankTransaction && !canMatch(row.posting),
+                        }"
+                        :role="canMatch(row.posting) ? 'button' : undefined"
+                        :tabindex="canMatch(row.posting) ? 0 : undefined"
+                        @click="canMatch(row.posting) && matchTo(row.posting)"
+                        @keydown.enter="canMatch(row.posting) && matchTo(row.posting)"
                     >
                         <span class="font-mono text-xs text-muted">{{ row.posting.transaction?.date }}</span>
 
-                        <span class="truncate text-sm">
-                            {{ row.posting.transaction?.payee?.name ?? row.posting.transaction?.memo ?? '—' }}
-                            <span v-if="row.posting.transaction?.payee && row.posting.transaction?.memo" class="text-muted">
-                                · {{ row.posting.transaction.memo }}
+                        <span class="min-w-0 text-sm">
+                            <span class="block truncate">
+                                {{ row.posting.transaction?.payee?.name ?? row.posting.transaction?.memo ?? '—' }}
+                                <span v-if="row.posting.transaction?.payee && row.posting.transaction?.memo" class="text-muted">
+                                    · {{ row.posting.transaction.memo }}
+                                </span>
+                            </span>
+
+                            <span
+                                v-if="proposalsByPosting.has(row.posting.id)"
+                                class="mt-0.5 flex items-center gap-3 font-mono text-xs not-italic"
+                            >
+                                <span class="flex min-w-0 items-center gap-2 text-accent">
+                                    <span class="size-1.5 shrink-0 rounded-full bg-accent"></span>
+                                    <span class="truncate">
+                                        {{ proposalsByPosting.get(row.posting.id)!.posted_on }}
+                                        · {{ bankTransactionLabel(proposalsByPosting.get(row.posting.id)!) }}
+                                    </span>
+                                </span>
+                                <button
+                                    type="button"
+                                    class="shrink-0 rounded-sm border border-accent/40 px-1.5 text-accent transition-colors hover:bg-accent hover:text-background"
+                                    title="Approve match"
+                                    @click="approveProposal(proposalsByPosting.get(row.posting.id)!)"
+                                >
+                                    <span aria-hidden="true">✓</span>
+                                    <span class="sr-only">Approve match</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    class="shrink-0 rounded-sm px-1.5 text-muted transition-colors hover:text-danger"
+                                    title="Not a match"
+                                    @click="rejectProposal(proposalsByPosting.get(row.posting.id)!)"
+                                >
+                                    <span aria-hidden="true">✕</span>
+                                    <span class="sr-only">Not a match</span>
+                                </button>
                             </span>
                         </span>
 
@@ -636,17 +974,13 @@ async function accountSaved(): Promise<void> {
                                 : '—' }}
                         </span>
 
-                        <button
+                        <PostingStatusMenu
                             v-if="row.posting.status !== null"
-                            type="button"
-                            class="w-8 shrink-0 rounded-sm text-right font-mono text-sm not-italic transition-colors hover:bg-edge/60 hover:text-foreground"
-                            :class="statusClass(row.posting.status)"
-                            :title="`${statusLabel(row.posting.status)} — click to mark ${statusLabel(nextStatus(row.posting.status)).toLowerCase()}`"
-                            @click="flipStatus(row.posting)"
-                        >
-                            <span aria-hidden="true">{{ statusSymbol(row.posting.status) }}</span>
-                            <span class="sr-only">{{ statusLabel(row.posting.status) }}</span>
-                        </button>
+                            :status="row.posting.status"
+                            :matched="Boolean(row.posting.bank_transaction)"
+                            :detail="bankDetail(row.posting)"
+                            @select="setStatus(row.posting, $event)"
+                        />
                         <span v-else class="w-8 shrink-0"></span>
                     </li>
                     </template>

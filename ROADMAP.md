@@ -4,7 +4,7 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Next
 
-- SimpleFIN transactions: design paused 2026-09-11 after a staging-table plus inbox attempt (reverted, see git history for 1428100 and 9bc2462). Jake's objections to the inbox: a proposed match is hard to see in context, and there is no view of nearby transactions on the same account to spot a fat-fingered entry. Next design must show bank rows alongside the account register.
+- SimpleFIN follow-ups: scheduled sync (manual header Sync only today); an unmatch action (currently a DB edit); decide whether pending bank rows stay visible in the band; a SimpleFIN row's payee/description could seed a payee alias table for better auto-payee on convert.
 - Duplicate candidate finder: surface likely pairs by account, amount, and a date window; each pair opens the merge dialog.
 - Accounts index balances: show a USD value and holdings count per row as of today, reusing the balance sheet builder.
 - Payee hygiene: search box, transaction count per payee, and a merge action that reassigns and deletes.
@@ -30,6 +30,11 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Done
 
+- SimpleFIN chunk 6: hand matching — Match on a band row puts the register in pick mode (unmatched status-bearing lines clickable, others dimmed, Esc or Cancel exits); clicking a line calls POST bank-transactions/{id}/match (2026-09-11).
+- SimpleFIN chunk 5: a bank row converts to a new transaction from the account page — TransactionForm prefilled from the row (date, payee by name, description as memo, this account's leg, balancing empty counter leg) and postings.*.financial_bank_transaction_id links the row atomically in TransactionWriter. Status column redesigned: _ / C / lock glyphs, cyan when matched, set from a dismissable menu (2026-09-11).
+- SimpleFIN chunk 4: BankTransactionMatcher proposes a posting per bank row when amount matches, dates are within 3 days, and the pairing is unambiguous; register line shows the bank row with Approve (links, clears a pending posting once the bank posts it) and Reject (records the posting in rejected_posting_ids, row returns to the band) (2026-09-11).
+- SimpleFIN chunk 3: GET financial/bank-transactions?financial_account_id lists an account's unmatched bank rows; the account page shows them in a Bank band above the register, refreshed after every sync (2026-09-11).
+- SimpleFIN chunk 2: financial_bank_transactions staging table, per-account sync endpoint with a 30-day first window and 7-day overlap, Sync action and last-synced label in the account header, bank balance stored on the account (2026-09-11).
 - SimpleFIN chunk 1: access URL in env, accounts endpoint cached an hour, account form picker to map an account to a SimpleFIN account (2026-09-11).
 
 - Journal filter bar: search plus preset chips (this month, last month, last 30 days, this year, pending, unreconciled) with the detailed filters collapsed behind a Filters toggle (2026-09-10).

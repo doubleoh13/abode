@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
 import { computed, ref } from 'vue';
-import { accountPathAncestor, accountPathLeaf, statusLabel, statusSymbol } from '../journal';
+import PostingStatusGlyph from './PostingStatusGlyph.vue';
+import { accountPathAncestor, accountPathLeaf, statusLabel } from '../journal';
 import { decimalToScaledInteger, formatAmount, scaledIntegerToDecimal } from '../money';
 import type { Commodity, Posting, Transaction } from '../types';
 
@@ -221,7 +222,7 @@ const headerFields: Array<{ field: HeaderField; label: string }> = [
                             {{ posting.commodity ? formatAmount(posting.amount, posting.commodity) : posting.amount }}
                         </span>
                         <span class="w-4 text-right font-mono text-muted" :title="statusLabel(posting.status)">
-                            {{ statusSymbol(posting.status) }}
+                            <PostingStatusGlyph :status="posting.status" />
                         </span>
                     </label>
                 </div>

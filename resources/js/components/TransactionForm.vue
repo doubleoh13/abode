@@ -9,6 +9,7 @@ import PostingRow from './PostingRow.vue';
 import {
     allocateBasis,
     decimalToScaledInteger,
+    negateAmount,
     scaledIntegerToDecimal,
     formatAmount,
     parseAmount,
@@ -16,6 +17,7 @@ import {
 } from '../money';
 import type {
     Account,
+    BankTransaction,
     Commodity,
     Institution,
     Lot,
@@ -32,6 +34,7 @@ const props = defineProps<{
     transaction: Transaction | null;
     schedule?: RecurringTransaction | null;
     duplicateOf?: Transaction | null;
+    bankTransaction?: BankTransaction | null;
     repeatRequired?: boolean;
     accounts: Account[];
     commodities: Commodity[];
@@ -79,6 +82,7 @@ function emptyDraft(): PostingDraft {
         amount: '',
         memo: '',
         financial_lot_id: null,
+        financial_bank_transaction_id: null,
         lotMode: 'existing',
         lotCost: '',
         lotCostMode: 'total',
@@ -99,6 +103,7 @@ function draftFromPosting(posting: Posting): PostingDraft {
         amount: posting.amount,
         memo: posting.memo ?? '',
         financial_lot_id: posting.financial_lot_id,
+        financial_bank_transaction_id: null,
         lotMode: posting.lot && decimalToScaledInteger(posting.amount) > 0n ? 'new' : 'existing',
         lotCost: posting.lot ? posting.lot.cost : '',
         lotCostMode: 'total',
@@ -119,10 +124,18 @@ function draftFromRecurringPosting(posting: RecurringPosting): PostingDraft {
 
 const prefill = props.transaction ?? props.schedule ?? props.duplicateOf ?? null;
 
+function payeeIdNamed(name: string | null): number | null {
+    if (name === null) {
+        return null;
+    }
+
+    return props.payees.find((payee) => payee.name.toLowerCase() === name.trim().toLowerCase())?.id ?? null;
+}
+
 const form = ref({
-    date: props.transaction?.date ?? props.schedule?.next_due_on ?? new Date().toISOString().slice(0, 10),
-    financial_payee_id: prefill?.financial_payee_id ?? null,
-    memo: prefill?.memo ?? '',
+    date: props.transaction?.date ?? props.schedule?.next_due_on ?? props.bankTransaction?.posted_on ?? new Date().toISOString().slice(0, 10),
+    financial_payee_id: prefill?.financial_payee_id ?? payeeIdNamed(props.bankTransaction?.payee ?? null),
+    memo: prefill?.memo ?? props.bankTransaction?.description ?? '',
 });
 
 function initialDrafts(): PostingDraft[] {
@@ -136,6 +149,19 @@ function initialDrafts(): PostingDraft[] {
 
     if (props.duplicateOf?.postings) {
         return props.duplicateOf.postings.map((posting) => ({ ...draftFromPosting(posting), id: null }));
+    }
+
+    if (props.bankTransaction) {
+        return [
+            {
+                ...emptyDraft(),
+                status: props.bankTransaction.pending ? 'pending' : 'cleared',
+                financial_account_id: props.bankTransaction.financial_account_id,
+                amount: props.bankTransaction.amount,
+                financial_bank_transaction_id: props.bankTransaction.id,
+            },
+            { ...emptyDraft(), amount: negateAmount(props.bankTransaction.amount) },
+        ];
     }
 
     return [emptyDraft(), emptyDraft()];
@@ -409,6 +435,10 @@ function postingPayload(draft: PostingDraft): Record<string, unknown> {
 
     if (draft.id !== null) {
         payload.id = draft.id;
+    }
+
+    if (draft.financial_bank_transaction_id !== null) {
+        payload.financial_bank_transaction_id = draft.financial_bank_transaction_id;
     }
 
     if (commodity !== null && commodity.id !== baseCurrency.value.id) {
