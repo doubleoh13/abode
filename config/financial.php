@@ -34,8 +34,8 @@ return [
 
     'simplefin' => [
         'timezone' => 'America/Indiana/Indianapolis',
-        'initial_days' => 30,
-        'overlap_days' => 7,
+        'initial_days' => 45,
+        'overlap_days' => 45,
         'match_window_days' => 3,
         'ignored_description_patterns' => [
             '/CORE ACCOUNT FIDELITY GOVERNMENT MONEY MARKET/i',
