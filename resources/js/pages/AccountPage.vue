@@ -101,6 +101,26 @@ const usd = computed(() => commodities.value.find((commodity) => commodity.code 
 
 const hasNonCashHoldings = computed(() => holdings.value.some((holding) => holding.commodity.code !== 'USD'));
 
+interface BankBalance {
+    value: string;
+    asOf: string;
+    difference: string | null;
+}
+
+const bankBalance = computed<BankBalance | null>(() => {
+    const value = account.value?.simplefin_balance ?? null;
+    const asOf = account.value?.simplefin_balance_date ?? null;
+    const ledger = headline.value?.value ?? null;
+
+    if (value === null || asOf === null) {
+        return null;
+    }
+
+    const difference = ledger === null ? null : subtractAmounts(value, ledger);
+
+    return { value, asOf, difference: difference !== null && decimalToScaledInteger(difference) === 0n ? null : difference };
+});
+
 interface Headline {
     label: string;
     value: string | null;
@@ -230,9 +250,15 @@ async function changePage(target: number): Promise<void> {
     await loadPostings();
 }
 
+function bankAmountDiffers(posting: Posting): boolean {
+    return posting.bank_transaction !== null
+        && posting.bank_transaction !== undefined
+        && decimalToScaledInteger(posting.bank_transaction.amount) !== decimalToScaledInteger(posting.amount);
+}
+
 function bankDetail(posting: Posting): string | undefined {
     return posting.bank_transaction
-        ? `bank ${posting.bank_transaction.posted_on} · ${bankTransactionLabel(posting.bank_transaction)} · ${formatUsd(posting.bank_transaction.amount)}`
+        ? `${posting.bank_transaction.posted_on} · ${bankTransactionLabel(posting.bank_transaction)} · ${formatUsd(posting.bank_transaction.amount)}`
         : undefined;
 }
 
@@ -633,12 +659,24 @@ async function accountSaved(): Promise<void> {
                 </div>
             </div>
 
-            <div v-if="loaded && headline" class="text-right">
-                <div class="font-mono text-2xl tabular-nums" :class="amountClass(headline.value)">
-                    {{ formatUsd(headline.value) }}
+            <div v-if="loaded && headline" class="flex items-end gap-8 text-right">
+                <div v-if="bankBalance">
+                    <div class="font-mono text-lg tabular-nums text-accent">
+                        {{ formatUsd(bankBalance.value) }}
+                    </div>
+                    <div class="mt-1 font-mono text-xs tracking-wider text-muted uppercase">
+                        <span v-if="bankBalance.difference !== null" class="text-danger">off by {{ formatUsd(bankBalance.difference) }}</span>
+                        <span v-else>{{ bankBalance.asOf }}</span>
+                    </div>
                 </div>
-                <div class="mt-1 font-mono text-xs tracking-wider text-muted uppercase">
-                    {{ headline.label }}<span v-if="headline.asOf"> · as of {{ headline.asOf }}</span>
+
+                <div>
+                    <div class="font-mono text-2xl tabular-nums" :class="amountClass(headline.value)">
+                        {{ formatUsd(headline.value) }}
+                    </div>
+                    <div class="mt-1 font-mono text-xs tracking-wider text-muted uppercase">
+                        {{ headline.label }}<span v-if="headline.asOf"> · as of {{ headline.asOf }}</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -999,6 +1037,18 @@ async function accountSaved(): Promise<void> {
                                     </svg>
                                     <span class="sr-only">Open transaction</span>
                                 </button>
+                            </span>
+
+                            <span
+                                v-if="bankAmountDiffers(row.posting)"
+                                class="mt-0.5 flex items-center gap-2 font-mono text-xs text-danger not-italic"
+                                :title="bankDetail(row.posting)"
+                            >
+                                <span class="size-1.5 shrink-0 rounded-full bg-danger"></span>
+                                <span class="truncate">
+                                    {{ row.posting.bank_transaction!.posted_on }}
+                                    · {{ formatUsd(row.posting.bank_transaction!.amount) }} ≠ {{ formatUsd(row.posting.amount) }}
+                                </span>
                             </span>
 
                             <span

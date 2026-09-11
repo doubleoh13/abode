@@ -24,3 +24,7 @@ Schedule::command('financial:fetch-prices')
 Schedule::command('financial:post-recurring')
     ->dailyAt('05:30')
     ->onFailure($logFailedOutput('financial:post-recurring'));
+
+Schedule::command('financial:simplefin-sync')
+    ->everyFourHours()
+    ->onFailure($logFailedOutput('financial:simplefin-sync'));

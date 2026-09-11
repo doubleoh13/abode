@@ -2,6 +2,7 @@
 
 namespace App\Support\Financial\SimpleFin;
 
+use App\Enums\Financial\PostingStatus;
 use App\Models\Financial\Account;
 use App\Models\Financial\BankTransaction;
 use Carbon\CarbonImmutable;
@@ -75,7 +76,12 @@ class SimpleFinImporter
             ->first();
 
         if ($existing !== null) {
+            $settledNow = $existing->pending && ! $transaction->pending;
             $existing->update($attributes);
+
+            if ($settledNow) {
+                $this->clearSettledPosting($existing);
+            }
 
             return false;
         }
@@ -87,6 +93,20 @@ class SimpleFinImporter
         ]);
 
         return true;
+    }
+
+    /**
+     * A row matched while the bank still had it pending clears its posting
+     * once the bank posts it. Cleared and reconciled postings are left as
+     * they are.
+     */
+    private function clearSettledPosting(BankTransaction $row): void
+    {
+        $posting = $row->posting;
+
+        if ($posting !== null && $posting->status === PostingStatus::Pending) {
+            $posting->update(['status' => PostingStatus::Cleared]);
+        }
     }
 
     /**

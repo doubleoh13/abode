@@ -4,7 +4,7 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Next
 
-- SimpleFIN follow-ups: scheduled sync (manual header Sync only today); decide whether pending bank rows stay visible in the band; a SimpleFIN row's payee/description could seed a payee alias table for better auto-payee on convert.
+- SimpleFIN follow-ups: decide whether pending bank rows stay visible in the band; a SimpleFIN row's payee/description could seed a payee alias table for better auto-payee on convert.
 - Duplicate candidate finder: surface likely pairs by account, amount, and a date window; each pair opens the merge dialog.
 - Accounts index balances: show a USD value and holdings count per row as of today, reusing the balance sheet builder.
 - Payee hygiene: search box, transaction count per payee, and a merge action that reassigns and deletes.
@@ -30,6 +30,7 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Done
 
+- SimpleFIN chunk 7: financial:simplefin-sync every four hours; a matched pending bank row that settles clears a Pending posting (never touches Cleared/Reconciled); header shows the bank balance and the difference from the ledger; register and form flag a matched posting whose amount differs from the bank row (2026-09-11).
 - Register: a hover icon beside the payee opens the line's transaction in the form, where a matched bank row shows beneath its posting with an Unmatch action (POST bank-transactions/{id}/unmatch frees the row and declines that posting); a +n counterparty expands to list every counter leg with amounts. Account path prefixes capitalized (Assets:, Liabilities:, Income:, Expenses:, Equity:) (2026-09-11).
 - SimpleFIN chunk 6: hand matching — Match on a band row puts the register in pick mode (unmatched status-bearing lines clickable, others dimmed, Esc or Cancel exits); clicking a line calls POST bank-transactions/{id}/match (2026-09-11).
 - SimpleFIN chunk 5: a bank row converts to a new transaction from the account page — TransactionForm prefilled from the row (date, payee by name, description as memo, this account's leg, balancing empty counter leg) and postings.*.financial_bank_transaction_id links the row atomically in TransactionWriter. Status column redesigned: _ / C / lock glyphs, cyan when matched, set from a dismissable menu (2026-09-11).

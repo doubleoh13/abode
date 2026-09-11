@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import DateInput from './DateInput.vue';
 import ComboBox from './ComboBox.vue';
 import LotPicker from './LotPicker.vue';
-import { formatAmount } from '../money';
+import { decimalToScaledInteger, formatAmount, parseAmount } from '../money';
 import type { Account, Commodity, Lot, PostingDraft, PostingStatus } from '../types';
 
 const props = defineProps<{
@@ -22,6 +22,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{ remove: []; lotsLoaded: [Lot[]]; createAccount: []; amountEnter: [KeyboardEvent]; unmatch: [] }>();
 const memoOpen = ref(props.draft.memo !== '');
+
+const bankAmountDiffers = computed(() => {
+    const entered = parseAmount(props.draft.amount);
+
+    return props.draft.bankTransaction !== null
+        && entered !== null
+        && decimalToScaledInteger(props.draft.bankTransaction.amount) !== decimalToScaledInteger(entered);
+});
 const accountPicker = ref<{ focus: () => void } | null>(null);
 
 onMounted(() => {
@@ -290,7 +298,10 @@ function errorFor(field: string): string | null {
                     · {{ draft.bankTransaction.description }}
                 </span>
             </span>
-            <span :class="draft.bankTransaction.amount.startsWith('-') ? 'text-danger' : ''">
+            <span
+                :class="bankAmountDiffers ? 'rounded-sm bg-danger/20 px-1 text-danger' : draft.bankTransaction.amount.startsWith('-') ? 'text-danger' : ''"
+                :title="bankAmountDiffers ? 'The bank amount differs from this posting' : undefined"
+            >
                 {{ formatAmount(draft.bankTransaction.amount, baseCurrency) }}
             </span>
             <button

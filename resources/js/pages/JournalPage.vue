@@ -651,7 +651,7 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                                 v-if="posting.status !== null"
                                 :status="posting.status"
                                 :matched="Boolean(posting.bank_transaction)"
-                                :detail="posting.bank_transaction ? `bank ${posting.bank_transaction.posted_on}` : undefined"
+                                :detail="posting.bank_transaction ? posting.bank_transaction.posted_on : undefined"
                                 @select="setStatus(transaction, posting, $event)"
                             />
 

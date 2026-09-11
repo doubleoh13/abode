@@ -1,8 +1,13 @@
 <?php
 
+use App\Enums\Financial\AccountType;
+use App\Enums\Financial\PostingStatus;
 use App\Enums\Permission;
 use App\Models\Financial\Account;
 use App\Models\Financial\BankTransaction;
+use App\Models\Financial\Commodity;
+use App\Models\Financial\Posting;
+use App\Models\Financial\Transaction;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -215,6 +220,42 @@ describe('with finance permissions', function () {
             ->and($pending->posted_on->toDateString())->toBe('2026-09-09')
             ->and((string) $pending->amount->strippedOfTrailingZeros())->toBe('-5.25')
             ->and($pending->description)->toBe('COFFEE SHOP');
+    });
+
+    test('a matched row settling at the bank clears a pending posting but leaves reconciled and cleared ones alone', function () {
+        config()->set('services.simplefin.access_url', 'https://user:secret@bridge.example/simplefin');
+        $usd = Commodity::query()->where('code', 'USD')->firstOrFail();
+        $account = Account::factory()->ofType(AccountType::Asset)->create(['simplefin_account_id' => 'ACT-1']);
+        $expense = Account::factory()->ofType(AccountType::Expense)->create();
+
+        $legs = [];
+
+        foreach (['TX-P' => PostingStatus::Pending, 'TX-R' => PostingStatus::Reconciled, 'TX-C' => PostingStatus::Cleared] as $externalId => $status) {
+            $transaction = Transaction::factory()->on('2026-09-08')->create();
+            Posting::factory()->forTransaction($transaction, 1)->inAccount($expense)->ofCommodity($usd)->create(['amount' => '5']);
+            $legs[$externalId] = Posting::factory()->forTransaction($transaction, 0)->inAccount($account)->ofCommodity($usd)->create(['amount' => '-5', 'status' => $status]);
+            BankTransaction::factory()->linkedTo($legs[$externalId])->create(['external_id' => $externalId, 'posted_on' => '2026-09-08', 'pending' => true]);
+        }
+
+        Http::fake([
+            'bridge.example/simplefin/accounts*' => Http::response([
+                'errors' => [],
+                'accounts' => [
+                    simpleFinAccountPayload('ACT-1', 'Everyday Checking', '100.00', [
+                        simpleFinTransactionPayload('TX-P', '2026-09-09 16:00:00', '-5.00', 'SETTLED'),
+                        simpleFinTransactionPayload('TX-R', '2026-09-09 16:00:00', '-5.00', 'SETTLED'),
+                        simpleFinTransactionPayload('TX-C', '2026-09-09 16:00:00', '-5.00', 'SETTLED', pending: true),
+                    ]),
+                ],
+            ]),
+        ]);
+
+        $this->postJson("/api/v1/financial/accounts/{$account->id}/simplefin-sync")->assertOk()->assertJsonPath('updated', 3);
+
+        expect($legs['TX-P']->refresh()->status)->toBe(PostingStatus::Cleared)
+            ->and($legs['TX-R']->refresh()->status)->toBe(PostingStatus::Reconciled)
+            ->and($legs['TX-C']->refresh()->status)->toBe(PostingStatus::Cleared)
+            ->and(BankTransaction::query()->where('external_id', 'TX-P')->value('financial_posting_id'))->toBe($legs['TX-P']->id);
     });
 
     test('a failing bridge surfaces as a server error, not a silent empty list', function () {
