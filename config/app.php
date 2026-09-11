@@ -68,6 +68,13 @@ return [
     'timezone' => 'UTC',
 
     /*
+    | Storage stays UTC; schedules read in Eastern because that is where the
+    | data lands: fund and 529 prices post in the evening, US time.
+    */
+
+    'schedule_timezone' => 'America/New_York',
+
+    /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
