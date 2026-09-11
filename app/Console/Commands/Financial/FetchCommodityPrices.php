@@ -3,6 +3,7 @@
 namespace App\Console\Commands\Financial;
 
 use App\Enums\Financial\PriceSource;
+use App\Exceptions\Financial\PriceFetchFailed;
 use App\Models\Financial\Commodity;
 use App\Models\Financial\CommodityPrice;
 use Carbon\CarbonImmutable;
@@ -44,8 +45,9 @@ class FetchCommodityPrices extends Command
                     ? $this->fetchYahoo($commodity->price_symbol)
                     : $this->fetchIn529($commodity->price_symbol);
             } catch (Throwable $exception) {
-                report($exception);
-                $this->error("{$commodity->code}: {$exception->getMessage()}");
+                $failure = PriceFetchFailed::for($commodity, $exception);
+                report($failure);
+                $this->error($failure->getMessage());
                 $failures++;
 
                 continue;

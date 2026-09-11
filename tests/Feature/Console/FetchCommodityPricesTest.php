@@ -1,9 +1,9 @@
 <?php
 
+use App\Exceptions\Financial\PriceFetchFailed;
 use App\Models\Financial\Commodity;
 use App\Models\Financial\CommodityPrice;
 use Carbon\CarbonImmutable;
-use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 
@@ -85,9 +85,11 @@ test('a failing source is reported without stopping the others', function () {
         ])),
     ]);
 
-    $this->artisan('financial:fetch-prices')->assertFailed();
+    $this->artisan('financial:fetch-prices')
+        ->expectsOutputToContain('AAA (AAA via yahoo): HTTP request returned status code 500')
+        ->assertFailed();
 
-    Exceptions::assertReported(RequestException::class);
+    Exceptions::assertReported(fn (PriceFetchFailed $failure): bool => str_starts_with($failure->getMessage(), 'AAA (AAA via yahoo)'));
     expect(CommodityPrice::query()->where('financial_commodity_id', $working->id)->count())->toBe(1);
 });
 
