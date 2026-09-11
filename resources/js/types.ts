@@ -45,9 +45,6 @@ export interface Account {
     allow_postings: boolean;
     institution?: Institution | null;
     simplefin_account_id: string | null;
-    simplefin_synced_at: string | null;
-    simplefin_balance: string | null;
-    simplefin_balance_date: string | null;
     opened_at: string | null;
     closed_at: string | null;
 }
@@ -139,25 +136,6 @@ export interface RecurringTransaction {
     ends_on: string | null;
     lead_days: number | null;
     postings?: RecurringPosting[];
-}
-
-export interface BankTransaction {
-    id: number;
-    financial_account_id: number;
-    account?: Account;
-    source: string;
-    external_id: string;
-    posted_on: string;
-    transacted_on: string | null;
-    pending: boolean;
-    amount: string;
-    currency: string;
-    description: string | null;
-    payee: string | null;
-    memo: string | null;
-    financial_posting_id: number | null;
-    ignored_at: string | null;
-    candidates?: Posting[];
 }
 
 export interface SimpleFinAccount {

@@ -4,16 +4,12 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Next
 
-- SimpleFIN, in chunks: (4) opt-in balance assertions from the stored bank balance; (5) payee rules so repeat descriptions map to a payee and category.
+- SimpleFIN transactions: design paused 2026-09-11 after a staging-table plus inbox attempt (reverted, see git history for 1428100 and 9bc2462). Jake's objections to the inbox: a proposed match is hard to see in context, and there is no view of nearby transactions on the same account to spot a fat-fingered entry. Next design must show bank rows alongside the account register.
 - Duplicate candidate finder: surface likely pairs by account, amount, and a date window; each pair opens the merge dialog.
 - Accounts index balances: show a USD value and holdings count per row as of today, reusing the balance sheet builder.
 - Payee hygiene: search box, transaction count per payee, and a merge action that reassigns and deletes.
 
 ## Backlog
-
-- Show a bank-link marker on journal postings that settle a bank transaction, and let a posting be unlinked from there.
-
-- Bank rows whose id changes between pending and posted leave a stale pending row; handle in the inbox first, automate only if it recurs.
 
 - Parent account pages roll up descendants into holdings and register instead of showing "No postings yet".
 - Upcoming band above the journal register for future-dated transactions, muted and separate from the paginated history.
@@ -33,10 +29,6 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 - In-kind transfers inflate a lot's acquired-quantity denominator, so allocated bases can sum below lot cost. Affects the lots endpoint, account and commodity pages, and the balance sheet equally.
 
 ## Done
-
-- SimpleFIN chunk 3: /finances/inbox lists unresolved bank rows with candidate postings (same account and amount within 5 days), Match, Create via the pre-filled transaction form, Ignore and Restore; landing page count (2026-09-11).
-
-- SimpleFIN chunk 2: financial_bank_transactions staging table linked per posting, importer every four hours with a 30-day first window and 7-day overlap, bank balance and sync time on accounts, merge carries bank links (2026-09-11).
 
 - SimpleFIN chunk 1: access URL in env, accounts endpoint cached an hour, account form picker to map an account to a SimpleFIN account (2026-09-11).
 

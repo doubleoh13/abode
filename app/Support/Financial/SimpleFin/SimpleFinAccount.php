@@ -13,8 +13,6 @@ final readonly class SimpleFinAccount
         public string $currency,
         public string $balance,
         public CarbonImmutable $balanceDate,
-        /** @var list<SimpleFinTransaction> */
-        public array $transactions = [],
     ) {}
 
     /**
@@ -29,7 +27,6 @@ final readonly class SimpleFinAccount
             currency: (string) $payload['currency'],
             balance: (string) $payload['balance'],
             balanceDate: CarbonImmutable::createFromTimestampUTC((int) $payload['balance-date']),
-            transactions: array_map(SimpleFinTransaction::fromPayload(...), $payload['transactions'] ?? []),
         );
     }
 }

@@ -2,7 +2,6 @@
 
 namespace App\Models\Financial;
 
-use App\Casts\BigDecimalCast;
 use App\Enums\Financial\AccountType;
 use App\Models\Concerns\HasAttachments;
 use App\Models\Concerns\HasNotes;
@@ -14,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['account_type', 'financial_institution_id', 'simplefin_account_id', 'simplefin_synced_at', 'simplefin_balance', 'simplefin_balance_date', 'parent_id', 'allow_postings', 'name', 'opened_at', 'closed_at'])]
+#[Fillable(['account_type', 'financial_institution_id', 'simplefin_account_id', 'parent_id', 'allow_postings', 'name', 'opened_at', 'closed_at'])]
 class Account extends Model
 {
     /** @use HasFactory<AccountFactory> */
@@ -79,9 +78,6 @@ class Account extends Model
         return [
             'account_type' => AccountType::class,
             'allow_postings' => 'boolean',
-            'simplefin_synced_at' => 'immutable_datetime',
-            'simplefin_balance' => BigDecimalCast::class,
-            'simplefin_balance_date' => 'immutable_date',
             'opened_at' => 'date',
             'closed_at' => 'date',
         ];

@@ -375,12 +375,9 @@ async function accountSaved(): Promise<void> {
                 <span
                     v-if="account.simplefin_account_id"
                     class="rounded-sm border border-accent/40 px-1.5 py-0.5 text-accent"
-                    :title="account.simplefin_synced_at ? `Synced ${new Date(account.simplefin_synced_at).toLocaleString()}` : 'Mapped to a SimpleFIN account, not synced yet'"
+                    title="Mapped to a SimpleFIN account for import"
                 >
                     Imports
-                </span>
-                <span v-if="account.simplefin_balance !== null && usd" :title="`Bank balance as of ${account.simplefin_balance_date}`">
-                    bank {{ formatAmount(account.simplefin_balance, usd) }}
                 </span>
                 <button type="button" class="tracking-wider uppercase transition-colors hover:text-foreground" @click="editFormOpen = true">
                     Edit

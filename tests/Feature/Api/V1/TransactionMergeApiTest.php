@@ -4,7 +4,6 @@ use App\Enums\Financial\AccountType;
 use App\Enums\Permission;
 use App\Models\Attachment;
 use App\Models\Financial\Account;
-use App\Models\Financial\BankTransaction;
 use App\Models\Financial\Commodity;
 use App\Models\Financial\Lot;
 use App\Models\Financial\Posting;
@@ -94,29 +93,6 @@ describe('with finance permissions', function () {
         expect(Transaction::query()->count())->toBe(1)
             ->and($merged->notes()->count())->toBe(1)
             ->and($merged->attachments()->count())->toBe(1);
-    });
-
-    test('bank links follow matching postings into the merge and orphaned ones return to the inbox', function () {
-        $manual = twoLeggedTransaction('2026-08-01', $this->checking, $this->groceries, '42.10');
-        $imported = twoLeggedTransaction('2026-08-03', $this->checking, $this->uncategorized, '42.10');
-        $checkingLeg = $imported->postings()->where('financial_account_id', $this->checking->id)->firstOrFail();
-        $otherLeg = $imported->postings()->where('financial_account_id', $this->uncategorized->id)->firstOrFail();
-        $kept = BankTransaction::factory()->linkedTo($checkingLeg)->create();
-        $orphaned = BankTransaction::factory()->linkedTo($otherLeg)->create();
-
-        $response = $this->postJson('/api/v1/financial/transactions/merge', [
-            'date' => '2026-08-03',
-            'financial_transaction_ids' => [$manual->id, $imported->id],
-            'postings' => [
-                mergeLeg($this->checking, $this->usd, '-42.10'),
-                mergeLeg($this->groceries, $this->usd, '42.10'),
-            ],
-        ])->assertCreated();
-
-        $mergedCheckingPostingId = $response->json('data.postings.0.id');
-
-        expect($kept->fresh()->financial_posting_id)->toBe($mergedCheckingPostingId)
-            ->and($orphaned->fresh()->financial_posting_id)->toBeNull();
     });
 
     test('a merge may re-reference a lot opened by an absorbed transaction', function () {

@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['financial_transaction_id', 'position', 'status', 'financial_account_id', 'financial_commodity_id', 'financial_lot_id', 'amount', 'memo', 'metadata'])]
 class Posting extends Model
@@ -41,16 +40,6 @@ class Posting extends Model
     public function commodity(): BelongsTo
     {
         return $this->belongsTo(Commodity::class, 'financial_commodity_id');
-    }
-
-    /**
-     * The bank-reported transaction this posting settles, if any.
-     *
-     * @return HasOne<BankTransaction, $this>
-     */
-    public function bankTransaction(): HasOne
-    {
-        return $this->hasOne(BankTransaction::class, 'financial_posting_id');
     }
 
     /**

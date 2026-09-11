@@ -20,4 +20,3 @@ Schedule::command('financial:fetch-prices')
 
 // Runs after the price fetch so the day's new postings never race it.
 Schedule::command('financial:post-recurring')->dailyAt('05:30');
-Schedule::command('financial:simplefin-import')->everyFourHours()->withoutOverlapping();

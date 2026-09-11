@@ -9,7 +9,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | docker/** | .ai/rules/docker.md |
 | Dockerfile | .ai/rules/dockerfile.md |
 | app/Enums/** | .ai/rules/enums.md |
-| app/Models/Financial/**, app/Models/Financial/BankTransaction.php | .ai/rules/financial.md |
+| app/Models/Financial/** | .ai/rules/financial.md |
 | **/*, ROADMAP.md | .ai/rules/general.md |
 | app/Http/** | .ai/rules/http.md |
 | resources/js/** | .ai/rules/js.md |

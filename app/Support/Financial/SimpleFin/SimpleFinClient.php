@@ -2,7 +2,6 @@
 
 namespace App\Support\Financial\SimpleFin;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -25,22 +24,6 @@ class SimpleFinClient
     public function accounts(): array
     {
         $payload = $this->get(['balances-only' => 1]);
-
-        return [
-            'accounts' => array_map(SimpleFinAccount::fromPayload(...), $payload['accounts'] ?? []),
-            'errors' => array_values(array_map(strval(...), $payload['errors'] ?? [])),
-        ];
-    }
-
-    /**
-     * Every account with its transactions posted on or after the start date,
-     * pending ones included.
-     *
-     * @return array{accounts: list<SimpleFinAccount>, errors: list<string>}
-     */
-    public function transactions(CarbonImmutable $startDate): array
-    {
-        $payload = $this->get(['start-date' => $startDate->startOfDay()->getTimestamp(), 'pending' => 1]);
 
         return [
             'accounts' => array_map(SimpleFinAccount::fromPayload(...), $payload['accounts'] ?? []),
