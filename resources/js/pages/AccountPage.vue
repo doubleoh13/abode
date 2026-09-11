@@ -8,7 +8,6 @@ import AccountForm from '../components/AccountForm.vue';
 import DateInput from '../components/DateInput.vue';
 import ComboBox from '../components/ComboBox.vue';
 import ModalDialog from '../components/ModalDialog.vue';
-import PaginationBar from '../components/PaginationBar.vue';
 import PostingStatusMenu from '../components/PostingStatusMenu.vue';
 import TransactionForm from '../components/TransactionForm.vue';
 import SkeletonList from '../components/SkeletonList.vue';
@@ -50,8 +49,11 @@ const balances = ref<AccountBalance[]>([]);
 const lots = ref<Lot[]>([]);
 const commodities = ref<Commodity[]>([]);
 const postings = ref<Posting[]>([]);
-const page = ref(1);
+const loadedPages = ref(1);
 const lastPage = ref(1);
+const loadingMore = ref(false);
+const registerSentinel = ref<HTMLElement | null>(null);
+const sentinelVisible = ref(false);
 const loaded = ref(false);
 
 const accountId = computed(() => Number(route.params.id));
@@ -264,29 +266,74 @@ async function toggleHideReconciled(): Promise<void> {
         // The preference is a convenience; a blocked store just means it does not persist.
     }
 
-    page.value = 1;
+    loadedPages.value = 1;
     await loadPostings();
 }
 
-async function loadPostings(): Promise<void> {
-    const response = (
+async function fetchPostingsPage(page: number): Promise<Paginated<Posting>> {
+    return (
         await axios.get<Paginated<Posting>>('/api/v1/financial/postings', {
             params: {
                 financial_account_id: accountId.value,
-                page: page.value,
+                page,
                 ...(hideReconciled.value ? { hide_reconciled: 1 } : {}),
             },
         })
     ).data;
-
-    postings.value = response.data;
-    lastPage.value = response.meta.last_page;
 }
 
-async function changePage(target: number): Promise<void> {
-    page.value = target;
-    await loadPostings();
+/**
+ * Re-reads every page already on screen so an edit anywhere in the loaded
+ * span shows up without losing the scroll position.
+ */
+async function loadPostings(): Promise<void> {
+    const pageNumbers = Array.from({ length: loadedPages.value }, (_, index) => index + 1);
+    const pages = await Promise.all(pageNumbers.map(fetchPostingsPage));
+
+    lastPage.value = pages[0].meta.last_page;
+    loadedPages.value = Math.min(loadedPages.value, lastPage.value);
+    postings.value = pages.slice(0, loadedPages.value).flatMap((response) => response.data);
 }
+
+async function loadMorePostings(): Promise<void> {
+    if (loadingMore.value) {
+        return;
+    }
+
+    loadingMore.value = true;
+
+    try {
+        while (sentinelVisible.value && loadedPages.value < lastPage.value) {
+            const response = await fetchPostingsPage(loadedPages.value + 1);
+
+            postings.value = [...postings.value, ...response.data];
+            lastPage.value = response.meta.last_page;
+            loadedPages.value += 1;
+        }
+    } finally {
+        loadingMore.value = false;
+    }
+}
+
+const sentinelObserver = new IntersectionObserver(([entry]) => {
+    sentinelVisible.value = entry.isIntersecting;
+
+    if (entry.isIntersecting) {
+        void loadMorePostings();
+    }
+}, { rootMargin: '400px 0px' });
+
+watch(registerSentinel, (element, previous) => {
+    if (previous) {
+        sentinelObserver.unobserve(previous);
+    }
+
+    if (element) {
+        sentinelObserver.observe(element);
+    }
+});
+
+onBeforeUnmount(() => sentinelObserver.disconnect());
 
 function bankAmountDiffers(posting: Posting): boolean {
     return posting.bank_transaction !== null
@@ -546,16 +593,11 @@ const registerRows = computed<RegisterRow[]>(() => {
         return visibleAssertions.value.map((assertion) => ({ kind: 'assertion', assertion }));
     }
 
-    const newest = postings.value[0].transaction?.date ?? '';
     const oldest = postings.value[postings.value.length - 1].transaction?.date ?? '';
     // An assertion marks the end of its day, so it renders above that day's
-    // postings; markers outside this page's date span stay on their own page.
+    // postings; markers older than the loaded span appear once it scrolls in.
     const queue = visibleAssertions.value
-        .filter(
-            (assertion) =>
-                (page.value === 1 || assertion.asserted_at <= newest) &&
-                (page.value === lastPage.value || assertion.asserted_at >= oldest),
-        )
+        .filter((assertion) => loadedPages.value >= lastPage.value || assertion.asserted_at >= oldest)
         .sort((first, second) => second.asserted_at.localeCompare(first.asserted_at));
     const rows: RegisterRow[] = [];
 
@@ -612,7 +654,7 @@ async function loadBalances(): Promise<void> {
 
 async function loadAccount(): Promise<void> {
     loaded.value = false;
-    page.value = 1;
+    loadedPages.value = 1;
     hideReconciled.value = readHideReconciled();
 
     const [accountResponse, lotsResponse, commoditiesResponse, accountsResponse, institutionsResponse, payeesResponse] = await Promise.all([
@@ -1230,7 +1272,9 @@ async function accountSaved(): Promise<void> {
                     </template>
                 </ul>
 
-                <PaginationBar :page="page" :last-page="lastPage" @change="changePage" />
+                <div ref="registerSentinel" class="h-px" />
+
+                <p v-if="loadingMore" class="mt-2 font-mono text-xs text-muted">Loading…</p>
             </section>
         </template>
 
