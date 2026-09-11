@@ -258,6 +258,34 @@ describe('with finance permissions', function () {
             ->and(BankTransaction::query()->where('external_id', 'TX-P')->value('financial_posting_id'))->toBe($legs['TX-P']->id);
     });
 
+    test('rows matching an ignored description pattern are never staged', function () {
+        config()->set('services.simplefin.access_url', 'https://user:secret@bridge.example/simplefin');
+        config()->set('financial.simplefin.ignored_description_patterns', ['/CORE ACCOUNT FIDELITY GOVERNMENT MONEY MARKET/i', '/^REINVESTMENT FIDELITY/i']);
+        $account = Account::factory()->create(['simplefin_account_id' => 'ACT-1']);
+
+        Http::fake([
+            'bridge.example/simplefin/accounts*' => Http::response([
+                'errors' => [],
+                'accounts' => [
+                    simpleFinAccountPayload('ACT-1', 'Cash Management', '100.00', [
+                        simpleFinTransactionPayload('TX-1', '2026-09-08 16:00:00', '-10.99', 'DIRECT DEBIT East Allen Cou9164674700 (Cash)'),
+                        simpleFinTransactionPayload('TX-2', '2026-09-08 16:00:00', '10.99', 'REDEMPTION FROM CORE ACCOUNT FIDELITY GOVERNMENT MONEY MARKET (SPAXX) MORNING TRADE (Cash)'),
+                        simpleFinTransactionPayload('TX-3', '2026-08-31 16:00:00', '37.66', 'DIVIDEND RECEIVED FIDELITY GOVERNMENT MONEY MARKET (SPAXX) (Cash)'),
+                        simpleFinTransactionPayload('TX-4', '2026-08-31 16:00:00', '-37.66', 'REINVESTMENT FIDELITY GOVERNMENT MONEY MARKET (SPAXX) (Cash)'),
+                    ]),
+                ],
+            ]),
+        ]);
+
+        $this->postJson("/api/v1/financial/accounts/{$account->id}/simplefin-sync")
+            ->assertOk()
+            ->assertJsonPath('created', 2)
+            ->assertJsonPath('ignored', 2);
+
+        expect(BankTransaction::query()->where('financial_account_id', $account->id)->orderBy('external_id')->pluck('external_id')->all())
+            ->toBe(['TX-1', 'TX-3']);
+    });
+
     test('a failing bridge surfaces as a server error, not a silent empty list', function () {
         config()->set('services.simplefin.access_url', 'https://user:secret@bridge.example/simplefin');
         Http::fake(['bridge.example/*' => Http::response('nope', 502)]);

@@ -25,6 +25,11 @@ return [
     | again once they post. A bank row proposes a posting as its match when
     | the amounts agree and the dates fall within match_window_days.
     |
+    | Rows whose description matches an ignored pattern are never staged.
+    | Fidelity reports each cash movement in its cash management account a
+    | second time as a sweep into or out of the SPAXX core position, which
+    | the ledger does not model.
+    |
     */
 
     'simplefin' => [
@@ -32,6 +37,10 @@ return [
         'initial_days' => 30,
         'overlap_days' => 7,
         'match_window_days' => 3,
+        'ignored_description_patterns' => [
+            '/CORE ACCOUNT FIDELITY GOVERNMENT MONEY MARKET/i',
+            '/^REINVESTMENT FIDELITY GOVERNMENT MONEY MARKET/i',
+        ],
     ],
 
 ];

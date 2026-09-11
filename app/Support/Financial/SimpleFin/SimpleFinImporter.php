@@ -19,7 +19,7 @@ class SimpleFinImporter
     public function __construct(private readonly SimpleFinClient $client) {}
 
     /**
-     * @return array{created: int, updated: int}
+     * @return array{created: int, updated: int, ignored: int}
      */
     public function sync(Account $account, ?CarbonImmutable $now = null): array
     {
@@ -36,9 +36,16 @@ class SimpleFinImporter
 
         $created = 0;
         $updated = 0;
+        $ignored = 0;
 
-        DB::transaction(function () use ($remote, $account, $now, &$created, &$updated): void {
+        DB::transaction(function () use ($remote, $account, $now, &$created, &$updated, &$ignored): void {
             foreach ($remote->transactions as $transaction) {
+                if ($this->isIgnored($transaction)) {
+                    $ignored++;
+
+                    continue;
+                }
+
                 $this->upsert($account, $transaction) ? $created++ : $updated++;
             }
 
@@ -49,7 +56,18 @@ class SimpleFinImporter
             ]);
         });
 
-        return ['created' => $created, 'updated' => $updated];
+        return ['created' => $created, 'updated' => $updated, 'ignored' => $ignored];
+    }
+
+    private function isIgnored(SimpleFinTransaction $transaction): bool
+    {
+        foreach ((array) config('financial.simplefin.ignored_description_patterns', []) as $pattern) {
+            if ($transaction->description !== null && preg_match($pattern, $transaction->description) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
