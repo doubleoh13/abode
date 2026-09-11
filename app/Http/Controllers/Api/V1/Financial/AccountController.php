@@ -49,24 +49,29 @@ class AccountController extends Controller
     }
 
     /**
-     * The account's own per-commodity posting sums, optionally as of the end
-     * of a date.
+     * Per-account, per-commodity posting sums for the account, optionally as
+     * of the end of a date and optionally across every account beneath it.
      */
     public function balances(Request $request, Account $account): JsonResponse
     {
         $validated = $request->validate([
             'as_of' => ['nullable', 'date'],
+            'include_descendants' => ['sometimes', 'boolean'],
         ]);
 
+        $accountIds = $request->boolean('include_descendants') ? $account->subtreeIds() : [$account->id];
+
         $balances = Posting::query()
-            ->where('financial_account_id', $account->id)
+            ->whereIn('financial_account_id', $accountIds)
             ->when($validated['as_of'] ?? null, fn (Builder $query, string $asOf) => $query
                 ->whereHas('transaction', fn (Builder $transaction) => $transaction->where('date', '<=', $asOf)))
-            ->groupBy('financial_commodity_id')
-            ->selectRaw('financial_commodity_id, sum(amount) as balance')
+            ->groupBy('financial_account_id', 'financial_commodity_id')
+            ->selectRaw('financial_account_id, financial_commodity_id, sum(amount) as balance')
+            ->orderBy('financial_account_id')
             ->orderBy('financial_commodity_id')
             ->get()
             ->map(fn (Posting $row): array => [
+                'financial_account_id' => $row->financial_account_id,
                 'financial_commodity_id' => $row->financial_commodity_id,
                 'balance' => (string) BigDecimal::of($row->balance)->strippedOfTrailingZeros(),
             ]);

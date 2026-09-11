@@ -9,6 +9,7 @@ use App\Models\Concerns\HasNotes;
 use Database\Factories\Financial\AccountFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -63,6 +64,34 @@ class Account extends Model
     public function unmatchedBankTransactions(): HasMany
     {
         return $this->bankTransactions()->whereNull('financial_posting_id');
+    }
+
+    /**
+     * This account's id followed by every descendant's.
+     *
+     * @return array<int, int>
+     */
+    public function subtreeIds(): array
+    {
+        $childIdsByParent = Account::query()
+            ->whereNotNull('parent_id')
+            ->get(['id', 'parent_id'])
+            ->groupBy('parent_id')
+            ->map(fn (Collection $children): array => $children->pluck('id')->all());
+
+        $ids = [$this->id];
+        $queue = [$this->id];
+
+        while ($queue !== []) {
+            $parentId = array_shift($queue);
+
+            foreach ($childIdsByParent->get($parentId, []) as $childId) {
+                $ids[] = $childId;
+                $queue[] = $childId;
+            }
+        }
+
+        return $ids;
     }
 
     /**

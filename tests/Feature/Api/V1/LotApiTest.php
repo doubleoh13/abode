@@ -82,6 +82,21 @@ describe('with finance permissions', function () {
             ->assertJsonPath('data.0.open_quantity', '30');
     });
 
+    test('include_descendants rolls up lots held in child accounts', function () {
+        $child = Account::factory()->childOf($this->brokerage)->create();
+        $lot = Lot::factory()->ofCommodity($this->fbtc)->create();
+        lotPickerPosting($lot, $child, 100, '2026-01-05');
+
+        $this->getJson("/api/v1/financial/lots?financial_account_id={$this->brokerage->id}")
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $this->getJson("/api/v1/financial/lots?financial_account_id={$this->brokerage->id}&include_descendants=1")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.open_quantity', '100');
+    });
+
     test('as_of excludes postings dated after it', function () {
         $lot = Lot::factory()->ofCommodity($this->fbtc)->create();
         lotPickerPosting($lot, $this->brokerage, 100, '2026-01-05');

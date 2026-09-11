@@ -32,8 +32,13 @@ class PostingController extends Controller
              * Leave reconciled postings out of the page. Running balances still count them.
              */
             'hide_reconciled' => ['sometimes', 'boolean'],
+            /**
+             * Widen an account register to every account beneath it.
+             */
+            'include_descendants' => ['sometimes', 'boolean'],
         ]);
 
+        $accountIds = $this->accountIds($request, $validated['financial_account_id'] ?? null);
         $eagerLoads = ['account', 'commodity', 'transaction.payee'];
 
         // Sibling postings feed the account register's counter-account
@@ -46,8 +51,8 @@ class PostingController extends Controller
         // Running balances are computed over every posting in scope first, so
         // hiding reconciled lines never changes the balance shown on the rest.
         $withRunningBalance = Posting::query()
-            ->when($validated['financial_account_id'] ?? null, fn (Builder $query, int $accountId) => $query
-                ->where('financial_account_id', $accountId))
+            ->when($accountIds, fn (Builder $query, array $ids) => $query
+                ->whereIn('financial_postings.financial_account_id', $ids))
             ->when($validated['financial_commodity_id'] ?? null, fn (Builder $query, int $commodityId) => $query
                 ->where('financial_postings.financial_commodity_id', $commodityId))
             ->join('financial_transactions', 'financial_transactions.id', '=', 'financial_postings.financial_transaction_id')
@@ -75,6 +80,20 @@ class PostingController extends Controller
                 ->paginate(50)
                 ->withQueryString(),
         );
+    }
+
+    /**
+     * @return array<int, int>|null
+     */
+    private function accountIds(Request $request, ?int $accountId): ?array
+    {
+        if ($accountId === null) {
+            return null;
+        }
+
+        return $request->boolean('include_descendants')
+            ? Account::query()->findOrFail($accountId)->subtreeIds()
+            : [$accountId];
     }
 
     /**

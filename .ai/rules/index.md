@@ -13,7 +13,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/Financial/** | .ai/rules/financial.md |
 | **/*, ROADMAP.md | .ai/rules/general.md |
 | app/Http/** | .ai/rules/http.md |
-| resources/js/** | .ai/rules/js.md |
+| resources/js/**, resources/js/router.ts | .ai/rules/js.md |
 | app/Listeners/RecreateDevelopmentUser.php | .ai/rules/listeners.md |
 | app/Http/Middleware/** | .ai/rules/middleware.md |
 | database/migrations/** | .ai/rules/migrations.md |

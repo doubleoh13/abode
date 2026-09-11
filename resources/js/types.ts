@@ -104,6 +104,7 @@ export interface Posting {
 }
 
 export interface AccountBalance {
+    financial_account_id: number;
     financial_commodity_id: number;
     balance: string;
 }

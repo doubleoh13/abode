@@ -55,6 +55,74 @@ const loaded = ref(false);
 
 const slugPath = computed(() => ((route.params.segments as string[] | undefined) ?? []).join('/'));
 const accountId = ref(0);
+const includeDescendants = ref(false);
+
+const children = computed<Account[]>(() =>
+    allAccounts.value
+        .filter((candidate) => candidate.parent_id === accountId.value)
+        .sort((first, second) => first.name.localeCompare(second.name, undefined, { numeric: true, sensitivity: 'base' })),
+);
+
+const canPost = computed(() => children.value.length === 0 || (account.value?.allow_postings ?? false));
+
+const subtreeIdsByChild = computed<Map<number, Set<number>>>(() => {
+    const childrenByParent = new Map<number, number[]>();
+
+    for (const candidate of allAccounts.value) {
+        if (candidate.parent_id !== null) {
+            childrenByParent.set(candidate.parent_id, [...(childrenByParent.get(candidate.parent_id) ?? []), candidate.id]);
+        }
+    }
+
+    const subtrees = new Map<number, Set<number>>();
+
+    for (const child of children.value) {
+        const ids = new Set<number>();
+        const queue = [child.id];
+
+        while (queue.length > 0) {
+            const current = queue.shift()!;
+
+            ids.add(current);
+            queue.push(...(childrenByParent.get(current) ?? []));
+        }
+
+        subtrees.set(child.id, ids);
+    }
+
+    return subtrees;
+});
+
+const valueByChild = computed<Map<number, string | null>>(() => {
+    const values = new Map<number, string | null>();
+
+    for (const child of children.value) {
+        const ids = subtreeIdsByChild.value.get(child.id) ?? new Set<number>();
+        let total: bigint | null = 0n;
+
+        for (const balance of balances.value) {
+            if (total === null || !ids.has(balance.financial_account_id)) {
+                continue;
+            }
+
+            const commodity = commoditiesById.value.get(balance.financial_commodity_id);
+            const value = commodity ? marketValue(balance.balance, commodity) : null;
+
+            total = value === null ? null : total + decimalToScaledInteger(value);
+        }
+
+        values.set(child.id, total === null ? null : scaledIntegerToDecimal(total));
+    }
+
+    return values;
+});
+
+function relativeAccountPath(posting: Posting): string {
+    const path = posting.account?.path ?? '';
+    const prefix = `${account.value?.path ?? ''}:`;
+
+    return path.startsWith(prefix) ? path.slice(prefix.length) : path;
+}
 
 const ancestors = computed<Account[]>(() => {
     const byId = new Map(allAccounts.value.map((candidate) => [candidate.id, candidate]));
@@ -100,20 +168,29 @@ const holdings = computed<Holding[]>(() => {
         );
     }
 
-    return balances.value
-        .filter((balance) => decimalToScaledInteger(balance.balance) !== 0n)
-        .flatMap((balance) => {
-            const commodity = commoditiesById.value.get(balance.financial_commodity_id);
+    const quantityByCommodity = new Map<number, bigint>();
+
+    for (const balance of balances.value) {
+        quantityByCommodity.set(
+            balance.financial_commodity_id,
+            (quantityByCommodity.get(balance.financial_commodity_id) ?? 0n) + decimalToScaledInteger(balance.balance),
+        );
+    }
+
+    return [...quantityByCommodity]
+        .filter(([, quantity]) => quantity !== 0n)
+        .flatMap(([commodityId, quantity]) => {
+            const commodity = commoditiesById.value.get(commodityId);
 
             if (!commodity) {
                 return [];
             }
 
-            const basis = basisByCommodity.get(balance.financial_commodity_id);
+            const basis = basisByCommodity.get(commodityId);
 
             return [{
                 commodity,
-                quantity: balance.balance,
+                quantity: scaledIntegerToDecimal(quantity),
                 basis: basis === undefined ? null : scaledIntegerToDecimal(basis),
             }];
         });
@@ -296,6 +373,7 @@ async function fetchPostingsPage(page: number): Promise<Paginated<Posting>> {
                 financial_account_id: accountId.value,
                 page,
                 ...(hideReconciled.value ? { hide_reconciled: 1 } : {}),
+                ...(includeDescendants.value ? { include_descendants: 1 } : {}),
             },
         })
     ).data;
@@ -452,7 +530,10 @@ onBeforeUnmount(() => {
 });
 
 function canMatch(posting: Posting): boolean {
-    return matchingBankTransaction.value !== null && !posting.bank_transaction && posting.status !== null;
+    return matchingBankTransaction.value !== null
+        && posting.financial_account_id === accountId.value
+        && !posting.bank_transaction
+        && posting.status !== null;
 }
 
 async function matchTo(posting: Posting): Promise<void> {
@@ -535,12 +616,19 @@ async function prefillAssertionBalance(): Promise<void> {
 
     const rows = (
         await axios.get<{ data: AccountBalance[] }>(`/api/v1/financial/accounts/${accountId.value}/balances`, {
-            params: { as_of: assertionForm.asserted_at },
+            params: { as_of: assertionForm.asserted_at, ...(includeDescendants.value ? { include_descendants: 1 } : {}) },
         })
     ).data.data;
 
-    assertionForm.balance =
-        rows.find((row) => row.financial_commodity_id === assertionForm.financial_commodity_id)?.balance ?? '0';
+    let total = 0n;
+
+    for (const row of rows) {
+        if (row.financial_commodity_id === assertionForm.financial_commodity_id) {
+            total += decimalToScaledInteger(row.balance);
+        }
+    }
+
+    assertionForm.balance = scaledIntegerToDecimal(total);
 }
 
 watch(
@@ -666,7 +754,9 @@ function amountClass(amount: string | null): string {
 }
 
 async function loadBalances(): Promise<void> {
-    const response = await axios.get<{ data: AccountBalance[] }>(`/api/v1/financial/accounts/${accountId.value}/balances`);
+    const response = await axios.get<{ data: AccountBalance[] }>(`/api/v1/financial/accounts/${accountId.value}/balances`, {
+        params: includeDescendants.value ? { include_descendants: 1 } : {},
+    });
 
     balances.value = response.data.data;
 }
@@ -685,11 +775,12 @@ async function loadAccount(): Promise<void> {
     }
 
     accountId.value = resolved.id;
+    includeDescendants.value = accountsResponse.data.data.some((candidate) => candidate.parent_id === resolved.id);
     hideReconciled.value = readHideReconciled();
 
     const [lotsResponse, commoditiesResponse, institutionsResponse, payeesResponse] = await Promise.all([
         axios.get<{ data: Lot[] }>('/api/v1/financial/lots', {
-            params: { financial_account_id: accountId.value },
+            params: { financial_account_id: accountId.value, ...(includeDescendants.value ? { include_descendants: 1 } : {}) },
         }),
         axios.get<{ data: Commodity[] }>('/api/v1/financial/commodities'),
         axios.get<{ data: Institution[] }>('/api/v1/financial/institutions'),
@@ -843,6 +934,31 @@ async function accountSaved(saved: Account): Promise<void> {
         </ModalDialog>
 
         <template v-if="loaded">
+            <section v-if="children.length > 0" class="mt-6">
+                <h2 class="font-mono text-xs tracking-wider text-muted uppercase">Sub-accounts</h2>
+
+                <ul class="mt-2 divide-y divide-edge overflow-hidden rounded-md border border-edge bg-surface">
+                    <li v-for="child in children" :key="child.id" class="flex items-center justify-between gap-4 px-4 py-2">
+                        <RouterLink
+                            :to="accountRoute(child)"
+                            class="flex items-center gap-2 text-sm transition-colors hover:text-accent"
+                            :class="child.closed_at ? 'text-muted line-through' : ''"
+                        >
+                            {{ child.name }}
+                            <span
+                                v-if="child.unmatched_bank_transactions_count"
+                                class="size-1.5 rounded-full bg-accent"
+                                title="Unmatched bank transactions"
+                            />
+                        </RouterLink>
+
+                        <span class="font-mono text-sm" :class="valueByChild.get(child.id) == null ? 'text-muted' : ''">
+                            {{ valueByChild.get(child.id) == null ? '—' : formatUsd(valueByChild.get(child.id)!) }}
+                        </span>
+                    </li>
+                </ul>
+            </section>
+
             <section v-if="hasNonCashHoldings" class="mt-6">
                 <h2 class="font-mono text-xs tracking-wider text-muted uppercase">Holdings</h2>
 
@@ -1074,7 +1190,7 @@ async function accountSaved(saved: Account): Promise<void> {
                         <button v-if="reconcilable" type="button" class="button-subtle" @click="openAssertionForm">
                             New assertion
                         </button>
-                        <button type="button" class="button-primary" @click="creatingTransaction = true">
+                        <button v-if="canPost" type="button" class="button-primary" @click="creatingTransaction = true">
                             New transaction
                         </button>
                     </span>
@@ -1136,8 +1252,12 @@ async function accountSaved(saved: Account): Promise<void> {
                     v-else
                     class="mt-2 divide-y divide-edge overflow-hidden rounded-md border border-edge bg-surface"
                 >
-                    <li class="grid grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_8.5rem_2rem] items-center gap-x-4 bg-background/40 px-4 py-2">
+                    <li
+                        class="grid items-center gap-x-4 bg-background/40 px-4 py-2"
+                        :class="includeDescendants ? 'grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_8rem_8.5rem_2rem]' : 'grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_8.5rem_2rem]'"
+                    >
                         <span class="field-label">Date</span>
+                        <span v-if="includeDescendants" class="field-label">Account</span>
                         <span class="field-label">Payee</span>
                         <span class="field-label">Counterparty</span>
                         <span class="field-label text-right">Amount</span>
@@ -1179,8 +1299,10 @@ async function accountSaved(saved: Account): Promise<void> {
                     </li>
                     <li
                         v-else
-                        class="group grid grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_8.5rem_2rem] items-start gap-x-4 px-4 py-2"
+                        class="group grid items-start gap-x-4 px-4 py-2"
                         :class="{
+                            'grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_8rem_8.5rem_2rem]': includeDescendants,
+                            'grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_8.5rem_2rem]': !includeDescendants,
                             italic: row.posting.status === 'pending',
                             'cursor-pointer transition-colors hover:bg-accent/10': canMatch(row.posting),
                             'opacity-40': matchingBankTransaction && !canMatch(row.posting),
@@ -1191,6 +1313,15 @@ async function accountSaved(saved: Account): Promise<void> {
                         @keydown.enter="canMatch(row.posting) && matchTo(row.posting)"
                     >
                         <span class="font-mono text-xs leading-5 text-muted">{{ row.posting.transaction?.date }}</span>
+
+                        <RouterLink
+                            v-if="includeDescendants && row.posting.account"
+                            :to="accountRoute(row.posting.account)"
+                            class="truncate text-sm text-muted transition-colors hover:text-accent"
+                            @click.stop
+                        >
+                            {{ relativeAccountPath(row.posting) }}
+                        </RouterLink>
 
                         <span class="min-w-0 text-sm">
                             <span class="flex items-center gap-2">

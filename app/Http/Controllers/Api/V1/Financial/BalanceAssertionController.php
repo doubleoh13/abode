@@ -42,9 +42,9 @@ class BalanceAssertionController extends Controller
 
     /**
      * `holds` reports whether the journal agreed with the balance at save
-     * time; `reconciled_postings` counts this account's postings marked
-     * reconciled, which happens only when `reconcile_postings` is set and
-     * the balance holds.
+     * time; `reconciled_postings` counts the postings marked reconciled in
+     * the account and every account beneath it, which happens only when
+     * `reconcile_postings` is set and the balance holds.
      */
     public function store(StoreBalanceAssertionRequest $request): BalanceAssertionResource
     {
@@ -71,15 +71,15 @@ class BalanceAssertionController extends Controller
     }
 
     /**
-     * The asserted account's own postings in the asserted commodity dated on
-     * or before the assertion.
+     * Postings in the asserted commodity dated on or before the assertion,
+     * across the asserted account and every account beneath it.
      *
      * @return Builder<Posting>
      */
     private function accountPostingsThrough(BalanceAssertion $assertion): Builder
     {
         return Posting::query()
-            ->where('financial_postings.financial_account_id', $assertion->financial_account_id)
+            ->whereIn('financial_postings.financial_account_id', $assertion->account->subtreeIds())
             ->where('financial_postings.financial_commodity_id', $assertion->financial_commodity_id)
             ->whereHas('transaction', fn (Builder $query) => $query->where('date', '<=', $assertion->asserted_at->toDateString()));
     }

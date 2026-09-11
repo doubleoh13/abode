@@ -94,6 +94,31 @@ describe('with finance permissions', function () {
             ->and($failed[0]['financial_account_id'])->toBe($this->checking->id);
     });
 
+    test('a parent account assertion is checked against its subtree', function () {
+        $savings = Account::factory()->ofType(AccountType::Asset)->create();
+        $emergency = Account::factory()->childOf($savings)->create();
+        $deposit = Transaction::factory()->on('2026-01-31')->create();
+        journalIssuePosting($deposit, 0, $emergency, $this->usd, 100);
+        journalIssuePosting($deposit, 1, $this->gains, $this->usd, -100);
+
+        BalanceAssertion::factory()
+            ->forAccount($savings)->ofCommodity($this->usd)
+            ->create(['asserted_at' => '2026-01-31', 'balance' => 100]);
+
+        $this->getJson('/api/v1/financial/journal-issues')->assertOk()->assertJsonCount(0, 'data');
+
+        $backdated = Transaction::factory()->on('2026-01-15')->create();
+        journalIssuePosting($backdated, 0, $emergency, $this->usd, 25);
+        journalIssuePosting($backdated, 1, $this->gains, $this->usd, -25);
+
+        $response = $this->getJson('/api/v1/financial/journal-issues')->assertOk();
+        $failed = collect($response->json('data'))->where('type', 'failed_assertion')->values();
+
+        expect($failed)->toHaveCount(1)
+            ->and($failed[0]['actual'])->toBe('125')
+            ->and($failed[0]['financial_account_id'])->toBe($savings->id);
+    });
+
     test('a lot edit retroactively unbalances dependent transactions', function () {
         $lot = Lot::factory()->ofCommodity($this->fbtc)->create(['cost' => 100]);
         $buy = Transaction::factory()->on('2026-01-05')->create();

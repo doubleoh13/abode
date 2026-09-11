@@ -61,6 +61,32 @@ describe('with view permissions', function () {
             ->assertJsonPath('data.0.account.id', $brokerage->id);
     });
 
+    test('include_descendants widens the register to the subtree with one running balance', function () {
+        $taxes = Account::factory()->ofType(AccountType::Expense)->create(['name' => 'Taxes']);
+        $lastYear = Account::factory()->childOf($taxes)->create(['name' => 'TY2025']);
+        $thisYear = Account::factory()->childOf($taxes)->create(['name' => 'TY2026']);
+        $checking = Account::factory()->ofType(AccountType::Asset)->create();
+        $usd = Commodity::query()->where('code', 'USD')->firstOrFail();
+
+        foreach ([['2026-01-05', '100', $lastYear], ['2026-01-10', '50', $thisYear]] as [$date, $amount, $account]) {
+            $transaction = Transaction::factory()->on($date)->create();
+            Posting::factory()->forTransaction($transaction, 0)->inAccount($account)->ofCommodity($usd)->create(['amount' => $amount]);
+            Posting::factory()->forTransaction($transaction, 1)->inAccount($checking)->ofCommodity($usd)->create(['amount' => bcmul($amount, '-1', 2)]);
+        }
+
+        $this->getJson("/api/v1/financial/postings?financial_account_id={$taxes->id}")
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $this->getJson("/api/v1/financial/postings?financial_account_id={$taxes->id}&include_descendants=1")
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.account.id', $thisYear->id)
+            ->assertJsonPath('data.0.running_balance', '150')
+            ->assertJsonPath('data.1.account.id', $lastYear->id)
+            ->assertJsonPath('data.1.running_balance', '100');
+    });
+
     test('the register lists an account\'s postings newest first with running balances', function () {
         $checking = Account::factory()->ofType(AccountType::Asset)->create();
         $groceries = Account::factory()->ofType(AccountType::Expense)->create();

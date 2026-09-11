@@ -30,19 +30,28 @@ class LotController extends Controller
             'financial_account_id' => ['nullable', 'required_without:financial_commodity_id', 'integer', Rule::exists(Account::class, 'id')],
             'financial_commodity_id' => ['nullable', 'required_without:financial_account_id', 'integer', Rule::exists(Commodity::class, 'id')],
             'as_of' => ['nullable', 'date'],
+            /**
+             * Widen the account filter to every account beneath it.
+             */
+            'include_descendants' => ['sometimes', 'boolean'],
         ]);
 
         $accountId = $validated['financial_account_id'] ?? null;
+        $accountIds = match (true) {
+            $accountId === null => null,
+            $request->boolean('include_descendants') => Account::query()->findOrFail($accountId)->subtreeIds(),
+            default => [$accountId],
+        };
 
         $lots = Lot::query()
             ->when($validated['financial_commodity_id'] ?? null, fn (Builder $query, int $commodityId) => $query
                 ->where('financial_commodity_id', $commodityId))
-            ->when($accountId, fn (Builder $query, int $account) => $query
-                ->whereHas('postings', fn (Builder $postings) => $postings->where('financial_account_id', $account)))
+            ->when($accountIds, fn (Builder $query, array $ids) => $query
+                ->whereHas('postings', fn (Builder $postings) => $postings->whereIn('financial_account_id', $ids)))
             ->withSum([
                 'postings as open_quantity' => fn (Builder $query) => $query
-                    ->when($accountId, fn (Builder $inAccount, int $account) => $inAccount
-                        ->where('financial_account_id', $account))
+                    ->when($accountIds, fn (Builder $inAccounts, array $ids) => $inAccounts
+                        ->whereIn('financial_account_id', $ids))
                     ->when(
                         $validated['as_of'] ?? null,
                         fn (Builder $withinDate, string $asOf) => $withinDate->whereHas(

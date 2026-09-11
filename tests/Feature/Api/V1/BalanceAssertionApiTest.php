@@ -83,6 +83,35 @@ describe('with finance permissions', function () {
             ->and($savingsLeg->refresh()->status)->toBe(PostingStatus::Cleared);
     });
 
+    test('an assertion on a parent account holds against its subtree and reconciles it', function () {
+        $brokerage = Account::factory()->ofType(AccountType::Asset)->create();
+        $cash = Account::factory()->childOf($brokerage)->create();
+        $sweep = Account::factory()->childOf($brokerage)->create();
+        $legs = [];
+
+        foreach ([['2026-01-10', '100', $cash], ['2026-01-20', '50', $sweep], ['2026-02-02', '-10', $cash]] as [$date, $amount, $account]) {
+            $transaction = Transaction::factory()->on($date)->create();
+            Posting::factory()->forTransaction($transaction, 1)->inAccount($this->checking)->ofCommodity($this->usd)->create(['amount' => bcmul($amount, '-1', 2), 'status' => PostingStatus::Cleared]);
+            $legs[$date] = Posting::factory()->forTransaction($transaction, 0)->inAccount($account)->ofCommodity($this->usd)->create(['amount' => $amount, 'status' => PostingStatus::Cleared]);
+        }
+
+        $this->postJson('/api/v1/financial/balance-assertions', [
+            'financial_account_id' => $brokerage->id,
+            'financial_commodity_id' => $this->usd->id,
+            'asserted_at' => '2026-01-31',
+            'balance' => '150',
+            'reconcile_postings' => true,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('holds', true)
+            ->assertJsonPath('reconciled_postings', 2);
+
+        expect($legs['2026-01-10']->refresh()->status)->toBe(PostingStatus::Reconciled)
+            ->and($legs['2026-01-20']->refresh()->status)->toBe(PostingStatus::Reconciled)
+            ->and($legs['2026-02-02']->refresh()->status)->toBe(PostingStatus::Cleared)
+            ->and(Posting::query()->where('financial_account_id', $this->checking->id)->where('status', PostingStatus::Reconciled)->exists())->toBeFalse();
+    });
+
     test('a failing assertion is saved but reconciles nothing', function () {
         $transaction = Transaction::factory()->on('2026-01-10')->create();
         $leg = Posting::factory()->forTransaction($transaction, 0)->inAccount($this->checking)->ofCommodity($this->usd)->create(['amount' => '100', 'status' => PostingStatus::Cleared]);

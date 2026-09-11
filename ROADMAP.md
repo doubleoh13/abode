@@ -11,7 +11,6 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Backlog
 
-- Parent account pages roll up descendants into holdings and register instead of showing "No postings yet".
 - Upcoming band above the journal register for future-dated transactions, muted and separate from the paginated history.
 - Account balances shown without an as-of date currently include future-dated postings; decide whether displayed balances default to today.
 - Net Worth Over Time report: BalanceSheetBuilder sampled at period ends, hand-rolled SVG like the price chart.
@@ -30,6 +29,7 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Done
 
+- Parent account pages: Sub-accounts list with rolled-up values, holdings/lots/balance across the subtree, register spanning descendants with an Account column (GET postings|lots|accounts/{id}/balances ?include_descendants=1), New transaction only where postings are allowed (2026-09-11).
 - Account form shows the SimpleFIN picker immediately while the list loads; the four-hourly sync refreshes the cached account list so the picker is warm (2026-09-11).
 - SimpleFIN: config('financial.simplefin.ignored_description_patterns') drops Fidelity SPAXX core-position sweep rows (REDEMPTION FROM / PURCHASE INTO CORE ACCOUNT, REINVESTMENT) before staging; the dividend row itself still lands (2026-09-11).
 - Account register: Hide reconciled toggle (GET postings?hide_reconciled=1, running balances still count hidden lines), remembered per account in localStorage; while hidden, only the newest balance assertion marker shows (2026-09-11).

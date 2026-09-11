@@ -58,6 +58,28 @@ describe('with finance permissions', function () {
             ->assertJsonPath('data.0.balance', '150.5');
     });
 
+    test('balances roll up the subtree per account with include_descendants', function () {
+        $savings = Account::factory()->ofType(AccountType::Asset)->create();
+        $emergency = Account::factory()->childOf($savings)->create();
+        $vacation = Account::factory()->childOf($savings)->create();
+        $usd = Commodity::query()->where('code', 'USD')->firstOrFail();
+        $transaction = Transaction::factory()->on('2026-01-05')->create();
+        Posting::factory()->forTransaction($transaction, 0)->inAccount($emergency)->ofCommodity($usd)->create(['amount' => '500']);
+        Posting::factory()->forTransaction($transaction, 1)->inAccount($vacation)->ofCommodity($usd)->create(['amount' => '200']);
+
+        $this->getJson("/api/v1/financial/accounts/{$savings->id}/balances")
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $this->getJson("/api/v1/financial/accounts/{$savings->id}/balances?include_descendants=1")
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.financial_account_id', $emergency->id)
+            ->assertJsonPath('data.0.balance', '500')
+            ->assertJsonPath('data.1.financial_account_id', $vacation->id)
+            ->assertJsonPath('data.1.balance', '200');
+    });
+
     test('required account fields use form language', function () {
         $this->postJson('/api/v1/financial/accounts', [])
             ->assertUnprocessable()

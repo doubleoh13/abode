@@ -30,8 +30,8 @@ class JournalIssueFinder
 
     /**
      * Recompute each balance assertion against the postings dated on or
-     * before its day; edits anywhere in history can break an old
-     * reconciliation point.
+     * before its day in the asserted account and every account beneath it;
+     * edits anywhere in history can break an old reconciliation point.
      *
      * @return list<array<string, mixed>>
      */
@@ -46,7 +46,14 @@ class JournalIssueFinder
                     select coalesce(sum(posting.amount), 0)
                     from financial_postings posting
                     join financial_transactions transaction on transaction.id = posting.financial_transaction_id
-                    where posting.financial_account_id = assertion.financial_account_id
+                    where posting.financial_account_id in (
+                            with recursive subtree as (
+                                select id from financial_accounts where id = assertion.financial_account_id
+                                union all
+                                select child.id from financial_accounts child join subtree on child.parent_id = subtree.id
+                            )
+                            select id from subtree
+                        )
                         and posting.financial_commodity_id = assertion.financial_commodity_id
                         and transaction.date <= assertion.asserted_at
                 ) as actual
