@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Financial;
 
 use App\Models\Financial\Account;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rules\Unique;
 use Illuminate\Validation\Validator;
 
@@ -53,6 +54,14 @@ class UpdateAccountRequest extends StoreAccountRequest
     protected function simpleFinUniqueRule(): Unique
     {
         return parent::simpleFinUniqueRule()->ignore($this->account()->id);
+    }
+
+    /**
+     * @return Builder<Account>
+     */
+    protected function siblingAccounts(): Builder
+    {
+        return parent::siblingAccounts()->whereKeyNot($this->account()->id);
     }
 
     private function createsCycle(Account $account): bool

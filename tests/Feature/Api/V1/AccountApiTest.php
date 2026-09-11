@@ -159,6 +159,30 @@ describe('with finance permissions', function () {
             ->assertJsonPath('errors.name.0', 'An account with this name already exists under the selected parent.');
     });
 
+    test('sibling names must stay distinct as URL segments', function () {
+        $taxes = Account::factory()->create(['name' => 'Taxes']);
+        Account::factory()->childOf($taxes)->create(['name' => 'Allen-County']);
+
+        $this->postJson('/api/v1/financial/accounts', [
+            'account_type' => 'expense',
+            'parent_id' => $taxes->id,
+            'name' => 'Allen County',
+        ])->assertUnprocessable()
+            ->assertJsonPath('errors.name.0', 'Another account under the selected parent shares this name once it becomes an address.');
+    });
+
+    test('renaming keeps an account\'s own URL segment available', function () {
+        $taxes = Account::factory()->create(['name' => 'Taxes']);
+        $county = Account::factory()->childOf($taxes)->create(['name' => 'Allen-County']);
+
+        $this->putJson("/api/v1/financial/accounts/{$county->id}", [
+            'account_type' => 'expense',
+            'parent_id' => $taxes->id,
+            'name' => 'Allen County',
+        ])->assertOk()
+            ->assertJsonPath('data.slug_path', 'expenses/taxes/allen-county');
+    });
+
     test('the same name is allowed under a different parent', function () {
         $food = Account::factory()->create(['name' => 'food']);
         $travel = Account::factory()->create(['name' => 'travel']);

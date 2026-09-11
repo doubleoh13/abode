@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 #[Fillable(['account_type', 'financial_institution_id', 'simplefin_account_id', 'simplefin_synced_at', 'simplefin_balance', 'simplefin_balance_date', 'parent_id', 'allow_postings', 'name', 'opened_at', 'closed_at'])]
 class Account extends Model
@@ -84,6 +85,16 @@ class Account extends Model
 
                 return implode(':', $segments);
             },
+        );
+    }
+
+    /**
+     * The path as URL segments: "expenses/food/dining-out".
+     */
+    protected function slugPath(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => implode('/', array_map(Str::slug(...), explode(':', $this->path))),
         );
     }
 

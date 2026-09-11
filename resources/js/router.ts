@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory, type LocationQuery } from 'vue-router';
+import { createRouter, createWebHistory, type LocationQuery, type RouteLocationRaw } from 'vue-router';
 import { auth, resolveAuthenticatedUser, setupRequired } from './auth';
 import AccountPage from './pages/AccountPage.vue';
 import AccountsPage from './pages/AccountsPage.vue';
@@ -16,6 +16,7 @@ import ReportsPage from './pages/ReportsPage.vue';
 import SchedulesPage from './pages/SchedulesPage.vue';
 import SettingsPage from './pages/SettingsPage.vue';
 import SetupPage from './pages/SetupPage.vue';
+import type { Account } from './types';
 
 export const router = createRouter({
     history: createWebHistory(),
@@ -49,7 +50,11 @@ export const router = createRouter({
                             meta: { title: 'Accounts' },
                         },
                         {
-                            path: 'accounts/:id',
+                            path: 'accounts/:type(assets|liabilities|income|expenses|equity)',
+                            redirect: (to) => ({ name: 'finances.accounts', hash: `#${String(to.params.type)}` }),
+                        },
+                        {
+                            path: 'accounts/:segments+',
                             name: 'finances.account',
                             component: AccountPage,
                             meta: { title: 'Account' },
@@ -100,6 +105,14 @@ export const router = createRouter({
         { path: '/setup', name: 'setup', component: SetupPage, meta: { title: 'Setup' } },
     ],
 });
+
+export function accountRoute(account: Pick<Account, 'slug_path'>): RouteLocationRaw {
+    return { name: 'finances.account', params: { segments: account.slug_path.split('/') } };
+}
+
+export function accountTypeRoute(account: Pick<Account, 'slug_path'>): RouteLocationRaw {
+    return { name: 'finances.accounts', hash: `#${account.slug_path.split('/')[0]}` };
+}
 
 export function setPageTitle(title: string | undefined): void {
     document.title = title ? `${title} · Abode` : 'Abode';

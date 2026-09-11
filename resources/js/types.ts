@@ -41,6 +41,7 @@ export interface Account {
     account_type: AccountType;
     name: string;
     path: string;
+    slug_path: string;
     parent_id: number | null;
     allow_postings: boolean;
     institution?: Institution | null;

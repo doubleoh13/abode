@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import axios from 'axios';
 import { computed, onMounted, ref, watch } from 'vue';
+import { accountRoute } from '../router';
 import DateInput from '../components/DateInput.vue';
 import SkeletonList from '../components/SkeletonList.vue';
 import { decimalToScaledInteger, formatAmount, scaledIntegerToDecimal } from '../money';
@@ -347,7 +348,7 @@ function toggleHoldings(accountId: number): void {
                                     <span v-else class="w-4 shrink-0" />
 
                                     <RouterLink
-                                        :to="{ name: 'finances.account', params: { id: row.account.id } }"
+                                        :to="accountRoute(row.account)"
                                         class="truncate text-sm transition-colors hover:text-accent"
                                     >
                                         {{ row.account.name }}

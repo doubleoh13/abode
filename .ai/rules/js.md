@@ -1,6 +1,7 @@
 ---
 paths:
   - 'resources/js/**'
+  - resources/js/router.ts
 ---
 
 # Js
@@ -33,3 +34,6 @@ Status glyphs come from components/PostingStatusGlyph.vue everywhere a posting s
 
 ## Unmatched-import dot comes from bankImports.ts, fed by the accounts index count
 GET financial/accounts carries unmatched_bank_transactions_count (withCount of rows with a null financial_posting_id, proposals included). resources/js/bankImports.ts holds the per-account counts: AppShell refreshes it on mount and on every route change, AccountPage overwrites its own account's count after each bank-row load so approve/match/unmatch update the sidebar without navigating. The indicator is a size-1.5 bg-accent dot (title "Unmatched bank transactions") beside Finances and Accounts in the sidebar and beside the account name on the accounts list — no counts in the nav, no separate endpoint.
+
+## Account pages are addressed by slug path, resolved client-side per visit
+Account URLs are /finances/accounts/{type}/{ancestor}/.../{leaf} built from the resource's slug_path (server-computed with Str::slug per path segment: "expenses/taxes/ty2026/allen-county"). Always build links with accountRoute(account) from router.ts, never the numeric id. AccountPage resolves the route by fetching the accounts list it already needs and matching slug_path; an unknown path replaces to not-found. A type-only URL (/finances/accounts/expenses) redirects to the list with that section's hash; AccountsPage scrolls to the #{slug} section after load, and the header's type word uses accountTypeRoute. Sibling names must stay distinct as slugs (validated in Store/UpdateAccountRequest). Renaming changes the URL: AccountPage replaces to the new route after save. No cross-page account cache by decision (two browser windows would drift) — every page fetches on mount.

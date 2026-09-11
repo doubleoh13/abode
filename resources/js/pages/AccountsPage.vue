@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
+import { useRoute } from 'vue-router';
+import { accountRoute } from '../router';
 import AccountForm from '../components/AccountForm.vue';
 import ModalDialog from '../components/ModalDialog.vue';
 import SkeletonList from '../components/SkeletonList.vue';
 import type { Account, AccountType, Institution } from '../types';
 
+const route = useRoute();
 const accounts = ref<Account[]>([]);
 const institutions = ref<Institution[]>([]);
 const loaded = ref(false);
@@ -24,14 +27,21 @@ async function loadAccounts(): Promise<void> {
     loaded.value = true;
 }
 
-onMounted(loadAccounts);
+onMounted(async () => {
+    await loadAccounts();
 
-const sections: Array<{ type: AccountType; label: string }> = [
-    { type: 'asset', label: 'Assets' },
-    { type: 'liability', label: 'Liabilities' },
-    { type: 'income', label: 'Income' },
-    { type: 'expense', label: 'Expenses' },
-    { type: 'equity', label: 'Equity' },
+    if (route.hash) {
+        await nextTick();
+        document.getElementById(route.hash.slice(1))?.scrollIntoView();
+    }
+});
+
+const sections: Array<{ type: AccountType; slug: string; label: string }> = [
+    { type: 'asset', slug: 'assets', label: 'Assets' },
+    { type: 'liability', slug: 'liabilities', label: 'Liabilities' },
+    { type: 'income', slug: 'income', label: 'Income' },
+    { type: 'expense', slug: 'expenses', label: 'Expenses' },
+    { type: 'equity', slug: 'equity', label: 'Equity' },
 ];
 
 interface AccountRow {
@@ -170,7 +180,9 @@ async function deleteAccount(account: Account): Promise<void> {
             <div v-if="hasVisibleAccounts" class="mt-6 flex flex-col gap-8">
                 <section
                     v-for="section in sections.filter((candidate) => rowsByType.get(candidate.type)?.length)"
+                    :id="section.slug"
                     :key="section.type"
+                    class="scroll-mt-8"
                 >
                     <h2 class="font-mono text-xs tracking-wider text-muted uppercase">
                         {{ section.label }}
@@ -185,7 +197,7 @@ async function deleteAccount(account: Account): Promise<void> {
                             class="group flex items-center justify-between gap-4 px-4 py-2"
                         >
                             <RouterLink
-                                :to="{ name: 'finances.account', params: { id: account.id } }"
+                                :to="accountRoute(account)"
                                 class="flex items-center gap-2 text-sm transition-colors hover:text-accent"
                                 :class="account.closed_at ? 'text-muted line-through' : ''"
                                 :style="{ paddingLeft: `${depth * 1.25}rem` }"

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
-import { setPageTitle } from '../router';
+import { useRoute, useRouter } from 'vue-router';
+import { accountRoute, accountTypeRoute, setPageTitle } from '../router';
 import { setUnmatchedBankTransactionCount } from '../bankImports';
 import AccountForm from '../components/AccountForm.vue';
 import DateInput from '../components/DateInput.vue';
@@ -11,10 +11,6 @@ import ModalDialog from '../components/ModalDialog.vue';
 import PostingStatusMenu from '../components/PostingStatusMenu.vue';
 import TransactionForm from '../components/TransactionForm.vue';
 import SkeletonList from '../components/SkeletonList.vue';
-import {
-    accountPathAncestor,
-    accountPathLeaf,
-} from '../journal';
 import {
     allocateBasis,
     decimalToScaledInteger,
@@ -40,6 +36,7 @@ import type {
 } from '../types';
 
 const route = useRoute();
+const router = useRouter();
 
 const account = ref<Account | null>(null);
 const allAccounts = ref<Account[]>([]);
@@ -56,7 +53,27 @@ const registerSentinel = ref<HTMLElement | null>(null);
 const sentinelVisible = ref(false);
 const loaded = ref(false);
 
-const accountId = computed(() => Number(route.params.id));
+const slugPath = computed(() => ((route.params.segments as string[] | undefined) ?? []).join('/'));
+const accountId = ref(0);
+
+const ancestors = computed<Account[]>(() => {
+    const byId = new Map(allAccounts.value.map((candidate) => [candidate.id, candidate]));
+    const chain: Account[] = [];
+    let parent = account.value?.parent_id ?? null;
+
+    while (parent !== null) {
+        const ancestor = byId.get(parent);
+
+        if (!ancestor) {
+            break;
+        }
+
+        chain.unshift(ancestor);
+        parent = ancestor.parent_id;
+    }
+
+    return chain;
+});
 
 const reconcilable = computed(() => account.value?.account_type === 'asset' || account.value?.account_type === 'liability');
 
@@ -657,15 +674,24 @@ async function loadBalances(): Promise<void> {
 async function loadAccount(): Promise<void> {
     loaded.value = false;
     loadedPages.value = 1;
+
+    const accountsResponse = await axios.get<{ data: Account[] }>('/api/v1/financial/accounts');
+    const resolved = accountsResponse.data.data.find((candidate) => candidate.slug_path === slugPath.value);
+
+    if (!resolved) {
+        await router.replace({ name: 'not-found', params: { pathMatch: route.path.slice(1).split('/') } });
+
+        return;
+    }
+
+    accountId.value = resolved.id;
     hideReconciled.value = readHideReconciled();
 
-    const [accountResponse, lotsResponse, commoditiesResponse, accountsResponse, institutionsResponse, payeesResponse] = await Promise.all([
-        axios.get<{ data: Account }>(`/api/v1/financial/accounts/${accountId.value}`),
+    const [lotsResponse, commoditiesResponse, institutionsResponse, payeesResponse] = await Promise.all([
         axios.get<{ data: Lot[] }>('/api/v1/financial/lots', {
             params: { financial_account_id: accountId.value },
         }),
         axios.get<{ data: Commodity[] }>('/api/v1/financial/commodities'),
-        axios.get<{ data: Account[] }>('/api/v1/financial/accounts'),
         axios.get<{ data: Institution[] }>('/api/v1/financial/institutions'),
         axios.get<{ data: Payee[] }>('/api/v1/financial/payees'),
         loadBalances(),
@@ -674,7 +700,7 @@ async function loadAccount(): Promise<void> {
         loadBankTransactions(),
     ]);
 
-    account.value = accountResponse.data.data;
+    account.value = resolved;
     allAccounts.value = accountsResponse.data.data;
     institutions.value = institutionsResponse.data.data;
     payees.value = payeesResponse.data.data;
@@ -685,7 +711,7 @@ async function loadAccount(): Promise<void> {
 }
 
 onMounted(loadAccount);
-watch(accountId, () => {
+watch(slugPath, () => {
     void loadAccount();
 });
 
@@ -721,8 +747,15 @@ async function syncSimpleFin(): Promise<void> {
     }
 }
 
-async function accountSaved(): Promise<void> {
+async function accountSaved(saved: Account): Promise<void> {
     editFormOpen.value = false;
+
+    if (saved.slug_path !== slugPath.value) {
+        await router.replace(accountRoute(saved));
+
+        return;
+    }
+
     await loadAccount();
 }
 </script>
@@ -732,8 +765,12 @@ async function accountSaved(): Promise<void> {
         <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
                 <div class="flex flex-wrap items-baseline gap-3">
-                    <h1 class="text-xl font-semibold">
-                        <span class="text-muted">{{ accountPathAncestor(account?.path) }}</span>{{ accountPathLeaf(account?.path) }}
+                    <h1 v-if="account" class="text-xl font-semibold">
+                        <RouterLink :to="accountTypeRoute(account)" class="text-muted transition-colors hover:text-accent">{{ account.path.split(':')[0] }}</RouterLink><span class="text-muted">:</span>
+                        <template v-for="ancestor in ancestors" :key="ancestor.id">
+                            <RouterLink :to="accountRoute(ancestor)" class="text-muted transition-colors hover:text-accent">{{ ancestor.name }}</RouterLink><span class="text-muted">:</span>
+                        </template>
+                        <span>{{ account.name }}</span>
                     </h1>
 
                     <span v-if="account?.simplefin_account_id" class="flex items-center gap-3 font-mono text-xs tracking-wider text-muted uppercase">

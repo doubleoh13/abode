@@ -6,7 +6,9 @@ use App\Enums\Financial\AccountType;
 use App\Models\Financial\Account;
 use App\Models\Financial\Institution;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 use Illuminate\Validation\Validator;
@@ -103,6 +105,24 @@ class StoreAccountRequest extends FormRequest
                     );
                 }
             },
+            function (Validator $validator): void {
+                if ($validator->errors()->hasAny(['name', 'parent_id', 'account_type'])) {
+                    return;
+                }
+
+                $slug = Str::slug($this->string('name'));
+
+                $conflicts = $this->siblingAccounts()
+                    ->get(['name'])
+                    ->contains(fn (Account $sibling): bool => Str::slug($sibling->name) === $slug);
+
+                if ($conflicts) {
+                    $validator->errors()->add(
+                        'name',
+                        'Another account under the selected parent shares this name once it becomes an address.',
+                    );
+                }
+            },
         ];
     }
 
@@ -123,6 +143,16 @@ class StoreAccountRequest extends FormRequest
     protected function siblingUniqueNameRule(): Unique
     {
         return Rule::unique(Account::class, 'name')
+            ->where('parent_id', $this->input('parent_id'))
+            ->where('account_type', $this->input('account_type'));
+    }
+
+    /**
+     * @return Builder<Account>
+     */
+    protected function siblingAccounts(): Builder
+    {
+        return Account::query()
             ->where('parent_id', $this->input('parent_id'))
             ->where('account_type', $this->input('account_type'));
     }

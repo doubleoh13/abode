@@ -2,7 +2,7 @@
 import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { setPageTitle } from '../router';
+import { accountRoute, setPageTitle } from '../router';
 import CommodityForm from '../components/CommodityForm.vue';
 import DateInput from '../components/DateInput.vue';
 import ModalDialog from '../components/ModalDialog.vue';
@@ -354,7 +354,7 @@ watch(commodityId, () => {
                                             </button>
                                             <RouterLink
                                                 v-if="holding.account"
-                                                :to="{ name: 'finances.account', params: { id: holding.account.id } }"
+                                                :to="accountRoute(holding.account)"
                                                 class="transition-colors hover:text-accent"
                                             >
                                                 <span class="text-muted">{{ accountPathAncestor(holding.account.path) }}</span>{{ accountPathLeaf(holding.account.path) }}
@@ -525,7 +525,7 @@ watch(commodityId, () => {
 
                         <RouterLink
                             v-if="posting.account"
-                            :to="{ name: 'finances.account', params: { id: posting.account.id } }"
+                            :to="accountRoute(posting.account)"
                             class="truncate text-sm text-muted transition-colors hover:text-accent"
                             :title="posting.account.path"
                         >

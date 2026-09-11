@@ -23,6 +23,7 @@ class AccountResource extends JsonResource
             'account_type' => $this->account_type,
             'name' => $this->name,
             'path' => $this->path,
+            'slug_path' => $this->slug_path,
             'parent_id' => $this->parent_id,
             'allow_postings' => $this->allow_postings,
             'institution' => new InstitutionResource($this->whenLoaded('institution')),

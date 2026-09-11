@@ -12,6 +12,13 @@ test('path derives from ancestry with the type prefix', function () {
         ->and($diningOut->path)->toBe('Expenses:food:dining-out');
 });
 
+test('slug_path turns each path segment into a URL segment', function () {
+    $taxes = Account::factory()->create(['name' => 'Taxes']);
+    $county = Account::factory()->childOf($taxes)->create(['name' => 'Allen County']);
+
+    expect($county->slug_path)->toBe('expenses/taxes/allen-county');
+});
+
 test('path prefixes follow ledger naming', function (AccountType $accountType, string $expectedPath) {
     $account = Account::factory()->ofType($accountType)->create(['name' => 'root']);
 
