@@ -3,6 +3,7 @@ paths:
   - 'app/Http/Controllers/Api/V1/Financial/**'
   - app/Http/Controllers/Api/V1/Financial/BankTransactionController.php
   - app/Http/Controllers/Api/V1/Financial/BalanceAssertionController.php
+  - app/Http/Controllers/Api/V1/Financial/PostingController.php
 ---
 
 # V1 Financial
@@ -18,3 +19,6 @@ Unmatch nulls financial_posting_id AND appends the freed posting id to rejected_
 
 ## Reconcile-on-assert touches only the asserted account's own legs, and only when the balance holds
 POST balance-assertions accepts reconcile_postings (boolean). The assertion is always saved; the response carries holds (journal sum through asserted_at equals balance) and reconciled_postings. Postings are marked Reconciled only when holds is true AND the flag is set, and only postings in the asserted account + commodity dated <= asserted_at that carry a status — counter legs in other accounts are never changed, matching "reconciliation is per account". A failing assertion reconciles nothing; the SPA alerts and leaves statuses as they were.
+
+## Register filters wrap the running-balance window in a subquery
+PostingController::index computes running_balance with a window function over EVERY posting in scope (account and/or commodity) in a subquery (toBase + fromSub as financial_postings), then applies row filters like hide_reconciled on the outside. Never add a WHERE that drops rows inside the windowed query — the running balance on the remaining rows would silently exclude the hidden amounts. Ordering uses the subquery's transaction_date alias. Per-view preferences such as hide_reconciled live in the browser (localStorage key abode.account.{id}.hide-reconciled), not on the server — config in code, no per-user settings table.

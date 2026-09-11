@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import AccountForm from './AccountForm.vue';
 import DateInput from './DateInput.vue';
 import ComboBox from './ComboBox.vue';
@@ -35,6 +35,7 @@ const props = defineProps<{
     schedule?: RecurringTransaction | null;
     duplicateOf?: Transaction | null;
     bankTransaction?: BankTransaction | null;
+    defaultAccountId?: number | null;
     repeatRequired?: boolean;
     accounts: Account[];
     commodities: Commodity[];
@@ -48,6 +49,7 @@ const emit = defineEmits<{
     payeeCreated: [Payee];
     accountCreated: [Account];
     bankTransactionUnmatched: [];
+    savedAndContinued: [];
 }>();
 
 const baseCurrency = computed(() => {
@@ -170,7 +172,7 @@ function initialDrafts(): PostingDraft[] {
         ];
     }
 
-    return [emptyDraft(), emptyDraft()];
+    return [{ ...emptyDraft(), financial_account_id: props.defaultAccountId ?? null }, emptyDraft()];
 }
 
 const postings = ref<PostingDraft[]>(initialDrafts());
@@ -415,14 +417,27 @@ function addPosting(): void {
  * Enter on the last posting's amount starts the next posting instead of
  * submitting; anywhere else Enter still saves.
  */
+const isBalanced = computed(() => balance.value.residual === '0');
+
+/**
+ * Enter on the last amount adds a posting while the transaction is still
+ * unbalanced; once it balances, Enter falls through to the form and saves.
+ */
 function handleAmountEnter(index: number, event: KeyboardEvent): void {
-    if (index !== postings.value.length - 1) {
+    if (index !== postings.value.length - 1 || isBalanced.value || event.ctrlKey || event.metaKey) {
         return;
     }
 
     event.preventDefault();
     autofocusPostingIndex.value = postings.value.length;
     addPosting();
+}
+
+function handleFormEnter(event: KeyboardEvent): void {
+    if ((event.ctrlKey || event.metaKey) && canSaveAndContinue.value) {
+        event.preventDefault();
+        void saveAndAddAnother();
+    }
 }
 
 function removePosting(index: number): void {
@@ -539,6 +554,34 @@ async function unmatchBankTransaction(draft: PostingDraft): Promise<void> {
     emit('bankTransactionUnmatched');
 }
 
+const canSaveAndContinue = computed(() => props.transaction === null && !props.schedule && !isSchedule.value);
+
+async function saveAndAddAnother(): Promise<void> {
+    submitting.value = true;
+    errors.value = {};
+
+    try {
+        await axios.post('/api/v1/financial/transactions', transactionPayload());
+    } catch (error) {
+        if (isAxiosError(error) && error.response?.status === 422) {
+            errors.value = error.response.data.errors;
+            return;
+        }
+
+        throw error;
+    } finally {
+        submitting.value = false;
+    }
+
+    emit('savedAndContinued');
+    form.value.financial_payee_id = null;
+    form.value.memo = '';
+    postings.value = initialDrafts();
+    autofocusPostingIndex.value = null;
+    await nextTick();
+    dateInput.value?.focus();
+}
+
 async function save(): Promise<void> {
     submitting.value = true;
     errors.value = {};
@@ -580,7 +623,7 @@ async function save(): Promise<void> {
         />
     </ModalDialog>
 
-    <form class="rounded-md border border-edge bg-surface p-5" @submit.prevent="save">
+    <form class="rounded-md border border-edge bg-surface p-5" @submit.prevent="save" @keydown.enter="handleFormEnter">
         <h2 class="font-mono text-xs tracking-wider text-muted uppercase">{{ title }}</h2>
 
         <div class="mt-4 grid grid-cols-1 gap-4" :class="repeatAvailable ? 'sm:grid-cols-[1fr_1fr_1fr_auto]' : 'sm:grid-cols-3'">
@@ -735,9 +778,19 @@ async function save(): Promise<void> {
             </div>
         </div>
 
-        <div class="mt-5 flex gap-3">
-            <button type="submit" :disabled="submitting" class="button-primary">Save</button>
+        <div class="mt-5 flex justify-end gap-3">
             <button type="button" class="button-subtle" @click="emit('cancelled')">Cancel</button>
+            <button
+                v-if="canSaveAndContinue"
+                type="button"
+                :disabled="submitting"
+                class="button-subtle"
+                title="Ctrl+Enter"
+                @click="saveAndAddAnother"
+            >
+                Save and new
+            </button>
+            <button type="submit" :disabled="submitting" class="button-primary">Save</button>
         </div>
     </form>
 </template>

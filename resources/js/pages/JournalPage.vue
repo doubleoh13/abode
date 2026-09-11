@@ -323,9 +323,13 @@ function closeForm(): void {
     duplicatingTransaction.value = null;
 }
 
+async function transactionAdded(): Promise<void> {
+    await Promise.all([loadTransactions(), loadIssues()]);
+}
+
 async function transactionSaved(): Promise<void> {
     closeForm();
-    await Promise.all([loadTransactions(), loadIssues()]);
+    await transactionAdded();
 }
 
 async function refreshTransaction(transaction: Transaction): Promise<void> {
@@ -409,6 +413,7 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                     :institutions="institutions"
                     :payees="payees"
                     @saved="transactionSaved"
+                    @saved-and-continued="transactionAdded"
                     @cancelled="closeForm"
                     @payee-created="registerPayee"
                     @account-created="registerAccount"

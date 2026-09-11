@@ -88,6 +88,15 @@ describe('with view permissions', function () {
             ->assertJsonPath('data.0.bank_transaction.id', $bankRow->id)
             ->assertJsonPath('data.0.bank_transaction.posted_on', '2026-01-21')
             ->assertJsonPath('data.1.bank_transaction', null);
+
+        Posting::query()->where('financial_account_id', $checking->id)->orderBy('id')->limit(2)->update(['status' => 'reconciled']);
+
+        $this->getJson("/api/v1/financial/postings?financial_account_id={$checking->id}&hide_reconciled=1")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.amount', '-20.5')
+            ->assertJsonPath('data.0.running_balance', '49.5')
+            ->assertJsonPath('meta.total', 1);
     });
 });
 

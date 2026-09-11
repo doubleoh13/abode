@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Financial;
 
+use App\Enums\Financial\PostingStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Financial\UpdatePostingRequest;
 use App\Http\Resources\Financial\PostingResource;
@@ -27,6 +28,10 @@ class PostingController extends Controller
         $validated = $request->validate([
             'financial_account_id' => ['nullable', 'required_without:financial_commodity_id', 'integer', Rule::exists(Account::class, 'id')],
             'financial_commodity_id' => ['nullable', 'required_without:financial_account_id', 'integer', Rule::exists(Commodity::class, 'id')],
+            /**
+             * Leave reconciled postings out of the page. Running balances still count them.
+             */
+            'hide_reconciled' => ['sometimes', 'boolean'],
         ]);
 
         $eagerLoads = ['account', 'commodity', 'transaction.payee'];
@@ -38,23 +43,34 @@ class PostingController extends Controller
             $eagerLoads[] = 'bankTransaction';
         }
 
+        // Running balances are computed over every posting in scope first, so
+        // hiding reconciled lines never changes the balance shown on the rest.
+        $withRunningBalance = Posting::query()
+            ->when($validated['financial_account_id'] ?? null, fn (Builder $query, int $accountId) => $query
+                ->where('financial_account_id', $accountId))
+            ->when($validated['financial_commodity_id'] ?? null, fn (Builder $query, int $commodityId) => $query
+                ->where('financial_postings.financial_commodity_id', $commodityId))
+            ->join('financial_transactions', 'financial_transactions.id', '=', 'financial_postings.financial_transaction_id')
+            ->select('financial_postings.*')
+            ->selectRaw('financial_transactions.date as transaction_date')
+            ->selectRaw(<<<'SQL'
+                sum(financial_postings.amount) over (
+                    partition by financial_postings.financial_commodity_id
+                    order by financial_transactions.date, financial_postings.financial_transaction_id, financial_postings.position
+                ) as running_balance
+                SQL)
+            ->toBase();
+
         return PostingResource::collection(
             Posting::query()
-                ->when($validated['financial_account_id'] ?? null, fn (Builder $query, int $accountId) => $query
-                    ->where('financial_account_id', $accountId))
-                ->when($validated['financial_commodity_id'] ?? null, fn (Builder $query, int $commodityId) => $query
-                    ->where('financial_postings.financial_commodity_id', $commodityId))
-                ->join('financial_transactions', 'financial_transactions.id', '=', 'financial_postings.financial_transaction_id')
-                ->select('financial_postings.*')
-                ->selectRaw(<<<'SQL'
-                    sum(financial_postings.amount) over (
-                        partition by financial_postings.financial_commodity_id
-                        order by financial_transactions.date, financial_postings.financial_transaction_id, financial_postings.position
-                    ) as running_balance
-                    SQL)
-                ->orderByDesc('financial_transactions.date')
-                ->orderByDesc('financial_postings.financial_transaction_id')
-                ->orderByDesc('financial_postings.position')
+                ->fromSub($withRunningBalance, 'financial_postings')
+                ->when($request->boolean('hide_reconciled'), fn (Builder $query) => $query
+                    ->where(fn (Builder $query) => $query
+                        ->whereNull('status')
+                        ->orWhere('status', '!=', PostingStatus::Reconciled)))
+                ->orderByDesc('transaction_date')
+                ->orderByDesc('financial_transaction_id')
+                ->orderByDesc('position')
                 ->with($eagerLoads)
                 ->paginate(50)
                 ->withQueryString(),

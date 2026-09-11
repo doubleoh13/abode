@@ -214,6 +214,11 @@ function toggleCounterparties(posting: Posting): void {
 }
 
 const editingTransaction = ref<Transaction | null>(null);
+const creatingTransaction = ref(false);
+
+async function transactionAdded(): Promise<void> {
+    await Promise.all([loadPostings(), loadBalances(), loadBankTransactions(), loadAssertions()]);
+}
 
 async function openTransaction(posting: Posting): Promise<void> {
     if (matchingBankTransaction.value || !posting.transaction) {
@@ -231,13 +236,45 @@ async function bankTransactionUnmatched(): Promise<void> {
 
 async function transactionSaved(): Promise<void> {
     editingTransaction.value = null;
-    await Promise.all([loadPostings(), loadBalances(), loadBankTransactions(), loadAssertions()]);
+    creatingTransaction.value = false;
+    await transactionAdded();
+}
+
+function hideReconciledStorageKey(): string {
+    return `abode.account.${accountId.value}.hide-reconciled`;
+}
+
+function readHideReconciled(): boolean {
+    try {
+        return localStorage.getItem(hideReconciledStorageKey()) === '1';
+    } catch {
+        return false;
+    }
+}
+
+const hideReconciled = ref(readHideReconciled());
+
+async function toggleHideReconciled(): Promise<void> {
+    hideReconciled.value = !hideReconciled.value;
+
+    try {
+        localStorage.setItem(hideReconciledStorageKey(), hideReconciled.value ? '1' : '0');
+    } catch {
+        // The preference is a convenience; a blocked store just means it does not persist.
+    }
+
+    page.value = 1;
+    await loadPostings();
 }
 
 async function loadPostings(): Promise<void> {
     const response = (
         await axios.get<Paginated<Posting>>('/api/v1/financial/postings', {
-            params: { financial_account_id: accountId.value, page: page.value },
+            params: {
+                financial_account_id: accountId.value,
+                page: page.value,
+                ...(hideReconciled.value ? { hide_reconciled: 1 } : {}),
+            },
         })
     ).data;
 
@@ -488,16 +525,30 @@ async function deleteAssertion(assertion: BalanceAssertion): Promise<void> {
 
 type RegisterRow = { kind: 'posting'; posting: Posting } | { kind: 'assertion'; assertion: BalanceAssertion };
 
+// With reconciled lines hidden, older assertions would stack up with nothing
+// between them, so only the newest marker stays.
+const visibleAssertions = computed<BalanceAssertion[]>(() => {
+    if (!hideReconciled.value) {
+        return assertions.value;
+    }
+
+    const newest = [...assertions.value].sort(
+        (first, second) => second.asserted_at.localeCompare(first.asserted_at) || second.id - first.id,
+    )[0];
+
+    return newest ? [newest] : [];
+});
+
 const registerRows = computed<RegisterRow[]>(() => {
     if (postings.value.length === 0) {
-        return assertions.value.map((assertion) => ({ kind: 'assertion', assertion }));
+        return visibleAssertions.value.map((assertion) => ({ kind: 'assertion', assertion }));
     }
 
     const newest = postings.value[0].transaction?.date ?? '';
     const oldest = postings.value[postings.value.length - 1].transaction?.date ?? '';
     // An assertion marks the end of its day, so it renders above that day's
     // postings; markers outside this page's date span stay on their own page.
-    const queue = assertions.value
+    const queue = visibleAssertions.value
         .filter(
             (assertion) =>
                 (page.value === 1 || assertion.asserted_at <= newest) &&
@@ -560,6 +611,7 @@ async function loadBalances(): Promise<void> {
 async function loadAccount(): Promise<void> {
     loaded.value = false;
     page.value = 1;
+    hideReconciled.value = readHideReconciled();
 
     const [accountResponse, lotsResponse, commoditiesResponse, accountsResponse, institutionsResponse, payeesResponse] = await Promise.all([
         axios.get<{ data: Account }>(`/api/v1/financial/accounts/${accountId.value}`),
@@ -639,6 +691,9 @@ async function accountSaved(): Promise<void> {
                     </h1>
 
                     <span v-if="account?.simplefin_account_id" class="flex items-center gap-3 font-mono text-xs tracking-wider text-muted uppercase">
+                        <span class="rounded-sm border border-accent/40 px-1.5 py-0.5 text-accent" title="Mapped to a SimpleFIN account for import">
+                            SimpleFIN
+                        </span>
                         <span>{{ account.simplefin_synced_at ? `synced ${formatSyncedAt(account.simplefin_synced_at)}` : 'never synced' }}</span>
                         <button
                             type="button"
@@ -656,13 +711,6 @@ async function accountSaved(): Promise<void> {
                     <span v-if="account.institution">{{ account.institution.name }}</span>
                     <span v-if="account.opened_at">opened {{ account.opened_at }}</span>
                     <span v-if="account.closed_at" class="text-danger">closed {{ account.closed_at }}</span>
-                    <span
-                        v-if="account.simplefin_account_id"
-                        class="rounded-sm border border-accent/40 px-1.5 py-0.5 text-accent"
-                        title="Mapped to a SimpleFIN account for import"
-                    >
-                        SimpleFIN
-                    </span>
                     <button type="button" class="tracking-wider uppercase transition-colors hover:text-foreground" @click="editFormOpen = true">
                         Edit
                     </button>
@@ -670,6 +718,14 @@ async function accountSaved(): Promise<void> {
             </div>
 
             <div v-if="loaded && headline" class="flex items-end gap-8 text-right">
+                <button
+                    type="button"
+                    class="font-mono text-xs tracking-wider text-muted uppercase transition-colors hover:text-foreground"
+                    @click="toggleHideReconciled"
+                >
+                    {{ hideReconciled ? 'Show reconciled' : 'Hide reconciled' }}
+                </button>
+
                 <div v-if="bankBalance">
                     <div class="font-mono text-lg tabular-nums text-accent">
                         {{ formatUsd(bankBalance.value) }}
@@ -813,6 +869,23 @@ async function accountSaved(): Promise<void> {
                 </div>
             </section>
 
+            <ModalDialog :open="creatingTransaction" @close="creatingTransaction = false">
+                <TransactionForm
+                    v-if="creatingTransaction"
+                    :transaction="null"
+                    :default-account-id="accountId"
+                    :accounts="allAccounts"
+                    :commodities="commodities"
+                    :institutions="institutions"
+                    :payees="payees"
+                    @saved="transactionSaved"
+                    @saved-and-continued="transactionAdded"
+                    @cancelled="creatingTransaction = false"
+                    @payee-created="registerPayee"
+                    @account-created="registerAccount"
+                />
+            </ModalDialog>
+
             <ModalDialog :open="editingTransaction !== null" @close="editingTransaction = null">
                 <TransactionForm
                     v-if="editingTransaction"
@@ -914,9 +987,14 @@ async function accountSaved(): Promise<void> {
                 <div class="flex items-center justify-between">
                     <h2 class="font-mono text-xs tracking-wider text-muted uppercase">Register</h2>
 
-                    <button type="button" class="button-subtle" @click="openAssertionForm">
-                        New assertion
-                    </button>
+                    <span class="flex items-center gap-3">
+                        <button type="button" class="button-subtle" @click="openAssertionForm">
+                            New assertion
+                        </button>
+                        <button type="button" class="button-primary" @click="creatingTransaction = true">
+                            New transaction
+                        </button>
+                    </span>
                 </div>
 
                 <ModalDialog :open="assertionFormOpen" @close="assertionFormOpen = false">
