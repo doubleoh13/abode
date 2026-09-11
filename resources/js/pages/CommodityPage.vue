@@ -3,6 +3,7 @@ import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { setPageTitle } from '../router';
+import CommodityForm from '../components/CommodityForm.vue';
 import DateInput from '../components/DateInput.vue';
 import ModalDialog from '../components/ModalDialog.vue';
 import PaginationBar from '../components/PaginationBar.vue';
@@ -164,6 +165,13 @@ function openPriceForm(): void {
     priceFormOpen.value = true;
 }
 
+const editFormOpen = ref(false);
+
+async function commoditySaved(): Promise<void> {
+    editFormOpen.value = false;
+    await reloadPrices();
+}
+
 async function reloadPrices(): Promise<void> {
     const [commodityResponse] = await Promise.all([
         axios.get<{ data: Commodity }>(`/api/v1/financial/commodities/${commodityId.value}`),
@@ -277,8 +285,21 @@ watch(commodityId, () => {
             <span v-if="commodity" class="flex items-center gap-3 font-mono text-xs tracking-wider text-muted uppercase">
                 <span>{{ commodity.kind }}</span>
                 <span>precision {{ commodity.display_precision }}</span>
+                <button type="button" class="tracking-wider uppercase transition-colors hover:text-foreground" @click="editFormOpen = true">
+                    Edit
+                </button>
             </span>
         </div>
+
+        <ModalDialog :open="editFormOpen" @close="editFormOpen = false">
+            <CommodityForm
+                v-if="commodity"
+                :key="commodity.id"
+                :commodity="commodity"
+                @saved="commoditySaved"
+                @cancelled="editFormOpen = false"
+            />
+        </ModalDialog>
 
         <template v-if="loaded">
             <div class="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">

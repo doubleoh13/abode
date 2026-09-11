@@ -194,6 +194,13 @@ async function deleteAccount(account: Account): Promise<void> {
                             </RouterLink>
 
                             <span class="flex items-center gap-3 font-mono text-xs text-muted">
+                                <span
+                                    v-if="account.simplefin_account_id"
+                                    class="tracking-wider text-accent uppercase"
+                                    title="Mapped to a SimpleFIN account for import"
+                                >
+                                    Imports
+                                </span>
                                 <span v-if="account.institution">{{ account.institution.name }}</span>
                                 <span v-if="account.closed_at">closed {{ account.closed_at }}</span>
 

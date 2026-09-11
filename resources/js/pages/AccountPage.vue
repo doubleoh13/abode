@@ -3,6 +3,7 @@ import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { setPageTitle } from '../router';
+import AccountForm from '../components/AccountForm.vue';
 import DateInput from '../components/DateInput.vue';
 import ComboBox from '../components/ComboBox.vue';
 import ModalDialog from '../components/ModalDialog.vue';
@@ -25,6 +26,7 @@ import {
     subtractAmounts,
 } from '../money';
 import type {
+    Institution,
     Account,
     AccountBalance,
     BalanceAssertion,
@@ -38,6 +40,9 @@ import type {
 const route = useRoute();
 
 const account = ref<Account | null>(null);
+const allAccounts = ref<Account[]>([]);
+const institutions = ref<Institution[]>([]);
+const editFormOpen = ref(false);
 const balances = ref<AccountBalance[]>([]);
 const lots = ref<Lot[]>([]);
 const commodities = ref<Commodity[]>([]);
@@ -321,18 +326,22 @@ async function loadAccount(): Promise<void> {
     loaded.value = false;
     page.value = 1;
 
-    const [accountResponse, balancesResponse, lotsResponse, commoditiesResponse] = await Promise.all([
+    const [accountResponse, balancesResponse, lotsResponse, commoditiesResponse, accountsResponse, institutionsResponse] = await Promise.all([
         axios.get<{ data: Account }>(`/api/v1/financial/accounts/${accountId.value}`),
         axios.get<{ data: AccountBalance[] }>(`/api/v1/financial/accounts/${accountId.value}/balances`),
         axios.get<{ data: Lot[] }>('/api/v1/financial/lots', {
             params: { financial_account_id: accountId.value },
         }),
         axios.get<{ data: Commodity[] }>('/api/v1/financial/commodities'),
+        axios.get<{ data: Account[] }>('/api/v1/financial/accounts'),
+        axios.get<{ data: Institution[] }>('/api/v1/financial/institutions'),
         loadPostings(),
         loadAssertions(),
     ]);
 
     account.value = accountResponse.data.data;
+    allAccounts.value = accountsResponse.data.data;
+    institutions.value = institutionsResponse.data.data;
     setPageTitle(account.value.path);
     balances.value = balancesResponse.data.data;
     lots.value = lotsResponse.data.data;
@@ -344,6 +353,11 @@ onMounted(loadAccount);
 watch(accountId, () => {
     void loadAccount();
 });
+
+async function accountSaved(): Promise<void> {
+    editFormOpen.value = false;
+    await loadAccount();
+}
 </script>
 
 <template>
@@ -358,8 +372,30 @@ watch(accountId, () => {
                 <span v-if="account.institution">{{ account.institution.name }}</span>
                 <span v-if="account.opened_at">opened {{ account.opened_at }}</span>
                 <span v-if="account.closed_at" class="text-danger">closed {{ account.closed_at }}</span>
+                <span
+                    v-if="account.simplefin_account_id"
+                    class="rounded-sm border border-accent/40 px-1.5 py-0.5 text-accent"
+                    title="Mapped to a SimpleFIN account for import"
+                >
+                    Imports
+                </span>
+                <button type="button" class="tracking-wider uppercase transition-colors hover:text-foreground" @click="editFormOpen = true">
+                    Edit
+                </button>
             </span>
         </div>
+
+        <ModalDialog :open="editFormOpen" @close="editFormOpen = false">
+            <AccountForm
+                v-if="account"
+                :key="account.id"
+                :account="account"
+                :accounts="allAccounts"
+                :institutions="institutions"
+                @saved="accountSaved"
+                @cancelled="editFormOpen = false"
+            />
+        </ModalDialog>
 
         <template v-if="loaded">
             <section v-if="holdings.length > 0" class="mt-6">
