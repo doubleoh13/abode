@@ -374,6 +374,30 @@ const holdings = computed<Holding[]>(() => {
 
 const usd = computed(() => commodities.value.find((commodity) => commodity.code === 'USD'));
 
+/**
+ * The headline plus every upcoming posting at market, or null when either
+ * side cannot be valued.
+ */
+const headlineWithUpcoming = computed<string | null>(() => {
+    if (headline.value?.value == null || upcomingPostings.value.length === 0) {
+        return null;
+    }
+
+    let total = decimalToScaledInteger(headline.value.value);
+
+    for (const posting of upcomingPostings.value) {
+        const value = posting.commodity ? marketValue(posting.amount, posting.commodity) : null;
+
+        if (value === null) {
+            return null;
+        }
+
+        total += decimalToScaledInteger(value);
+    }
+
+    return scaledIntegerToDecimal(total);
+});
+
 const hasNonCashHoldings = computed(() => holdings.value.some((holding) => holding.commodity.code !== 'USD'));
 
 interface BankBalance {
@@ -1136,6 +1160,9 @@ async function accountSaved(saved: Account): Promise<void> {
                     </div>
                     <div class="mt-1 font-mono text-xs tracking-wider text-muted uppercase">
                         {{ headline.label }}<span v-if="headline.asOf"> · as of {{ headline.asOf }}</span>
+                    </div>
+                    <div v-if="headlineWithUpcoming !== null" class="mt-1 font-mono text-xs tracking-wider text-muted uppercase">
+                        {{ formatUsd(headlineWithUpcoming) }} with upcoming
                     </div>
                 </div>
             </div>
