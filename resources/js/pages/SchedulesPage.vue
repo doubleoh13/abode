@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import axios from 'axios';
 import { onMounted, ref } from 'vue';
+import { confirmAction } from '../dialogs';
 import ModalDialog from '../components/ModalDialog.vue';
 import SkeletonList from '../components/SkeletonList.vue';
 import TransactionForm from '../components/TransactionForm.vue';
@@ -73,7 +74,7 @@ async function scheduleSaved(): Promise<void> {
 }
 
 async function deleteSchedule(schedule: RecurringTransaction): Promise<void> {
-    if (!confirm(`Delete the ${schedule.payee?.name ?? schedule.memo ?? 'untitled'} schedule? Transactions it already posted stay in the journal.`)) {
+    if (!(await confirmAction(`Delete the ${schedule.payee?.name ?? schedule.memo ?? 'untitled'} schedule? Transactions it already posted stay in the journal.`, 'Delete'))) {
         return;
     }
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import axios from 'axios';
 import { onMounted, ref } from 'vue';
+import { confirmAction } from '../dialogs';
 import ModalDialog from '../components/ModalDialog.vue';
 import PayeeForm from '../components/PayeeForm.vue';
 import SkeletonList from '../components/SkeletonList.vue';
@@ -39,7 +40,7 @@ async function payeeSaved(): Promise<void> {
 }
 
 async function deletePayee(payee: Payee): Promise<void> {
-    if (!confirm(`Delete ${payee.name}?`)) {
+    if (!(await confirmAction(`Delete ${payee.name}?`, 'Delete'))) {
         return;
     }
 

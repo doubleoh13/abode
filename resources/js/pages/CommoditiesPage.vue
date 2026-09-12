@@ -2,6 +2,7 @@
 import axios from 'axios';
 import { formatAmount } from '../money';
 import { computed, onMounted, ref } from 'vue';
+import { confirmAction } from '../dialogs';
 import CommodityForm from '../components/CommodityForm.vue';
 import ModalDialog from '../components/ModalDialog.vue';
 import SkeletonList from '../components/SkeletonList.vue';
@@ -40,7 +41,7 @@ async function commoditySaved(): Promise<void> {
 }
 
 async function deleteCommodity(commodity: Commodity): Promise<void> {
-    if (!confirm(`Delete ${commodity.code}?`)) {
+    if (!(await confirmAction(`Delete ${commodity.code}?`, 'Delete'))) {
         return;
     }
 

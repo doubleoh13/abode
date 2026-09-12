@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { confirmAction, showMessage } from '../dialogs';
 import { useRoute, useRouter } from 'vue-router';
 import { accountRoute, accountTypeRoute, setPageTitle } from '../router';
 import { setUnmatchedBankTransactionCount } from '../bankImports';
@@ -718,7 +719,7 @@ async function matchTo(posting: Posting): Promise<void> {
         });
     } catch (error) {
         if (isAxiosError(error) && (error.response?.status === 422 || error.response?.status === 409)) {
-            alert(error.response.data.errors?.financial_posting_id?.[0] ?? error.response.data.message);
+            await showMessage(error.response.data.errors?.financial_posting_id?.[0] ?? error.response.data.message);
             return;
         }
 
@@ -835,12 +836,12 @@ async function saveAssertion(): Promise<void> {
     await Promise.all([loadAssertions(), loadPostings()]);
 
     if (assertionForm.reconcile_postings && !holds) {
-        alert('The journal does not match this balance, so nothing was marked reconciled.');
+        await showMessage('The journal does not match this balance, so nothing was marked reconciled.');
     }
 }
 
 async function deleteAssertion(assertion: BalanceAssertion): Promise<void> {
-    if (!confirm(`Delete the ${assertion.asserted_at} assertion?`)) {
+    if (!(await confirmAction(`Delete the ${assertion.asserted_at} assertion?`, 'Delete'))) {
         return;
     }
 
@@ -1002,7 +1003,7 @@ async function syncSimpleFin(): Promise<void> {
         await loadBankTransactions();
     } catch (error) {
         if (isAxiosError(error) && error.response?.status === 409) {
-            alert(error.response.data.message);
+            await showMessage(error.response.data.message);
             return;
         }
 

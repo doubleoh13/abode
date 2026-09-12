@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
 import { computed, nextTick, onMounted, ref } from 'vue';
+import { confirmAction, showMessage } from '../dialogs';
 import { useRoute } from 'vue-router';
 import { accountRoute } from '../router';
 import AccountForm from '../components/AccountForm.vue';
@@ -165,7 +166,7 @@ async function requestDelete(account: Account): Promise<void> {
         return;
     }
 
-    if (confirm(`Delete ${account.path}?`)) {
+    if (await confirmAction(`Delete ${account.path}?`, 'Delete')) {
         await removeAccount(account, () => axios.delete(`/api/v1/financial/accounts/${account.id}`));
     }
 }
@@ -194,7 +195,7 @@ async function removeAccount(account: Account, request: () => Promise<unknown>):
         }
 
         if (isAxiosError(error) && error.response?.status === 409) {
-            alert(error.response.data.message);
+            await showMessage(error.response.data.message);
             return;
         }
 

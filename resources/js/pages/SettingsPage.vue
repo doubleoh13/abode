@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
 import { onMounted, reactive, ref } from 'vue';
+import { confirmAction } from '../dialogs';
 import ApiTokenForm from '../components/ApiTokenForm.vue';
 import ModalDialog from '../components/ModalDialog.vue';
 import { auth, type AuthenticatedUser } from '../auth';
@@ -84,7 +85,7 @@ function openTokenForm(): void {
 }
 
 async function revokeToken(token: ApiToken): Promise<void> {
-    if (!confirm(`Revoke ${token.name}?`)) {
+    if (!(await confirmAction(`Revoke ${token.name}?`, 'Revoke'))) {
         return;
     }
 

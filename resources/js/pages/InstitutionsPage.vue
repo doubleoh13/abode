@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
 import { onMounted, ref } from 'vue';
+import { confirmAction, showMessage } from '../dialogs';
 import InstitutionForm from '../components/InstitutionForm.vue';
 import ModalDialog from '../components/ModalDialog.vue';
 import SkeletonList from '../components/SkeletonList.vue';
@@ -40,7 +41,7 @@ async function institutionSaved(): Promise<void> {
 }
 
 async function deleteInstitution(institution: Institution): Promise<void> {
-    if (!confirm(`Delete ${institution.name}?`)) {
+    if (!(await confirmAction(`Delete ${institution.name}?`, 'Delete'))) {
         return;
     }
 
@@ -49,7 +50,7 @@ async function deleteInstitution(institution: Institution): Promise<void> {
         await loadInstitutions();
     } catch (error) {
         if (isAxiosError(error) && error.response?.status === 409) {
-            alert(error.response.data.message);
+            await showMessage(error.response.data.message);
             return;
         }
 

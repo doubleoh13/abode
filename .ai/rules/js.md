@@ -16,7 +16,7 @@ All SPA code is TypeScript: .ts modules and <script setup lang="ts"> in SFCs (au
 TypeScript is pinned to 5.x: vue-tsc cannot drive the Go-based TypeScript 7 compiler.
 
 ## UI interaction patterns for CRUD pages
-CRUD pages follow one pattern (see PayeesPage as the minimal example): full-width layout, header row with h1 left + primary action button right, forms open in ModalDialog (animated, Escape/backdrop close), first field autofocused, per-field 422 errors rendered inline, row actions (Edit/Delete) as mono uppercase buttons revealed on row hover, native confirm() for deletes, 409 messages surfaced via alert().
+CRUD pages follow one pattern (see PayeesPage as the minimal example): full-width layout, header row with h1 left + primary action button right, forms open in ModalDialog (animated, Escape/backdrop close), first field autofocused, per-field 422 errors rendered inline, row actions (Edit/Delete) as mono uppercase buttons revealed on row hover. Never call window.confirm/alert/prompt: deletes and other irreversible actions await confirmAction(message, label) and 409/refusal messages await showMessage(message), both from resources/js/dialogs.ts; DialogHost (mounted once in App.vue, a nested ModalDialog so it stacks above open forms) renders the pending one. Escape/backdrop resolve false.
 Selects are always the ComboBox component (type-to-filter, arrow/Enter/Tab select, explicit "(none)" row when nullable) — never a native select. Shared form styling comes from the .input/.field-label/.button-primary/.button-subtle classes in app.css; never restyle inline.
 Shared API types live in resources/js/types.ts; auth state stays in the plain reactive auth.ts module (no Pinia).
 

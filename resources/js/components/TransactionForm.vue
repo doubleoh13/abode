@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { confirmAction } from '../dialogs';
 import AccountForm from './AccountForm.vue';
 import DateInput from './DateInput.vue';
 import ComboBox from './ComboBox.vue';
@@ -545,7 +546,7 @@ watch(
 );
 
 async function unmatchBankTransaction(draft: PostingDraft): Promise<void> {
-    if (!draft.bankTransaction || !confirm('Unmatch this bank transaction from the posting?')) {
+    if (!draft.bankTransaction || !(await confirmAction('Unmatch this bank transaction from the posting?', 'Unmatch'))) {
         return;
     }
 

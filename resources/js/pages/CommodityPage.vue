@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { confirmAction } from '../dialogs';
 import { useRoute } from 'vue-router';
 import { accountRoute, setPageTitle } from '../router';
 import CommodityForm from '../components/CommodityForm.vue';
@@ -203,7 +204,7 @@ async function savePrice(): Promise<void> {
 }
 
 async function deletePrice(point: CommodityPrice): Promise<void> {
-    if (!confirm(`Delete the ${point.priced_at.slice(0, 10)} price?`)) {
+    if (!(await confirmAction(`Delete the ${point.priced_at.slice(0, 10)} price?`, 'Delete'))) {
         return;
     }
 

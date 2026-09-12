@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import axios, { isAxiosError } from 'axios';
 import { computed, onMounted, ref, watch } from 'vue';
+import { confirmAction, showMessage } from '../dialogs';
 import DateInput from '../components/DateInput.vue';
 import ComboBox from '../components/ComboBox.vue';
 import MergeDialog from '../components/MergeDialog.vue';
@@ -372,7 +373,7 @@ async function transactionsMerged(): Promise<void> {
 }
 
 async function deleteTransaction(transaction: Transaction): Promise<void> {
-    if (!confirm(`Delete the ${transaction.date} transaction?`)) {
+    if (!(await confirmAction(`Delete the ${transaction.date} transaction?`, 'Delete'))) {
         return;
     }
 
@@ -380,7 +381,7 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
         await axios.delete(`/api/v1/financial/transactions/${transaction.id}`);
     } catch (error) {
         if (isAxiosError(error) && error.response?.status === 409) {
-            alert(error.response.data.message);
+            await showMessage(error.response.data.message);
             return;
         }
 
