@@ -21,7 +21,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/js/pages/AccountPage.vue | .ai/rules/pages.md |
 | app/Http/Requests/Financial/**, app/Http/Requests/Financial/UpdateTransactionRequest.php | .ai/rules/requests-financial.md |
 | resources/** | .ai/rules/resources.md |
-| routes/**, routes/console.php | .ai/rules/routes.md |
+| routes/**, routes/console.php, routes/api.php | .ai/rules/routes.md |
 | app/Support/Financial/SimpleFin/**, app/Support/Financial/SimpleFin/SimpleFinClient.php | .ai/rules/simple-fin.md |
 | app/Support/Financial/** | .ai/rules/support-financial.md |
 | tests/** | .ai/rules/tests.md |

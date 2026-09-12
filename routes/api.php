@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\Financial\RecurringTransactionController;
 use App\Http\Controllers\Api\V1\Financial\ReportController;
 use App\Http\Controllers\Api\V1\Financial\SimpleFinController;
 use App\Http\Controllers\Api\V1\Financial\TransactionController;
+use App\Http\Controllers\Api\V1\LoginController;
 use App\Http\Controllers\Api\V1\NoteController;
 use App\Http\Controllers\Api\V1\SetupController;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +25,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     Route::get('/setup', [SetupController::class, 'show']);
     Route::post('/setup', [SetupController::class, 'store'])->middleware('throttle:setup');
+    Route::post('/login', [LoginController::class, 'store'])->middleware('throttle:login');
 });
 
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
@@ -31,6 +33,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::patch('/user', [CurrentUserController::class, 'update']);
     Route::put('/user/password', [CurrentUserController::class, 'updatePassword']);
 
+    Route::post('/logout', [LoginController::class, 'destroy']);
     Route::apiResource('tokens', ApiTokenController::class)->only(['index', 'store', 'destroy']);
 
     Route::apiResource('notes', NoteController::class)->except('show');
