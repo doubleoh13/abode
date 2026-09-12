@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { confirmAction, showMessage } from '../dialogs';
 import { useRoute, useRouter } from 'vue-router';
 import { accountRoute, accountTypeRoute, setPageTitle } from '../router';
+import { localToday, localTomorrow } from '../journal';
 import { setUnmatchedBankTransactionCount } from '../bankImports';
 import AccountForm from '../components/AccountForm.vue';
 import DateInput from '../components/DateInput.vue';
@@ -62,7 +63,15 @@ const includeDescendants = ref(false);
 type Period = { kind: 'year'; year: number } | { kind: 'month'; year: number; month: number } | { kind: 'all' };
 
 const today = new Date();
+const todayIso = localToday();
 const period = ref<Period>({ kind: 'year', year: today.getFullYear() });
+
+/**
+ * Balances and registers end today; anything dated later is upcoming.
+ */
+function throughToday(to?: string): string {
+    return to !== undefined && to < todayIso ? to : todayIso;
+}
 const periodScoped = computed(() => account.value?.account_type === 'income' || account.value?.account_type === 'expense');
 
 function periodLabel(candidate: Period): string {
@@ -201,10 +210,10 @@ async function loadPeriodTotals(): Promise<void> {
     const descendants = includeDescendants.value ? { include_descendants: 1 } : {};
     const [years, months] = await Promise.all([
         axios.get<{ data: PeriodTotal[] }>(`/api/v1/financial/accounts/${accountId.value}/period-totals`, {
-            params: { group: 'year', ...descendants },
+            params: { group: 'year', to: todayIso, ...descendants },
         }),
         axios.get<{ data: PeriodTotal[] }>(`/api/v1/financial/accounts/${accountId.value}/period-totals`, {
-            params: { group: 'month', from: `${monthTotalsYear.value}-01-01`, to: `${monthTotalsYear.value}-12-31`, ...descendants },
+            params: { group: 'month', from: `${monthTotalsYear.value}-01-01`, to: throughToday(`${monthTotalsYear.value}-12-31`), ...descendants },
         }),
     ]);
 
@@ -544,6 +553,7 @@ async function fetchPostingsPage(page: number): Promise<Paginated<Posting>> {
                 ...(hideReconciled.value ? { hide_reconciled: 1 } : {}),
                 ...(includeDescendants.value ? { include_descendants: 1 } : {}),
                 ...periodParams.value,
+                to: throughToday(periodParams.value.to),
             },
         })
     ).data;
@@ -555,11 +565,33 @@ async function fetchPostingsPage(page: number): Promise<Paginated<Posting>> {
  */
 async function loadPostings(): Promise<void> {
     const pageNumbers = Array.from({ length: loadedPages.value }, (_, index) => index + 1);
-    const pages = await Promise.all(pageNumbers.map(fetchPostingsPage));
+    const [pages, upcoming] = await Promise.all([Promise.all(pageNumbers.map(fetchPostingsPage)), fetchUpcomingPostings()]);
 
     lastPage.value = pages[0].meta.last_page;
     loadedPages.value = Math.min(loadedPages.value, lastPage.value);
     postings.value = pages.slice(0, loadedPages.value).flatMap((response) => response.data);
+    upcomingPostings.value = upcoming;
+}
+
+const upcomingPostings = ref<Posting[]>([]);
+
+async function fetchUpcomingPostings(): Promise<Posting[]> {
+    const window = periodParams.value;
+
+    if (window.to !== undefined && window.to <= todayIso) {
+        return [];
+    }
+
+    const response = await axios.get<Paginated<Posting>>('/api/v1/financial/postings', {
+        params: {
+            financial_account_id: accountId.value,
+            ...(includeDescendants.value ? { include_descendants: 1 } : {}),
+            from: localTomorrow(),
+            ...(window.to !== undefined ? { to: window.to } : {}),
+        },
+    });
+
+    return response.data.data;
 }
 
 async function loadMorePostings(): Promise<void> {
@@ -849,7 +881,10 @@ async function deleteAssertion(assertion: BalanceAssertion): Promise<void> {
     await loadAssertions();
 }
 
-type RegisterRow = { kind: 'posting'; posting: Posting } | { kind: 'assertion'; assertion: BalanceAssertion };
+type RegisterRow =
+    | { kind: 'posting'; posting: Posting; upcoming?: boolean }
+    | { kind: 'assertion'; assertion: BalanceAssertion }
+    | { kind: 'upcoming' };
 
 // With reconciled lines hidden, older assertions would stack up with nothing
 // between them, so only the newest marker stays.
@@ -866,6 +901,14 @@ const visibleAssertions = computed<BalanceAssertion[]>(() => {
 });
 
 const registerRows = computed<RegisterRow[]>(() => {
+    const upcoming: RegisterRow[] = upcomingPostings.value.length === 0
+        ? []
+        : [{ kind: 'upcoming' }, ...upcomingPostings.value.map((posting): RegisterRow => ({ kind: 'posting', posting, upcoming: true }))];
+
+    return [...upcoming, ...settledRegisterRows()];
+});
+
+function settledRegisterRows(): RegisterRow[] {
     if (postings.value.length === 0) {
         return visibleAssertions.value.map((assertion) => ({ kind: 'assertion', assertion }));
     }
@@ -889,7 +932,7 @@ const registerRows = computed<RegisterRow[]>(() => {
     }
 
     return [...rows, ...queue.map((assertion): RegisterRow => ({ kind: 'assertion', assertion }))];
-});
+}
 
 const commodityOptions = computed(() =>
     commodities.value.map((commodity) => ({ value: commodity.id, label: commodity.code })),
@@ -927,7 +970,8 @@ async function loadBalances(): Promise<void> {
     const response = await axios.get<{ data: AccountBalance[] }>(`/api/v1/financial/accounts/${accountId.value}/balances`, {
         params: {
             ...(includeDescendants.value ? { include_descendants: 1 } : {}),
-            ...(periodParams.value.from ? { from: periodParams.value.from, as_of: periodParams.value.to } : {}),
+            ...(periodParams.value.from ? { from: periodParams.value.from } : {}),
+            as_of: throughToday(periodParams.value.to),
         },
     });
 
@@ -1486,9 +1530,12 @@ async function accountSaved(saved: Account): Promise<void> {
                         <span class="field-label text-right">Balance</span>
                         <span></span>
                     </li>
-                    <template v-for="row in registerRows" :key="row.kind === 'posting' ? `p-${row.posting.id}` : `a-${row.assertion.id}`">
+                    <template v-for="row in registerRows" :key="row.kind === 'posting' ? `p-${row.posting.id}` : row.kind === 'assertion' ? `a-${row.assertion.id}` : 'upcoming'">
+                    <li v-if="row.kind === 'upcoming'" class="bg-background/40 px-4 py-1.5 font-mono text-xs tracking-wider text-muted uppercase">
+                        Upcoming
+                    </li>
                     <li
-                        v-if="row.kind === 'assertion'"
+                        v-else-if="row.kind === 'assertion'"
                         class="grid grid-cols-[5.5rem_minmax(0,1fr)_auto] items-center gap-x-4 px-4 py-1.5 font-mono text-xs"
                         :class="issuesByAssertion.has(row.assertion.id) ? 'text-danger' : 'text-accent'"
                     >
@@ -1526,6 +1573,7 @@ async function accountSaved(saved: Account): Promise<void> {
                             'grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_8rem_8.5rem_2rem]': includeDescendants,
                             'grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_8.5rem_2rem]': !includeDescendants,
                             italic: row.posting.status === 'pending',
+                            'opacity-60': row.upcoming,
                             'cursor-pointer transition-colors hover:bg-accent/10': canMatch(row.posting),
                             'opacity-40': matchingBankTransaction && !canMatch(row.posting),
                         }"
@@ -1647,7 +1695,7 @@ async function accountSaved(saved: Account): Promise<void> {
                         </span>
 
                         <span class="text-right font-mono text-sm text-muted">
-                            {{ row.posting.running_balance !== undefined && row.posting.commodity
+                            {{ !row.upcoming && row.posting.running_balance !== undefined && row.posting.commodity
                                 ? formatAmount(row.posting.running_balance, row.posting.commodity)
                                 : '—' }}
                         </span>

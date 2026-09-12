@@ -2,6 +2,7 @@
 import axios from 'axios';
 import { computed, onMounted, ref, watch } from 'vue';
 import { accountRoute } from '../router';
+import { localToday } from '../journal';
 import DateInput from '../components/DateInput.vue';
 import SkeletonList from '../components/SkeletonList.vue';
 import { decimalToScaledInteger, formatAmount, scaledIntegerToDecimal } from '../money';
@@ -34,15 +35,6 @@ function toggleShowHoldings(): void {
     }
 }
 
-function localToday(): string {
-    const now = new Date();
-
-    return [
-        now.getFullYear(),
-        String(now.getMonth() + 1).padStart(2, '0'),
-        String(now.getDate()).padStart(2, '0'),
-    ].join('-');
-}
 
 const asOf = ref(localToday());
 

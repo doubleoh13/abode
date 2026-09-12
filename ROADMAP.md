@@ -11,8 +11,6 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Backlog
 
-- Upcoming band above the journal register for future-dated transactions, muted and separate from the paginated history.
-- Account balances shown without an as-of date currently include future-dated postings; decide whether displayed balances default to today.
 - Net Worth Over Time report: BalanceSheetBuilder sampled at period ends, hand-rolled SVG like the price chart.
 - Income Statement report.
 - Investment Performance report. Open question: attributing realized gains per commodity; start by inferring from sibling lot postings in the sale transaction.
@@ -28,6 +26,7 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Done
 
+- Balances and registers end today: account balances, holdings, period totals and the register default to as_of/to = today, and future-dated postings sit in a muted Upcoming band above the account register and the journal (the journal's band appears only while the To filter is empty) (2026-09-12).
 - Merge accounts: POST accounts/{id}/merge folds an account into a same-type target (postings, bank rows, recurring templates, notes, attachments, children, SimpleFIN mapping move; source assertions dropped; 409 when both are mapped) offered as an optional "Merge into" target in the accounts list delete dialog (2026-09-12).
 - Reconcile-on-assert: an assertion with reconcile_postings marks the subtree's postings through its date (shipped 2026-09-11 as 698de23, batch action item retired).
 - Parent account pages: Sub-accounts list with rolled-up values, holdings/lots/balance across the subtree, register spanning descendants with an Account column (GET postings|lots|accounts/{id}/balances ?include_descendants=1), New transaction only where postings are allowed (2026-09-11).

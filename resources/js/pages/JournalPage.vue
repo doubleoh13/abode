@@ -9,10 +9,7 @@ import ModalDialog from '../components/ModalDialog.vue';
 import PaginationBar from '../components/PaginationBar.vue';
 import TransactionForm from '../components/TransactionForm.vue';
 import PostingStatusMenu from '../components/PostingStatusMenu.vue';
-import {
-    accountPathAncestor,
-    accountPathLeaf,
-} from '../journal';
+import { accountPathAncestor, accountPathLeaf, isoDate, localToday, localTomorrow } from '../journal';
 import { formatAmount } from '../money';
 import type {
     Account,
@@ -98,10 +95,6 @@ const detailedFilterCount = computed(
         (filterFrom.value !== '' ? 1 : 0) +
         (filterTo.value !== '' ? 1 : 0),
 );
-
-function isoDate(date: Date): string {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
 
 interface DateRange {
     from: string;
@@ -222,23 +215,52 @@ const issuesByPosting = computed(() => {
     return map;
 });
 
-async function loadTransactions(): Promise<void> {
-    const response = (
-        await axios.get<Paginated<Transaction>>('/api/v1/financial/transactions', {
-            params: {
-                page: page.value,
-                financial_account_id: filterAccountId.value ?? undefined,
-                status: includedStatuses.value.length > 0 ? includedStatuses.value : undefined,
-                exclude_status: excludedStatuses.value.length > 0 ? excludedStatuses.value : undefined,
-                from: filterFrom.value || undefined,
-                to: filterTo.value || undefined,
-                search: searchQuery.value || undefined,
-            },
-        })
-    ).data;
+const upcomingTransactions = ref<Transaction[]>([]);
 
-    transactions.value = response.data;
-    lastPage.value = response.meta.last_page;
+interface JournalRow {
+    transaction: Transaction;
+    upcoming: boolean;
+    dividerBefore: boolean;
+}
+
+const journalRows = computed<JournalRow[]>(() => [
+    ...upcomingTransactions.value.map((transaction, index) => ({ transaction, upcoming: true, dividerBefore: index === 0 })),
+    ...transactions.value.map((transaction) => ({ transaction, upcoming: false, dividerBefore: false })),
+]);
+
+/**
+ * Without an explicit "to" the register ends today and future-dated
+ * transactions sit in their own band above it.
+ */
+async function loadTransactions(): Promise<void> {
+    const sharedParams = {
+        financial_account_id: filterAccountId.value ?? undefined,
+        status: includedStatuses.value.length > 0 ? includedStatuses.value : undefined,
+        exclude_status: excludedStatuses.value.length > 0 ? excludedStatuses.value : undefined,
+        search: searchQuery.value || undefined,
+    };
+    const showUpcoming = filterTo.value === '';
+    const tomorrow = localTomorrow();
+
+    const [response, upcoming] = await Promise.all([
+        axios.get<Paginated<Transaction>>('/api/v1/financial/transactions', {
+            params: {
+                ...sharedParams,
+                page: page.value,
+                from: filterFrom.value || undefined,
+                to: filterTo.value || localToday(),
+            },
+        }),
+        showUpcoming
+            ? axios.get<Paginated<Transaction>>('/api/v1/financial/transactions', {
+                params: { ...sharedParams, from: filterFrom.value > tomorrow ? filterFrom.value : tomorrow },
+            })
+            : Promise.resolve(null),
+    ]);
+
+    transactions.value = response.data.data;
+    lastPage.value = response.data.meta.last_page;
+    upcomingTransactions.value = upcoming?.data.data ?? [];
 }
 
 async function applyFilters(): Promise<void> {
@@ -546,7 +568,7 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                 </label>
             </div>
 
-            <p v-if="transactions.length === 0" class="mt-6 text-sm text-muted">
+            <p v-if="journalRows.length === 0" class="mt-6 text-sm text-muted">
                 {{ hasActiveFilters ? 'No matching transactions.' : 'No transactions yet.' }}
             </p>
 
@@ -554,11 +576,14 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                 v-else
                 class="mt-6 divide-y divide-edge overflow-hidden rounded-md border border-edge bg-surface"
             >
+                <template v-for="{ transaction, upcoming, dividerBefore } in journalRows" :key="transaction.id">
+                <li v-if="dividerBefore" class="bg-background/40 px-4 py-1.5 font-mono text-xs tracking-wider text-muted uppercase">
+                    Upcoming
+                </li>
                 <li
-                    v-for="transaction in transactions"
-                    :key="transaction.id"
                     class="group px-4 py-2"
                     :class="{
+                        'opacity-60': upcoming,
                         'cursor-pointer transition-colors hover:bg-edge/40': mergeSource && mergeSource.id !== transaction.id,
                         'bg-accent/10': mergeSource?.id === transaction.id,
                     }"
@@ -665,6 +690,7 @@ async function deleteTransaction(transaction: Transaction): Promise<void> {
                         </div>
                     </div>
                 </li>
+                </template>
             </ul>
 
             <PaginationBar :page="page" :last-page="lastPage" @change="changePage" />

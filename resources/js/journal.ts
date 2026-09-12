@@ -23,3 +23,17 @@ export function recurrenceLabel(frequency: RecurrenceFrequency, interval: number
 
     return interval === 1 ? `Every ${unit}` : `Every ${interval} ${unit}s`;
 }
+
+export function isoDate(date: Date): string {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+export function localToday(): string {
+    return isoDate(new Date());
+}
+
+export function localTomorrow(): string {
+    const now = new Date();
+
+    return isoDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+}
