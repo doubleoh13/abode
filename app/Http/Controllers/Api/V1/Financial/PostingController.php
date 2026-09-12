@@ -36,6 +36,12 @@ class PostingController extends Controller
              * Widen an account register to every account beneath it.
              */
             'include_descendants' => ['sometimes', 'boolean'],
+            /**
+             * Restrict the register to transactions dated within a window;
+             * running balances restart from zero at `from`.
+             */
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
         ]);
 
         $accountIds = $this->accountIds($request, $validated['financial_account_id'] ?? null);
@@ -50,9 +56,14 @@ class PostingController extends Controller
 
         // Running balances are computed over every posting in scope first, so
         // hiding reconciled lines never changes the balance shown on the rest.
+        // The date window is part of the scope: a period's balance starts at zero.
         $withRunningBalance = Posting::query()
             ->when($accountIds, fn (Builder $query, array $ids) => $query
                 ->whereIn('financial_postings.financial_account_id', $ids))
+            ->when($validated['from'] ?? null, fn (Builder $query, string $from) => $query
+                ->where('financial_transactions.date', '>=', $from))
+            ->when($validated['to'] ?? null, fn (Builder $query, string $to) => $query
+                ->where('financial_transactions.date', '<=', $to))
             ->when($validated['financial_commodity_id'] ?? null, fn (Builder $query, int $commodityId) => $query
                 ->where('financial_postings.financial_commodity_id', $commodityId))
             ->join('financial_transactions', 'financial_transactions.id', '=', 'financial_postings.financial_transaction_id')

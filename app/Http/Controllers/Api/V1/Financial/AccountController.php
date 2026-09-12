@@ -15,6 +15,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Validation\Rule;
 
 #[Group('Financial / Accounts')]
 class AccountController extends Controller
@@ -49,12 +50,14 @@ class AccountController extends Controller
     }
 
     /**
-     * Per-account, per-commodity posting sums for the account, optionally as
-     * of the end of a date and optionally across every account beneath it.
+     * Per-account, per-commodity posting sums for the account, optionally
+     * from a date, as of the end of a date, and across every account
+     * beneath it.
      */
     public function balances(Request $request, Account $account): JsonResponse
     {
         $validated = $request->validate([
+            'from' => ['nullable', 'date'],
             'as_of' => ['nullable', 'date'],
             'include_descendants' => ['sometimes', 'boolean'],
         ]);
@@ -63,6 +66,8 @@ class AccountController extends Controller
 
         $balances = Posting::query()
             ->whereIn('financial_account_id', $accountIds)
+            ->when($validated['from'] ?? null, fn (Builder $query, string $from) => $query
+                ->whereHas('transaction', fn (Builder $transaction) => $transaction->where('date', '>=', $from)))
             ->when($validated['as_of'] ?? null, fn (Builder $query, string $asOf) => $query
                 ->whereHas('transaction', fn (Builder $transaction) => $transaction->where('date', '<=', $asOf)))
             ->groupBy('financial_account_id', 'financial_commodity_id')
@@ -77,6 +82,44 @@ class AccountController extends Controller
             ]);
 
         return response()->json(['data' => $balances]);
+    }
+
+    /**
+     * Per-commodity posting sums grouped by calendar year or month, oldest
+     * first, for the account and optionally every account beneath it. Only
+     * periods with postings are returned.
+     */
+    public function periodTotals(Request $request, Account $account): JsonResponse
+    {
+        $validated = $request->validate([
+            'group' => ['required', Rule::in(['year', 'month'])],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'include_descendants' => ['sometimes', 'boolean'],
+        ]);
+
+        $accountIds = $request->boolean('include_descendants') ? $account->subtreeIds() : [$account->id];
+        $format = $validated['group'] === 'year' ? 'YYYY' : 'YYYY-MM';
+
+        $totals = Posting::query()
+            ->join('financial_transactions', 'financial_transactions.id', '=', 'financial_postings.financial_transaction_id')
+            ->whereIn('financial_postings.financial_account_id', $accountIds)
+            ->when($validated['from'] ?? null, fn (Builder $query, string $from) => $query
+                ->where('financial_transactions.date', '>=', $from))
+            ->when($validated['to'] ?? null, fn (Builder $query, string $to) => $query
+                ->where('financial_transactions.date', '<=', $to))
+            ->groupByRaw("to_char(financial_transactions.date, '{$format}'), financial_postings.financial_commodity_id")
+            ->selectRaw("to_char(financial_transactions.date, '{$format}') as period, financial_postings.financial_commodity_id, sum(financial_postings.amount) as total")
+            ->orderBy('period')
+            ->orderBy('financial_postings.financial_commodity_id')
+            ->get()
+            ->map(fn (Posting $row): array => [
+                'period' => $row->period,
+                'financial_commodity_id' => $row->financial_commodity_id,
+                'total' => (string) BigDecimal::of($row->total)->strippedOfTrailingZeros(),
+            ]);
+
+        return response()->json(['data' => $totals]);
     }
 
     public function update(UpdateAccountRequest $request, Account $account): AccountResource

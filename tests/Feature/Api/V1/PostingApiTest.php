@@ -61,6 +61,25 @@ describe('with view permissions', function () {
             ->assertJsonPath('data.0.account.id', $brokerage->id);
     });
 
+    test('a date window restarts the running balance at its start', function () {
+        $electricity = Account::factory()->ofType(AccountType::Expense)->create();
+        $checking = Account::factory()->ofType(AccountType::Asset)->create();
+        $usd = Commodity::query()->where('code', 'USD')->firstOrFail();
+
+        foreach ([['2025-12-15', '80'], ['2026-01-10', '100'], ['2026-02-10', '120'], ['2027-01-05', '90']] as [$date, $amount]) {
+            $transaction = Transaction::factory()->on($date)->create();
+            Posting::factory()->forTransaction($transaction, 0)->inAccount($electricity)->ofCommodity($usd)->create(['amount' => $amount]);
+            Posting::factory()->forTransaction($transaction, 1)->inAccount($checking)->ofCommodity($usd)->create(['amount' => bcmul($amount, '-1', 2)]);
+        }
+
+        $this->getJson("/api/v1/financial/postings?financial_account_id={$electricity->id}&from=2026-01-01&to=2026-12-31")
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.transaction.date', '2026-02-10')
+            ->assertJsonPath('data.0.running_balance', '220')
+            ->assertJsonPath('data.1.running_balance', '100');
+    });
+
     test('include_descendants widens the register to the subtree with one running balance', function () {
         $taxes = Account::factory()->ofType(AccountType::Expense)->create(['name' => 'Taxes']);
         $lastYear = Account::factory()->childOf($taxes)->create(['name' => 'TY2025']);

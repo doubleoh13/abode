@@ -30,6 +30,7 @@ import type {
     Lot,
     Paginated,
     Payee,
+    PeriodTotal,
     Posting,
     PostingStatus,
     Transaction,
@@ -56,6 +57,171 @@ const loaded = ref(false);
 const slugPath = computed(() => ((route.params.segments as string[] | undefined) ?? []).join('/'));
 const accountId = ref(0);
 const includeDescendants = ref(false);
+
+type Period = { kind: 'year'; year: number } | { kind: 'month'; year: number; month: number } | { kind: 'all' };
+
+const today = new Date();
+const period = ref<Period>({ kind: 'year', year: today.getFullYear() });
+const periodScoped = computed(() => account.value?.account_type === 'income' || account.value?.account_type === 'expense');
+
+function periodLabel(candidate: Period): string {
+    switch (candidate.kind) {
+        case 'year':
+            return String(candidate.year);
+        case 'month':
+            return `${candidate.year}-${String(candidate.month).padStart(2, '0')}`;
+        case 'all':
+            return 'All time';
+    }
+}
+
+function periodWindow(candidate: Period): { from: string; to: string } | null {
+    switch (candidate.kind) {
+        case 'year':
+            return { from: `${candidate.year}-01-01`, to: `${candidate.year}-12-31` };
+        case 'month': {
+            const lastDay = new Date(candidate.year, candidate.month, 0).getDate();
+            const month = String(candidate.month).padStart(2, '0');
+
+            return { from: `${candidate.year}-${month}-01`, to: `${candidate.year}-${month}-${String(lastDay).padStart(2, '0')}` };
+        }
+        case 'all':
+            return null;
+    }
+}
+
+const activePeriodLabel = computed(() => periodLabel(period.value));
+
+const periodParams = computed<{ from?: string; to?: string }>(() => {
+    const window = periodScoped.value ? periodWindow(period.value) : null;
+
+    return window ?? {};
+});
+
+const yearTotals = ref<PeriodTotal[]>([]);
+const monthTotals = ref<PeriodTotal[]>([]);
+const monthTotalsYear = computed(() => (period.value.kind === 'all' ? today.getFullYear() : period.value.year));
+
+interface PeriodCell {
+    period: Period;
+    label: string;
+    value: string | null;
+    share: number | null;
+}
+
+/**
+ * One cell per period label, empty periods included, with each bar sized
+ * against the largest absolute value in the row.
+ */
+function periodCells(rows: PeriodTotal[], labels: string[]): PeriodCell[] {
+    const byPeriod = new Map<string, PeriodTotal[]>();
+
+    for (const row of rows) {
+        byPeriod.set(row.period, [...(byPeriod.get(row.period) ?? []), row]);
+    }
+
+    const magnitudes = new Map<string, bigint | null>();
+
+    for (const [label, totals] of byPeriod) {
+        let magnitude: bigint | null = 0n;
+
+        for (const total of totals) {
+            const commodity = commoditiesById.value.get(total.financial_commodity_id);
+            const value = commodity ? marketValue(total.total, commodity) : null;
+
+            magnitude = magnitude === null || value === null ? null : magnitude + decimalToScaledInteger(value);
+        }
+
+        magnitudes.set(label, magnitude === null ? null : (magnitude < 0n ? -magnitude : magnitude));
+    }
+
+    const largest = [...magnitudes.values()].reduce<bigint>((max, magnitude) => (magnitude !== null && magnitude > max ? magnitude : max), 0n);
+
+    return labels.map((label) => {
+        const [year, month] = label.split('-').map(Number);
+        const totals = byPeriod.get(label) ?? [];
+        const magnitude = magnitudes.get(label) ?? null;
+
+        return {
+            period: month === undefined ? { kind: 'year', year } : { kind: 'month', year, month },
+            label,
+            value: totals.length === 0
+                ? null
+                : totals
+                    .flatMap((total) => {
+                        const commodity = commoditiesById.value.get(total.financial_commodity_id);
+
+                        return commodity ? [formatAmount(total.total, commodity)] : [];
+                    })
+                    .join(' · '),
+            share: magnitude === null || largest === 0n ? null : Number((magnitude * 1000n) / largest) / 1000,
+        };
+    });
+}
+
+const allTimeTotal = computed<string | null>(() => {
+    let total: bigint | null = 0n;
+
+    for (const row of yearTotals.value) {
+        const commodity = commoditiesById.value.get(row.financial_commodity_id);
+        const value = commodity ? marketValue(row.total, commodity) : null;
+
+        total = total === null || value === null ? null : total + decimalToScaledInteger(value);
+    }
+
+    return total === null ? null : scaledIntegerToDecimal(total);
+});
+
+const yearCells = computed<PeriodCell[]>(() => {
+    const years = yearTotals.value.map((row) => Number(row.period));
+    const first = Math.min(...years, today.getFullYear());
+    const last = Math.max(...years, today.getFullYear());
+    const labels = Array.from({ length: last - first + 1 }, (_, offset) => String(first + offset));
+
+    return periodCells(yearTotals.value, labels);
+});
+
+const monthCells = computed<PeriodCell[]>(() => {
+    const year = monthTotalsYear.value;
+    const lastMonth = year === today.getFullYear() ? today.getMonth() + 1 : 12;
+    const labels = Array.from({ length: lastMonth }, (_, offset) => `${year}-${String(offset + 1).padStart(2, '0')}`);
+
+    return periodCells(monthTotals.value, labels);
+});
+
+async function loadPeriodTotals(): Promise<void> {
+    if (!periodScoped.value) {
+        yearTotals.value = [];
+        monthTotals.value = [];
+
+        return;
+    }
+
+    const descendants = includeDescendants.value ? { include_descendants: 1 } : {};
+    const [years, months] = await Promise.all([
+        axios.get<{ data: PeriodTotal[] }>(`/api/v1/financial/accounts/${accountId.value}/period-totals`, {
+            params: { group: 'year', ...descendants },
+        }),
+        axios.get<{ data: PeriodTotal[] }>(`/api/v1/financial/accounts/${accountId.value}/period-totals`, {
+            params: { group: 'month', from: `${monthTotalsYear.value}-01-01`, to: `${monthTotalsYear.value}-12-31`, ...descendants },
+        }),
+    ]);
+
+    yearTotals.value = years.data.data;
+    monthTotals.value = months.data.data;
+}
+
+watch(period, async (selected, previous) => {
+    if (!loaded.value) {
+        return;
+    }
+
+    loadedPages.value = 1;
+
+    const yearChanged = (selected.kind === 'all' ? today.getFullYear() : selected.year) !== (previous.kind === 'all' ? today.getFullYear() : previous.year);
+
+    await Promise.all([loadPostings(), loadBalances(), ...(yearChanged ? [loadPeriodTotals()] : [])]);
+});
 
 const children = computed<Account[]>(() =>
     allAccounts.value
@@ -227,8 +393,10 @@ interface Headline {
 }
 
 const headline = computed<Headline | null>(() => {
+    const totalLabel = `Total · ${activePeriodLabel.value}`;
+
     if (holdings.value.length === 0) {
-        return null;
+        return periodScoped.value ? { label: totalLabel, value: '0', asOf: null } : null;
     }
 
     let total = 0n;
@@ -244,7 +412,7 @@ const headline = computed<Headline | null>(() => {
     }
 
     if (!hasNonCashHoldings.value) {
-        return { label: 'Balance', value: scaledIntegerToDecimal(total), asOf: null };
+        return { label: periodScoped.value ? totalLabel : 'Balance', value: scaledIntegerToDecimal(total), asOf: null };
     }
 
     const priceDates = holdings.value
@@ -374,6 +542,7 @@ async function fetchPostingsPage(page: number): Promise<Paginated<Posting>> {
                 page,
                 ...(hideReconciled.value ? { hide_reconciled: 1 } : {}),
                 ...(includeDescendants.value ? { include_descendants: 1 } : {}),
+                ...periodParams.value,
             },
         })
     ).data;
@@ -755,7 +924,10 @@ function amountClass(amount: string | null): string {
 
 async function loadBalances(): Promise<void> {
     const response = await axios.get<{ data: AccountBalance[] }>(`/api/v1/financial/accounts/${accountId.value}/balances`, {
-        params: includeDescendants.value ? { include_descendants: 1 } : {},
+        params: {
+            ...(includeDescendants.value ? { include_descendants: 1 } : {}),
+            ...(periodParams.value.from ? { from: periodParams.value.from, as_of: periodParams.value.to } : {}),
+        },
     });
 
     balances.value = response.data.data;
@@ -775,7 +947,9 @@ async function loadAccount(): Promise<void> {
     }
 
     accountId.value = resolved.id;
+    account.value = resolved;
     includeDescendants.value = accountsResponse.data.data.some((candidate) => candidate.parent_id === resolved.id);
+    period.value = { kind: 'year', year: today.getFullYear() };
     hideReconciled.value = readHideReconciled();
 
     const [lotsResponse, commoditiesResponse, institutionsResponse, payeesResponse] = await Promise.all([
@@ -789,9 +963,9 @@ async function loadAccount(): Promise<void> {
         loadPostings(),
         loadAssertions(),
         loadBankTransactions(),
+        loadPeriodTotals(),
     ]);
 
-    account.value = resolved;
     allAccounts.value = accountsResponse.data.data;
     institutions.value = institutionsResponse.data.data;
     payees.value = payeesResponse.data.data;
@@ -893,6 +1067,7 @@ async function accountSaved(saved: Account): Promise<void> {
 
             <div v-if="loaded && headline" class="flex items-end gap-8 text-right">
                 <button
+                    v-if="!periodScoped"
                     type="button"
                     class="font-mono text-xs tracking-wider text-muted uppercase transition-colors hover:text-foreground"
                     @click="toggleHideReconciled"
@@ -934,6 +1109,52 @@ async function accountSaved(saved: Account): Promise<void> {
         </ModalDialog>
 
         <template v-if="loaded">
+            <section v-if="periodScoped" class="mt-6 flex flex-col gap-2">
+                <div class="flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        class="period-cell"
+                        :class="activePeriodLabel === 'All time' ? 'border-accent/60' : 'border-edge'"
+                        @click="period = { kind: 'all' }"
+                    >
+                        <span class="font-mono text-xs tracking-wider text-muted uppercase">All time</span>
+                        <span class="mt-1 w-full text-right font-mono text-sm tabular-nums">{{ formatUsd(allTimeTotal) }}</span>
+                    </button>
+
+                    <button
+                        v-for="cell in yearCells"
+                        :key="cell.label"
+                        type="button"
+                        class="period-cell"
+                        :class="cell.label === activePeriodLabel ? 'border-accent/60' : 'border-edge'"
+                        @click="period = cell.period"
+                    >
+                        <span class="font-mono text-xs tracking-wider text-muted uppercase">{{ cell.label }}</span>
+                        <span class="mt-1 w-full text-right font-mono text-sm tabular-nums" :class="cell.value === null ? 'text-muted' : ''">{{ cell.value ?? '—' }}</span>
+                        <span class="mt-1.5 h-0.5 w-full rounded-full bg-edge">
+                            <span v-if="cell.share !== null" class="block h-full rounded-full bg-accent" :style="{ width: `${cell.share * 100}%` }" />
+                        </span>
+                    </button>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    <button
+                        v-for="cell in monthCells"
+                        :key="cell.label"
+                        type="button"
+                        class="period-cell"
+                        :class="cell.label === activePeriodLabel ? 'border-accent/60' : 'border-edge'"
+                        @click="period = cell.period"
+                    >
+                        <span class="font-mono text-xs tracking-wider text-muted uppercase">{{ cell.label }}</span>
+                        <span class="mt-1 w-full text-right font-mono text-sm tabular-nums" :class="cell.value === null ? 'text-muted' : ''">{{ cell.value ?? '—' }}</span>
+                        <span class="mt-1.5 h-0.5 w-full rounded-full bg-edge">
+                            <span v-if="cell.share !== null" class="block h-full rounded-full bg-accent" :style="{ width: `${cell.share * 100}%` }" />
+                        </span>
+                    </button>
+                </div>
+            </section>
+
             <section v-if="children.length > 0" class="mt-6">
                 <h2 class="font-mono text-xs tracking-wider text-muted uppercase">Sub-accounts</h2>
 

@@ -47,6 +47,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('transactions', TransactionController::class)->only(['index', 'show']);
             Route::apiResource('recurring-transactions', RecurringTransactionController::class)->only(['index', 'show']);
             Route::get('accounts/{account}/balances', [AccountController::class, 'balances'])->name('accounts.balances');
+            Route::get('accounts/{account}/period-totals', [AccountController::class, 'periodTotals'])->name('accounts.period-totals');
             Route::get('commodities/{commodity}/balances', [CommodityController::class, 'balances'])->name('commodities.balances');
             Route::get('commodities/{commodity}/price-series', [CommodityController::class, 'priceSeries'])->name('commodities.price-series');
             Route::apiResource('balance-assertions', BalanceAssertionController::class)->only('index');

@@ -58,6 +58,38 @@ describe('with finance permissions', function () {
             ->assertJsonPath('data.0.balance', '150.5');
     });
 
+    test('balances and period totals honor a date window', function () {
+        $utilities = Account::factory()->ofType(AccountType::Expense)->create();
+        $electricity = Account::factory()->childOf($utilities)->create();
+        $usd = Commodity::query()->where('code', 'USD')->firstOrFail();
+
+        foreach ([['2025-12-15', '80'], ['2026-01-10', '100'], ['2026-01-25', '20'], ['2026-02-10', '120']] as [$date, $amount]) {
+            $transaction = Transaction::factory()->on($date)->create();
+            Posting::factory()->forTransaction($transaction, 0)->inAccount($electricity)->ofCommodity($usd)->create(['amount' => $amount]);
+        }
+
+        $this->getJson("/api/v1/financial/accounts/{$electricity->id}/balances?from=2026-01-01&as_of=2026-12-31")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.balance', '240');
+
+        $this->getJson("/api/v1/financial/accounts/{$utilities->id}/period-totals?group=year&include_descendants=1")
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.period', '2025')
+            ->assertJsonPath('data.0.total', '80')
+            ->assertJsonPath('data.1.period', '2026')
+            ->assertJsonPath('data.1.total', '240');
+
+        $this->getJson("/api/v1/financial/accounts/{$electricity->id}/period-totals?group=month&from=2026-01-01&to=2026-12-31")
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.period', '2026-01')
+            ->assertJsonPath('data.0.total', '120')
+            ->assertJsonPath('data.1.period', '2026-02')
+            ->assertJsonPath('data.1.total', '120');
+    });
+
     test('balances roll up the subtree per account with include_descendants', function () {
         $savings = Account::factory()->ofType(AccountType::Asset)->create();
         $emergency = Account::factory()->childOf($savings)->create();

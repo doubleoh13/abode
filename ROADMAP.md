@@ -11,6 +11,7 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Backlog
 
+- Merge accounts: fold one account into another (reassign postings, bank rows, assertions, lots; then delete) so ad-hoc splits like tax-year sub-accounts can be flattened (2026-09-12).
 - Upcoming band above the journal register for future-dated transactions, muted and separate from the paginated history.
 - Account balances shown without an as-of date currently include future-dated postings; decide whether displayed balances default to today.
 - Net Worth Over Time report: BalanceSheetBuilder sampled at period ends, hand-rolled SVG like the price chart.

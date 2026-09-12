@@ -109,6 +109,12 @@ export interface AccountBalance {
     balance: string;
 }
 
+export interface PeriodTotal {
+    period: string;
+    financial_commodity_id: number;
+    total: string;
+}
+
 export interface CommodityBalance {
     financial_account_id: number;
     balance: string;
