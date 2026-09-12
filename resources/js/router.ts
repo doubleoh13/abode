@@ -7,6 +7,7 @@ import BalanceSheetPage from './pages/BalanceSheetPage.vue';
 import CommoditiesPage from './pages/CommoditiesPage.vue';
 import CommodityPage from './pages/CommodityPage.vue';
 import FinancesPage from './pages/FinancesPage.vue';
+import IncomeStatementPage from './pages/IncomeStatementPage.vue';
 import InstitutionsPage from './pages/InstitutionsPage.vue';
 import JournalPage from './pages/JournalPage.vue';
 import LoginPage from './pages/LoginPage.vue';
@@ -82,6 +83,12 @@ export const router = createRouter({
                             name: 'finances.reports.balance-sheet',
                             component: BalanceSheetPage,
                             meta: { title: 'Balance sheet' },
+                        },
+                        {
+                            path: 'reports/income-statement',
+                            name: 'finances.reports.income-statement',
+                            component: IncomeStatementPage,
+                            meta: { title: 'Income statement' },
                         },
                         {
                             path: 'institutions',

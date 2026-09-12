@@ -157,3 +157,48 @@ describe('with finance permissions', function () {
             ->assertJsonPath('data.totals.net_worth', '100');
     });
 });
+
+describe('income statement', function () {
+    beforeEach(function () {
+        actingWithPermissions(Permission::ViewFinances);
+
+        $this->usd = Commodity::query()->where('code', 'USD')->firstOrFail();
+        $this->checking = Account::factory()->ofType(AccountType::Asset)->create();
+    });
+
+    test('a window before its start is rejected', function () {
+        $this->getJson('/api/v1/financial/reports/income-statement?from=2026-02-01&to=2026-01-01')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['to']);
+    });
+
+    test('activity within the window is reported with income and expenses both positive', function () {
+        $salary = Account::factory()->ofType(AccountType::Income)->create();
+        $utilities = Account::factory()->ofType(AccountType::Expense)->create();
+        $electricity = Account::factory()->childOf($utilities)->create();
+        $fbtc = Commodity::factory()->create(['display_precision' => 8]);
+
+        balanceSheetPosting($salary, $this->usd, '-5000', '2026-01-15');
+        balanceSheetPosting($electricity, $this->usd, '120', '2026-01-20');
+        balanceSheetPosting($electricity, $this->usd, '-20', '2026-02-02');
+        balanceSheetPosting($salary, $fbtc, '-0.5', '2026-02-10');
+        balanceSheetPosting($utilities, $this->usd, '999', '2025-12-31');
+        balanceSheetPosting($this->checking, $this->usd, '5000', '2026-01-15');
+
+        $this->getJson('/api/v1/financial/reports/income-statement?from=2026-01-01&to=2026-03-31')
+            ->assertOk()
+            ->assertJsonPath('data.from', '2026-01-01')
+            ->assertJsonPath('data.to', '2026-03-31')
+            ->assertJsonCount(3, 'data.rows')
+            ->assertJsonPath('data.rows.0.financial_account_id', $salary->id)
+            ->assertJsonPath('data.rows.0.account_type', 'income')
+            ->assertJsonPath('data.rows.0.amount', '5000')
+            ->assertJsonPath('data.rows.1.financial_commodity_id', $fbtc->id)
+            ->assertJsonPath('data.rows.1.amount', '0.5')
+            ->assertJsonPath('data.rows.2.financial_account_id', $electricity->id)
+            ->assertJsonPath('data.rows.2.amount', '100')
+            ->assertJsonPath('data.totals.income', '5000')
+            ->assertJsonPath('data.totals.expenses', '100')
+            ->assertJsonPath('data.totals.net', '4900');
+    });
+});

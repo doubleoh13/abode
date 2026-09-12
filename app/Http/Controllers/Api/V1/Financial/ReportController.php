@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Financial;
 
 use App\Http\Controllers\Controller;
 use App\Support\Financial\BalanceSheetBuilder;
+use App\Support\Financial\IncomeStatementBuilder;
 use Carbon\CarbonImmutable;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
@@ -28,5 +29,27 @@ class ReportController extends Controller
             : CarbonImmutable::today();
 
         return response()->json(['data' => $balanceSheet->build($asOf)]);
+    }
+
+    /**
+     * Income and expense activity between two dates inclusive (default: the
+     * current year through today), with income earned and expenses spent
+     * both positive and a net line.
+     */
+    public function incomeStatement(Request $request, IncomeStatementBuilder $incomeStatement): JsonResponse
+    {
+        $validated = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
+        $from = isset($validated['from'])
+            ? CarbonImmutable::parse($validated['from'])
+            : CarbonImmutable::today()->startOfYear();
+        $to = isset($validated['to'])
+            ? CarbonImmutable::parse($validated['to'])
+            : CarbonImmutable::today();
+
+        return response()->json(['data' => $incomeStatement->build($from, $to)]);
     }
 }

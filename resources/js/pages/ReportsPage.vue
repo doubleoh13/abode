@@ -5,6 +5,11 @@ const reports = [
         label: 'Balance sheet',
         description: 'Assets and liabilities as of a date, valued at market, with net worth.',
     },
+    {
+        name: 'finances.reports.income-statement',
+        label: 'Income statement',
+        description: 'Income and expenses over a period, by account, with the net.',
+    },
 ];
 </script>
 

@@ -59,6 +59,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::get('lots', [LotController::class, 'index'])->name('lots.index');
             Route::get('journal-issues', [JournalIssueController::class, 'index'])->name('journal-issues.index');
             Route::get('reports/balance-sheet', [ReportController::class, 'balanceSheet'])->name('reports.balance-sheet');
+            Route::get('reports/income-statement', [ReportController::class, 'incomeStatement'])->name('reports.income-statement');
             Route::apiResource('commodity-prices', CommodityPriceController::class)->only('index');
         });
 

@@ -224,6 +224,24 @@ export interface BalanceSheet {
     };
 }
 
+export interface IncomeStatementRow {
+    financial_account_id: number;
+    financial_commodity_id: number;
+    account_type: AccountType;
+    amount: string;
+}
+
+export interface IncomeStatement {
+    from: string;
+    to: string;
+    rows: IncomeStatementRow[];
+    totals: {
+        income: string;
+        expenses: string;
+        net: string;
+    };
+}
+
 export interface PostingDraft {
     id: number | null;
     status: PostingStatus | null;

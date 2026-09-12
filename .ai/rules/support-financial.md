@@ -1,6 +1,7 @@
 ---
 paths:
   - 'app/Support/Financial/**'
+  - app/Support/Financial/IncomeStatementBuilder.php
 ---
 
 # Support Financial
@@ -10,3 +11,6 @@ Server-side report valuation (BalanceSheetBuilder) must stay bit-for-bit with mo
 
 ## Bank row matching: propose only plain, unambiguous pairs; rejection is per row
 BankTransactionMatcher::proposals pairs an account's unmatched bank rows with USD postings that have no bank link, equal amount (BigDecimal isEqualTo), and |posted_on - transaction date| <= config('financial.simplefin.match_window_days') (3). A pair is proposed ONLY when the row has exactly one candidate and that posting has exactly one candidate row; anything ambiguous stays in the band for a person. Matching runs in PHP over the small unmatched set, not in SQL. The SPA pulls proposed rows out of the Bank band and renders them on the register line with Approve/Reject. Approve = POST bank-transactions/{id}/match (also used for hand matching); a Pending posting becomes Cleared only when the bank row is not pending. Reject = POST .../reject appends the posting id to rejected_posting_ids (jsonb list on the row) so it is never proposed again; the row drops back to the band. Both 409 when the row is already linked.
+
+## Income statement signs: earned and spent are both positive; totals are currency-only
+GET financial/reports/income-statement?from&to (inclusive; default current year through today) returns per (account, commodity) rows for income and expense accounts with a non-zero sum in the window. Row amounts are reader-signed: income rows are negated from ledger sign so earned income is positive, expenses stay positive, and a refund shows as a negative expense. totals.income / totals.expenses sum currency-kind rows only (non-currency income such as shares is listed as a quantity line on the page, never valued or totalled); totals.net = income − expenses. The page (IncomeStatementPage) mirrors BalanceSheetPage: client-side tree rollup from the accounts list, collapsible parents showing the subtree total when collapsed and their own amount when expanded, and the same reports rule about server-computed signed totals applies.

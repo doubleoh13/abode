@@ -12,7 +12,6 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 ## Backlog
 
 - Net Worth Over Time report: BalanceSheetBuilder sampled at period ends, hand-rolled SVG like the price chart.
-- Income Statement report.
 - Investment Performance report. Open question: attributing realized gains per commodity; start by inferring from sibling lot postings in the sale transaction.
 - Recurring schedules with lot-bearing legs (a recurring brokerage buy needs the day's price).
 - Business-day adjustment for schedules (previous or next business day when a due date lands on a weekend).
@@ -26,6 +25,7 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Done
 
+- Income statement report: GET reports/income-statement?from&to (IncomeStatementBuilder; income earned and expenses spent both positive, currency-only totals, net = income − expenses) with a tree page at /finances/reports/income-statement and This year / Last year / This month / Last month presets (2026-09-12).
 - Balances and registers end today: account balances, holdings, period totals and the register default to as_of/to = today, and future-dated postings sit in a muted Upcoming band above the account register and the journal (the journal's band appears only while the To filter is empty) (2026-09-12).
 - Merge accounts: POST accounts/{id}/merge folds an account into a same-type target (postings, bank rows, recurring templates, notes, attachments, children, SimpleFIN mapping move; source assertions dropped; 409 when both are mapped) offered as an optional "Merge into" target in the accounts list delete dialog (2026-09-12).
 - Reconcile-on-assert: an assertion with reconcile_postings marks the subtree's postings through its date (shipped 2026-09-11 as 698de23, batch action item retired).
