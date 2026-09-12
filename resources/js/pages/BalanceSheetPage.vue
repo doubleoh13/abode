@@ -12,7 +12,27 @@ const commodities = ref<Commodity[]>([]);
 const report = ref<BalanceSheet | null>(null);
 const loaded = ref(false);
 const collapsedAccountIds = ref(new Set<number>());
-const expandedHoldingsAccountIds = ref(new Set<number>());
+const showHoldingsStorageKey = 'abode.balance-sheet.show-holdings';
+
+function readShowHoldings(): boolean {
+    try {
+        return localStorage.getItem(showHoldingsStorageKey) === '1';
+    } catch {
+        return false;
+    }
+}
+
+const showHoldings = ref(readShowHoldings());
+
+function toggleShowHoldings(): void {
+    showHoldings.value = !showHoldings.value;
+
+    try {
+        localStorage.setItem(showHoldingsStorageKey, showHoldings.value ? '1' : '0');
+    } catch {
+        // The preference is a convenience; a blocked store just means it does not persist.
+    }
+}
 
 function localToday(): string {
     const now = new Date();
@@ -269,9 +289,6 @@ function toggleCollapsed(accountId: number): void {
     collapsedAccountIds.value = toggleInSet(collapsedAccountIds.value, accountId);
 }
 
-function toggleHoldings(accountId: number): void {
-    expandedHoldingsAccountIds.value = toggleInSet(expandedHoldingsAccountIds.value, accountId);
-}
 </script>
 
 <template>
@@ -279,10 +296,21 @@ function toggleHoldings(accountId: number): void {
         <div class="flex flex-wrap items-center justify-between gap-4">
             <h1 class="text-xl font-semibold">Balance sheet</h1>
 
-            <label class="flex items-center gap-2">
-                <span class="field-label">As of</span>
-                <DateInput v-model="asOf" />
-            </label>
+            <div class="flex flex-wrap items-center gap-3">
+                <button
+                    type="button"
+                    class="button-subtle"
+                    :aria-pressed="showHoldings"
+                    @click="toggleShowHoldings"
+                >
+                    {{ showHoldings ? 'Hide holdings' : 'Show holdings' }}
+                </button>
+
+                <label class="flex items-center gap-2">
+                    <span class="field-label">As of</span>
+                    <DateInput v-model="asOf" />
+                </label>
+            </div>
         </div>
 
         <template v-if="loaded && report">
@@ -360,20 +388,7 @@ function toggleHoldings(accountId: number): void {
                                         {{ row.balance !== null ? formatBaseAmount(row.balance) : '' }}
                                     </span>
 
-                                    <button
-                                        v-if="row.holdingsListable"
-                                        type="button"
-                                        class="font-mono text-xs tracking-wider text-muted uppercase transition-colors hover:text-foreground"
-                                        :aria-expanded="expandedHoldingsAccountIds.has(row.account.id)"
-                                        @click="toggleHoldings(row.account.id)"
-                                    >
-                                        {{ row.holdings.length }}
-                                        {{ row.holdings.length === 1 ? 'holding' : 'holdings' }}
-                                    </button>
-
-                                    <template
-                                        v-if="row.holdingsListable && expandedHoldingsAccountIds.has(row.account.id)"
-                                    >
+                                    <template v-if="showHoldings && row.holdingsListable">
                                         <span
                                             v-for="holding in row.holdings"
                                             :key="holding.financial_commodity_id"
