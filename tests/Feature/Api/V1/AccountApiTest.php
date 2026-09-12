@@ -133,7 +133,7 @@ describe('with finance permissions', function () {
             ->assertJsonPath('data.3.path', 'Expenses:food:dining-out');
     });
 
-    test('the index counts each account\'s unmatched bank transactions', function () {
+    test('the index counts each account\'s postings and unmatched bank transactions', function () {
         $checking = Account::factory()->ofType(AccountType::Asset)->create();
         $savings = Account::factory()->ofType(AccountType::Asset)->create();
         $posting = Posting::factory()->inAccount($checking)->create();
@@ -143,9 +143,12 @@ describe('with finance permissions', function () {
         $response = $this->getJson('/api/v1/financial/accounts')->assertOk();
 
         $counts = collect($response->json('data'))->pluck('unmatched_bank_transactions_count', 'id');
+        $postingCounts = collect($response->json('data'))->pluck('postings_count', 'id');
 
         expect($counts[$checking->id])->toBe(2)
-            ->and($counts[$savings->id])->toBe(0);
+            ->and($counts[$savings->id])->toBe(0)
+            ->and($postingCounts[$checking->id])->toBe(1)
+            ->and($postingCounts[$savings->id])->toBe(0);
     });
 
     test('a SimpleFIN id round trips and must be unique', function () {

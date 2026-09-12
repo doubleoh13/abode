@@ -4,6 +4,7 @@ import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { accountRoute } from '../router';
 import AccountForm from '../components/AccountForm.vue';
+import ComboBox from '../components/ComboBox.vue';
 import ModalDialog from '../components/ModalDialog.vue';
 import SkeletonList from '../components/SkeletonList.vue';
 import type { Account, AccountType, Institution } from '../types';
@@ -118,15 +119,80 @@ async function accountSaved(): Promise<void> {
     await loadAccounts();
 }
 
-async function deleteAccount(account: Account): Promise<void> {
-    if (!confirm(`Delete ${account.path}?`)) {
+const deletingAccount = ref<Account | null>(null);
+const mergeTargetId = ref<number | null>(null);
+const deleteErrors = ref<Record<string, string[]>>({});
+
+const subtreeIds = computed<Set<number>>(() => {
+    const ids = new Set<number>();
+
+    if (!deletingAccount.value) {
+        return ids;
+    }
+
+    const childrenByParent = new Map<number, number[]>();
+
+    for (const account of accounts.value) {
+        if (account.parent_id !== null) {
+            childrenByParent.set(account.parent_id, [...(childrenByParent.get(account.parent_id) ?? []), account.id]);
+        }
+    }
+
+    const queue = [deletingAccount.value.id];
+
+    while (queue.length > 0) {
+        const current = queue.shift()!;
+
+        ids.add(current);
+        queue.push(...(childrenByParent.get(current) ?? []));
+    }
+
+    return ids;
+});
+
+const mergeTargetOptions = computed(() =>
+    accounts.value
+        .filter((candidate) => candidate.account_type === deletingAccount.value?.account_type && !subtreeIds.value.has(candidate.id))
+        .map((candidate) => ({ value: candidate.id, label: candidate.path })),
+);
+
+async function requestDelete(account: Account): Promise<void> {
+    if (account.postings_count) {
+        deletingAccount.value = account;
+        mergeTargetId.value = null;
+        deleteErrors.value = {};
+
         return;
     }
 
+    if (confirm(`Delete ${account.path}?`)) {
+        await removeAccount(account, () => axios.delete(`/api/v1/financial/accounts/${account.id}`));
+    }
+}
+
+async function mergeAccount(): Promise<void> {
+    const account = deletingAccount.value;
+
+    if (!account || mergeTargetId.value === null) {
+        return;
+    }
+
+    await removeAccount(account, () =>
+        axios.post(`/api/v1/financial/accounts/${account.id}/merge`, { target_account_id: mergeTargetId.value }),
+    );
+}
+
+async function removeAccount(account: Account, request: () => Promise<unknown>): Promise<void> {
     try {
-        await axios.delete(`/api/v1/financial/accounts/${account.id}`);
+        await request();
+        deletingAccount.value = null;
         await loadAccounts();
     } catch (error) {
+        if (isAxiosError(error) && error.response?.status === 422) {
+            deleteErrors.value = error.response.data.errors;
+            return;
+        }
+
         if (isAxiosError(error) && error.response?.status === 409) {
             alert(error.response.data.message);
             return;
@@ -169,6 +235,36 @@ async function deleteAccount(account: Account): Promise<void> {
                     @saved="accountSaved"
                     @cancelled="closeForm"
                 />
+            </ModalDialog>
+
+            <ModalDialog :open="deletingAccount !== null" @close="deletingAccount = null">
+                <form
+                    class="mx-auto flex w-96 flex-col gap-5 rounded-md border border-edge bg-surface p-5"
+                    @submit.prevent="mergeAccount"
+                >
+                    <h3 class="font-mono text-sm tracking-wider uppercase">Delete {{ deletingAccount?.path }}</h3>
+
+                    <p class="text-sm">
+                        {{ deletingAccount?.postings_count === 1
+                            ? '1 posting still points here. Choose where it moves.'
+                            : `${deletingAccount?.postings_count} postings still point here. Choose where they move.` }}
+                    </p>
+
+                    <div class="flex flex-col gap-1.5">
+                        <span class="field-label">Move to</span>
+                        <ComboBox v-model="mergeTargetId" :options="mergeTargetOptions" />
+                        <p v-if="deleteErrors.target_account_id" class="text-sm text-danger">
+                            {{ deleteErrors.target_account_id[0] }}
+                        </p>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button type="submit" class="button-primary" :disabled="mergeTargetId === null">
+                            Merge and delete
+                        </button>
+                        <button type="button" class="button-subtle" @click="deletingAccount = null">Cancel</button>
+                    </div>
+                </form>
             </ModalDialog>
 
             <p v-if="!hasAccounts" class="mt-6 text-sm text-muted">No accounts yet.</p>
@@ -231,7 +327,7 @@ async function deleteAccount(account: Account): Promise<void> {
                                 <button
                                     type="button"
                                     class="tracking-wider uppercase transition-opacity sm:opacity-0 sm:group-hover:opacity-100 hover:text-danger"
-                                    @click="deleteAccount(account)"
+                                    @click="requestDelete(account)"
                                 >
                                     Delete
                                 </button>

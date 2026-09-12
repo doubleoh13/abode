@@ -49,6 +49,14 @@ class Account extends Model
     }
 
     /**
+     * @return HasMany<Posting, $this>
+     */
+    public function postings(): HasMany
+    {
+        return $this->hasMany(Posting::class, 'financial_account_id');
+    }
+
+    /**
      * @return HasMany<BankTransaction, $this>
      */
     public function bankTransactions(): HasMany

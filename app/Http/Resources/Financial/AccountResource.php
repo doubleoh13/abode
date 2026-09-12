@@ -31,6 +31,7 @@ class AccountResource extends JsonResource
             'simplefin_synced_at' => $this->simplefin_synced_at?->toIso8601String(),
             'simplefin_balance' => $this->simplefin_balance === null ? null : (string) $this->simplefin_balance->strippedOfTrailingZeros(),
             'simplefin_balance_date' => $this->simplefin_balance_date?->toDateString(),
+            'postings_count' => $this->whenCounted('postings'),
             'unmatched_bank_transactions_count' => $this->whenCounted('unmatchedBankTransactions'),
             'opened_at' => $this->opened_at?->toDateString(),
             'closed_at' => $this->closed_at?->toDateString(),

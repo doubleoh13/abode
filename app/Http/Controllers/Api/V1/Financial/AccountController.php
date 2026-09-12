@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api\V1\Financial;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Financial\MergeAccountRequest;
 use App\Http\Requests\Financial\StoreAccountRequest;
 use App\Http\Requests\Financial\UpdateAccountRequest;
 use App\Http\Resources\Financial\AccountResource;
 use App\Models\Financial\Account;
 use App\Models\Financial\Posting;
+use App\Support\Financial\AccountMerger;
 use Brick\Math\BigDecimal;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Contracts\Database\Eloquent\Builder;
@@ -22,7 +24,7 @@ class AccountController extends Controller
 {
     public function index(): AnonymousResourceCollection
     {
-        $accounts = Account::query()->with('institution')->withCount('unmatchedBankTransactions')->get();
+        $accounts = Account::query()->with('institution')->withCount(['postings', 'unmatchedBankTransactions'])->get();
 
         $accountsById = $accounts->keyBy('id');
 
@@ -127,6 +129,26 @@ class AccountController extends Controller
         $account->update($request->validated());
 
         return new AccountResource($account->load('institution'));
+    }
+
+    /**
+     * Fold this account into another and delete it.
+     *
+     * Postings, bank rows, recurring templates, notes, attachments and child
+     * accounts move to the target; this account's balance assertions are
+     * dropped. The SimpleFIN mapping moves when the target has none.
+     */
+    public function merge(MergeAccountRequest $request, Account $account, AccountMerger $merger): AccountResource
+    {
+        $target = $request->targetAccount();
+
+        abort_if(
+            $account->simplefin_account_id !== null && $target->simplefin_account_id !== null,
+            Response::HTTP_CONFLICT,
+            'Both accounts are mapped to SimpleFIN. Unmap one first.',
+        );
+
+        return new AccountResource($merger->merge($account, $target)->load('institution'));
     }
 
     public function destroy(Account $account): Response

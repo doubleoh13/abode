@@ -4,6 +4,7 @@ paths:
   - app/Http/Controllers/Api/V1/Financial/BankTransactionController.php
   - app/Http/Controllers/Api/V1/Financial/BalanceAssertionController.php
   - app/Http/Controllers/Api/V1/Financial/PostingController.php
+  - app/Http/Controllers/Api/V1/Financial/AccountController.php
 ---
 
 # V1 Financial
@@ -22,3 +23,6 @@ POST balance-assertions accepts reconcile_postings (boolean). The assertion is a
 
 ## Register filters wrap the running-balance window in a subquery
 PostingController::index computes running_balance with a window function over EVERY posting in scope (account and/or commodity, optionally the account subtree, optionally the from/to date window) in a subquery (toBase + fromSub as financial_postings), then applies row filters like hide_reconciled on the outside. Scope filters (account ids, date window) belong INSIDE the windowed query because they define what the balance is over — a period's balance deliberately starts at zero at `from`. Row filters that merely hide lines (hide_reconciled) must stay OUTSIDE, or the running balance on the remaining rows would silently exclude the hidden amounts. Ordering uses the subquery's transaction_date alias. Per-view preferences such as hide_reconciled live in the browser (localStorage key abode.account.{id}.hide-reconciled), not on the server — config in code, no per-user settings table.
+
+## Merge accounts via POST accounts/{account}/merge; source assertions are dropped
+AccountMerger (App\Support\Financial) folds the route account into target_account_id inside one DB transaction: postings, bank rows, recurring posting templates, notes, attachments and child accounts are re-pointed to the target; the source's balance assertions are DELETED (they asserted a balance that no longer exists on its own — the target's remain and may surface as failed issues); the SimpleFIN mapping and sync fields move only when the target has none, and the controller 409s when both are mapped ("unmap one first") instead of silently dropping one; allow_postings is set on a target that ends up with both children and postings. MergeAccountRequest rejects self, a different type, a target inside the source subtree, and a child name/slug clash under the target. Never call Str::slug(...) as a first-class callable in a Collection map — the key is passed as the separator; wrap it in a closure. The SPA exposes it through Delete on the accounts list: an account with postings (postings_count on the index) opens a dialog whose only field is a required "Merge postings into" ComboBox (same-type accounts minus the subtree) and submits POST merge; an account without postings keeps the native confirm + DELETE (409 alert if it has children). There is no merge action on the account page.

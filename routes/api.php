@@ -64,6 +64,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
         Route::middleware('can:manage-finances')->group(function () {
             Route::apiResource('accounts', AccountController::class)->only(['store', 'update', 'destroy']);
+            Route::post('accounts/{account}/merge', [AccountController::class, 'merge'])->name('accounts.merge');
             Route::apiResource('institutions', InstitutionController::class)->only(['store', 'update', 'destroy']);
             Route::apiResource('commodities', CommodityController::class)->only(['store', 'update', 'destroy']);
             Route::apiResource('payees', PayeeController::class)->only(['store', 'update', 'destroy']);

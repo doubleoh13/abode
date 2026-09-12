@@ -49,6 +49,7 @@ export interface Account {
     simplefin_synced_at: string | null;
     simplefin_balance: string | null;
     simplefin_balance_date: string | null;
+    postings_count?: number;
     unmatched_bank_transactions_count?: number;
     opened_at: string | null;
     closed_at: string | null;

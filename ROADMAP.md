@@ -11,13 +11,11 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Backlog
 
-- Merge accounts: fold one account into another (reassign postings, bank rows, assertions, lots; then delete) so ad-hoc splits like tax-year sub-accounts can be flattened (2026-09-12).
 - Upcoming band above the journal register for future-dated transactions, muted and separate from the paginated history.
 - Account balances shown without an as-of date currently include future-dated postings; decide whether displayed balances default to today.
 - Net Worth Over Time report: BalanceSheetBuilder sampled at period ends, hand-rolled SVG like the price chart.
 - Income Statement report.
 - Investment Performance report. Open question: attributing realized gains per commodity; start by inferring from sibling lot postings in the sale transaction.
-- Reconciliation batch action: assert a balance and mark everything through that date reconciled in one step.
 - Recurring schedules with lot-bearing legs (a recurring brokerage buy needs the day's price).
 - Business-day adjustment for schedules (previous or next business day when a due date lands on a weekend).
 - Expose the default recurring lead window through the API so the form's placeholder isn't hardcoded to the config value.
@@ -30,6 +28,8 @@ Working list for Abode. Add ideas as they come up; move items to Done with the c
 
 ## Done
 
+- Merge accounts: POST accounts/{id}/merge folds an account into a same-type target (postings, bank rows, recurring templates, notes, attachments, children, SimpleFIN mapping move; source assertions dropped; 409 when both are mapped) offered as an optional "Merge into" target in the accounts list delete dialog (2026-09-12).
+- Reconcile-on-assert: an assertion with reconcile_postings marks the subtree's postings through its date (shipped 2026-09-11 as 698de23, batch action item retired).
 - Parent account pages: Sub-accounts list with rolled-up values, holdings/lots/balance across the subtree, register spanning descendants with an Account column (GET postings|lots|accounts/{id}/balances ?include_descendants=1), New transaction only where postings are allowed (2026-09-11).
 - Account form shows the SimpleFIN picker immediately while the list loads; the four-hourly sync refreshes the cached account list so the picker is warm (2026-09-11).
 - SimpleFIN: config('financial.simplefin.ignored_description_patterns') drops Fidelity SPAXX core-position sweep rows (REDEMPTION FROM / PURCHASE INTO CORE ACCOUNT, REINVESTMENT) before staging; the dividend row itself still lands (2026-09-11).

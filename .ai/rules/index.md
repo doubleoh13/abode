@@ -25,4 +25,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Support/Financial/SimpleFin/**, app/Support/Financial/SimpleFin/SimpleFinClient.php | .ai/rules/simple-fin.md |
 | app/Support/Financial/** | .ai/rules/support-financial.md |
 | tests/** | .ai/rules/tests.md |
-| app/Http/Controllers/Api/V1/Financial/**, app/Http/Controllers/Api/V1/Financial/BankTransactionController.php, app/Http/Controllers/Api/V1/Financial/BalanceAssertionController.php, app/Http/Controllers/Api/V1/Financial/PostingController.php | .ai/rules/v1-financial.md |
+| app/Http/Controllers/Api/V1/Financial/**, app/Http/Controllers/Api/V1/Financial/BankTransactionController.php, app/Http/Controllers/Api/V1/Financial/BalanceAssertionController.php, app/Http/Controllers/Api/V1/Financial/PostingController.php, app/Http/Controllers/Api/V1/Financial/AccountController.php | .ai/rules/v1-financial.md |
